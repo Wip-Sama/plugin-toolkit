@@ -27,6 +27,7 @@ Added:
   - Cpu utilization and core count monitoring
   - Time series monitoring for jobs (resource monitoring is now done constantly and kept)
   - Export flow as images to share your work /be wary that big flows may take a lto of resources to render in good quality
+  - Multiple scratch disk support
 Changes:
 	- Node can now be focused by simply changing a value
   - Improved interactions with the flow editor, from trackpad to mouse (zoom is now handled with ctrl) panning can be done by scrolling

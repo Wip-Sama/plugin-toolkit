@@ -19,6 +19,7 @@ import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
+import org.koin.core.component.KoinComponent
 import org.wip.plugintoolkit.api.JobHandle
 import org.wip.plugintoolkit.api.PluginLogger
 import org.wip.plugintoolkit.api.RelativePath
@@ -47,7 +48,7 @@ class JobManager(
     /** Injected [AppScope] for managing job lifecycles and worker coordination. */
     private val scope: CoroutineScope,
     private val settingsRepository: SettingsRepository
-) {
+) : KoinComponent {
     private val maxConcurrentJobs get() = maxOf(1, settingsRepository.settings.value.jobs.maxConcurrentJobs)
     private val maxEndedJobs get() = settingsRepository.settings.value.jobs.maxEndedJobs
     private val maxHistoryLength get() = settingsRepository.settings.value.jobs.maxHistoryLength
@@ -1073,8 +1074,13 @@ class JobManager(
         activeJobPeakMemory.remove(jobId)
         if (job != null && job.resumeState != null) {
             try {
-                val appDataDir = settingsPersistence.getSettingsDir()
-                FileUtils.deleteDirectory("$appDataDir/jobs/$jobId/sandbox")
+                val scratchDiskManager: ScratchDiskManager? = getKoin().getOrNull()
+                if (scratchDiskManager != null) {
+                    scratchDiskManager.deleteJobSandbox(jobId, job.scratchDir)
+                } else {
+                    val appDataDir = settingsPersistence.getSettingsDir()
+                    FileUtils.deleteDirectory("$appDataDir/jobs/$jobId/sandbox")
+                }
             } catch (_: Exception) {}
         }
     }
@@ -1090,8 +1096,13 @@ class JobManager(
             activeJobPeakMemory.remove(job.id)
             if (job.resumeState != null) {
                 try {
-                    val appDataDir = settingsPersistence.getSettingsDir()
-                    FileUtils.deleteDirectory("$appDataDir/jobs/${job.id}/sandbox")
+                    val scratchDiskManager: ScratchDiskManager? = getKoin().getOrNull()
+                    if (scratchDiskManager != null) {
+                        scratchDiskManager.deleteJobSandbox(job.id, job.scratchDir)
+                    } else {
+                        val appDataDir = settingsPersistence.getSettingsDir()
+                        FileUtils.deleteDirectory("$appDataDir/jobs/${job.id}/sandbox")
+                    }
                 } catch (_: Exception) {}
             }
         }

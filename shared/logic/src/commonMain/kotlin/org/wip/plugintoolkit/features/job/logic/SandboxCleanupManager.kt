@@ -29,7 +29,23 @@ class SandboxCleanupManager {
      * for orphaned job directories that are no longer active in [JobManager].
      */
     suspend fun cleanOrphanSandboxes(appDataDir: String, activeJobIds: Set<String>) {
-        // 1. Attempt pending deferred deletions
+        cleanPendingDeletions()
+        val jobsDir = Path("$appDataDir/jobs")
+        scanAndCleanJobsDir(jobsDir, activeJobIds)
+    }
+
+    /**
+     * Cleans orphaned job directories across all candidate roots managed by [scratchDiskManager].
+     */
+    suspend fun cleanOrphanSandboxes(scratchDiskManager: ScratchDiskManager, activeJobIds: Set<String>) {
+        cleanPendingDeletions()
+        for (root in scratchDiskManager.getAllCandidateRoots()) {
+            val jobsDir = Path("$root/jobs")
+            scanAndCleanJobsDir(jobsDir, activeJobIds)
+        }
+    }
+
+    private suspend fun cleanPendingDeletions() {
         val currentPending = mutex.withLock { pendingDeletions.toList() }
         for (pathStr in currentPending) {
             val path = Path(pathStr)
@@ -45,11 +61,11 @@ class SandboxCleanupManager {
                 mutex.withLock { pendingDeletions.remove(pathStr) }
             }
         }
+    }
 
-        val jobsDir = Path("$appDataDir/jobs")
+    private suspend fun scanAndCleanJobsDir(jobsDir: Path, activeJobIds: Set<String>) {
         if (!SystemFileSystem.exists(jobsDir)) return
 
-        // 2. Scan jobs directory for orphaned job sandboxes
         try {
             val entries = SystemFileSystem.list(jobsDir)
             for (entry in entries) {
@@ -68,7 +84,7 @@ class SandboxCleanupManager {
                 }
             }
         } catch (e: Exception) {
-            Logger.e(e) { "SandboxCleanupManager: Error scanning jobs directory for orphans" }
+            Logger.e(e) { "SandboxCleanupManager: Error scanning jobs directory for orphans at $jobsDir" }
         }
     }
 }

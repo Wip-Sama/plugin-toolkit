@@ -498,7 +498,8 @@ class FlowEngine(
                         if (jsonVal !is JsonNull) capabilityParameters[port.id] = jsonVal
                     }
 
-                    val nodeSandbox = "$appDataDir/jobs/${job.id}/sandbox/node_${node.id}"
+                    val scratchDiskManager: ScratchDiskManager = getKoin().getOrNull() ?: ScratchDiskManager()
+                    val nodeSandbox = scratchDiskManager.getJobNodeSandboxDir(job.id, "node_${node.id}", job.scratchDir)
 
                     node.capability.parameters?.forEach { (key, meta) ->
                         val isOutputLocation = meta.role == ParameterRole.OUTPUT_LOCATION

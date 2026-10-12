@@ -32,6 +32,7 @@ import org.wip.plugintoolkit.features.settings.model.FlowSettings
 import org.wip.plugintoolkit.features.settings.model.GeneralSettings
 import org.wip.plugintoolkit.features.settings.model.OrthogonalStepMode
 import org.wip.plugintoolkit.features.settings.model.WindowStartMode
+import org.wip.plugintoolkit.features.settings.ui.ConfigureScratchDisksControl
 import org.wip.plugintoolkit.features.settings.ui.SettingNavKey
 import org.wip.plugintoolkit.features.settings.utils.SettingText
 import org.wip.plugintoolkit.features.settings.utils.SettingsRegistryBuilder
@@ -143,6 +144,16 @@ fun SettingsRegistryBuilder.systemDefinitions(
                                 }
                             }
                         )
+                    }
+                )
+
+                custom(
+                    id = "general.scratchDisks",
+                    title = Res.string.setting_scratch_disks,
+                    icon = Icons.Default.Storage,
+                    subtitle = SettingText.Resource(Res.string.setting_scratch_disks_subtitle),
+                    control = { settings, onUpdate ->
+                        ConfigureScratchDisksControl(settings, onUpdate)
                     }
                 )
             }

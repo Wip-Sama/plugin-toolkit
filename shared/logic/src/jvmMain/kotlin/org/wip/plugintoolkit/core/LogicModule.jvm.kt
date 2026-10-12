@@ -22,6 +22,7 @@ import org.wip.plugintoolkit.features.flows.logic.ReactiveCapabilityLockTracker
 import org.wip.plugintoolkit.features.job.logic.DefaultSystemNodeExecutorRegistry
 import org.wip.plugintoolkit.features.job.logic.JobManager
 import org.wip.plugintoolkit.features.job.logic.SandboxCleanupManager
+import org.wip.plugintoolkit.features.job.logic.ScratchDiskManager
 import org.wip.plugintoolkit.features.job.logic.SystemNodeExecutorRegistry
 import org.wip.plugintoolkit.features.plugin.logic.PluginFolderManager
 import org.wip.plugintoolkit.features.plugin.logic.PluginInstaller
@@ -75,6 +76,7 @@ actual val logicModule: Module = module {
     single { PluginScanner(get(), get()) }
     single { PluginManager(get(), get(), get(), get(), get(), get(), get(), get(named("LoomScope"))) }
     single { SandboxCleanupManager() }
+    single { ScratchDiskManager(get(), get()) }
     single { JobManager(get(named("LoomScope")), get()) }
     single { FlowExecutionGuard({ getOrNull<JobManager>() }, { getOrNull<FlowRepository>()?.flows?.value ?: emptyList() }) }
     single { FlowRepository(get(), get(), get(named("LoomScope")), get(), get()) }

@@ -126,6 +126,17 @@ enum class CacheManagementMode {
 }
 
 /**
+ * Configuration for a scratch disk location used for temporary buffers and job execution sandboxes.
+ */
+@Serializable
+data class ScratchDiskConfig(
+    val id: String = "",
+    val path: String = "",
+    val priority: Int = 1,
+    val enabled: Boolean = true
+)
+
+/**
  * General application layout, animation, and startup behavior.
  */
 @Serializable
@@ -138,9 +149,13 @@ data class GeneralSettings(
     val closeToTray: Boolean = false,
     val cacheManagement: CacheManagementMode = CacheManagementMode.SystemManaged,
     val singleInstanceLock: Boolean = true,
-    val maxMemoryMb: Int = DEFAULT_MAX_MEMORY_MB
+    val maxMemoryMb: Int = DEFAULT_MAX_MEMORY_MB,
+    val scratchDisks: List<ScratchDiskConfig> = emptyList()
 ) {
     fun effectiveMaxMemoryMb(): Int = maxMemoryMb.coerceAtLeast(MIN_MAX_MEMORY_MB)
+
+    fun sortedScratchDisks(): List<ScratchDiskConfig> =
+        scratchDisks.sortedWith(compareBy<ScratchDiskConfig> { it.priority }.thenBy { it.path })
 
     companion object {
         const val MIN_MAX_MEMORY_MB: Int = 1024

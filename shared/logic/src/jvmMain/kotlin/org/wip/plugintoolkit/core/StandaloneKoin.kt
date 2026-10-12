@@ -13,6 +13,7 @@ import org.wip.plugintoolkit.core.utils.SemanticRegistry
 import org.wip.plugintoolkit.features.job.logic.DefaultSystemNodeExecutorRegistry
 import org.wip.plugintoolkit.features.job.logic.JobManager
 import org.wip.plugintoolkit.features.job.logic.SandboxCleanupManager
+import org.wip.plugintoolkit.features.job.logic.ScratchDiskManager
 import org.wip.plugintoolkit.features.job.logic.SystemNodeExecutorRegistry
 import org.wip.plugintoolkit.features.plugin.logic.PluginLifecycleCoordinator
 import org.wip.plugintoolkit.features.plugin.logic.PluginLifecycleManager
@@ -63,6 +64,7 @@ fun createStandaloneLogicModule(): Module = module {
         )
     }
     single { SandboxCleanupManager() }
+    single { ScratchDiskManager() }
     single { JobManager(get(named("LoomScope")), get()) }
     single<SystemNodeExecutorRegistry> { DefaultSystemNodeExecutorRegistry(get()) }
 }

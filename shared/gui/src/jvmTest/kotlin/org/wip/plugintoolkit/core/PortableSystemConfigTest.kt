@@ -109,6 +109,11 @@ class PortableSystemConfigTest {
         assertTrue(cacheDef != null)
         assertTrue(cacheDef is SettingDefinition.DropdownSetting<*>)
 
+        // Scratch disks setting should be present
+        val scratchDef = allDefinitions.find { it.id == "general.scratchDisks" }
+        assertTrue(scratchDef != null)
+        assertTrue(scratchDef is SettingDefinition.CustomSetting)
+
         // Auto update setting should be omitted
         val autoUpdateDef = allDefinitions.find { it.id == "autoUpdate.enabled" }
         assertNull(autoUpdateDef)
@@ -130,6 +135,11 @@ class PortableSystemConfigTest {
         val startupDef = allDefinitions.find { it.id == "general.launchAtStartup" }
         assertTrue(startupDef != null)
         assertTrue(startupDef!!.enabled(settings))
+
+        // Scratch disks setting should be present
+        val defaultScratchDef = allDefinitions.find { it.id == "general.scratchDisks" }
+        assertTrue(defaultScratchDef != null)
+        assertTrue(defaultScratchDef is SettingDefinition.CustomSetting)
 
         // Auto update setting should be present
         val autoUpdateDef = allDefinitions.find { it.id == "autoUpdate.enabled" }

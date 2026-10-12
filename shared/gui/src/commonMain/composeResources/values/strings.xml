@@ -1011,4 +1011,22 @@
     <string name="color_picker_tooltip_slider_tone">Tone</string>
     <string name="color_picker_tooltip_slider_alpha">Opacity</string>
     <string name="color_picker_tooltip_delete_color">Delete (Canc)</string>
+
+    <!-- Scratch Disks -->
+    <string name="setting_scratch_disks">Scratch Disks</string>
+    <string name="setting_scratch_disks_subtitle">Configure directories for temporary files and job sandboxes, prioritized by order</string>
+    <string name="configure_scratch_disks_title">Configure Scratch Disks</string>
+    <string name="configure_scratch_disks_desc">Add multiple scratch disks and sort them by priority. The application uses the highest-priority accessible disk.</string>
+    <string name="action_sort_priority">Sort by Priority</string>
+    <string name="action_add_scratch_disk">Add Scratch Disk</string>
+    <string name="scratch_disk_fallback_info">Fallback Location: %1$s</string>
+    <string name="scratch_disk_empty">No custom scratch disks configured. The default AppData folder is used as scratch disk.</string>
+    <string name="scratch_disk_priority_badge">Priority #%1$d</string>
+    <string name="scratch_disk_priority_placeholder">Priority</string>
+    <string name="scratch_disk_path_placeholder">Enter scratch disk directory path...</string>
+    <string name="scratch_disk_saved_toast">Scratch disk settings saved</string>
+    <string name="scratch_disk_priority_up">Increase Priority (Move Up)</string>
+    <string name="scratch_disk_priority_down">Decrease Priority (Move Down)</string>
+    <string name="scratch_disk_status_ready">Ready</string>
+    <string name="scratch_disk_status_unavailable">Unavailable / Read-Only</string>
 </resources>

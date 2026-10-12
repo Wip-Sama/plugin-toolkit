@@ -1007,4 +1007,22 @@
     <string name="color_picker_tooltip_slider_tone">Tono</string>
     <string name="color_picker_tooltip_slider_alpha">Opacità</string>
     <string name="color_picker_tooltip_delete_color">Elimina (Canc)</string>
+
+    <!-- Scratch Disks -->
+    <string name="setting_scratch_disks">Dischi di Scratch</string>
+    <string name="setting_scratch_disks_subtitle">Configura cartelle per file temporanei e sandbox dei job, ordinate per priorità</string>
+    <string name="configure_scratch_disks_title">Configura Dischi di Scratch</string>
+    <string name="configure_scratch_disks_desc">Aggiungi più dischi di scratch e ordinali per priorità. L\'applicazione usa il primo disco accessibile con priorità più alta.</string>
+    <string name="action_sort_priority">Ordina per Priorità</string>
+    <string name="action_add_scratch_disk">Aggiungi Disco di Scratch</string>
+    <string name="scratch_disk_fallback_info">Percorso di Riserva: %1$s</string>
+    <string name="scratch_disk_empty">Nessun disco di scratch personalizzato configurato. La cartella predefinita AppData viene utilizzata come scratch disk.</string>
+    <string name="scratch_disk_priority_badge">Priorità #%1$d</string>
+    <string name="scratch_disk_priority_placeholder">Priorità</string>
+    <string name="scratch_disk_path_placeholder">Inserisci percorso cartella disco di scratch...</string>
+    <string name="scratch_disk_saved_toast">Impostazioni dischi di scratch salvate</string>
+    <string name="scratch_disk_priority_up">Aumenta Priorità (Sposta Su)</string>
+    <string name="scratch_disk_priority_down">Diminuisci Priorità (Sposta Giù)</string>
+    <string name="scratch_disk_status_ready">Pronto</string>
+    <string name="scratch_disk_status_unavailable">Non disponibile / Sola lettura</string>
 </resources>

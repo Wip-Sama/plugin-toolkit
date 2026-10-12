@@ -154,16 +154,15 @@ class JobWorker(
             val preserveSandbox = currentJob?.status == JobStatus.Paused ||
                     (currentJob?.type == JobType.Flow && currentJob.status == JobStatus.Failed && currentJob.resumeState != null)
             if (!preserveSandbox) {
-                val settingsPersistence: SettingsPersistence = get()
-                val appDataDir = settingsPersistence.getSettingsDir()
-                val sandboxDir = Path("$appDataDir/jobs/${job.id}/sandbox")
+                val scratchDiskManager: ScratchDiskManager = getKoin().getOrNull() ?: ScratchDiskManager()
+                val sandboxDir = scratchDiskManager.getJobSandboxDir(job.id, job.scratchDir)
                 try {
-                    deleteRecursively(sandboxDir)
+                    scratchDiskManager.deleteJobSandbox(job.id, job.scratchDir)
                 } catch (e: Exception) {
                     Logger.w(e) { "Worker $workerId: Failed to delete sandbox dir $sandboxDir. Registering for deferred cleanup." }
                     try {
                         val cleanupManager: SandboxCleanupManager by inject()
-                        cleanupManager.registerFailedDeletion(sandboxDir.toString())
+                        cleanupManager.registerFailedDeletion(sandboxDir)
                     } catch (_: Exception) {}
                 }
             } else {
@@ -182,9 +181,10 @@ class JobWorker(
             throw IllegalStateException("Capability '${job.capabilityName}' is scoped only as a node in flows and cannot be executed directly.")
         }
         val mutableParams = job.parameters.toMutableMap()
-        val settingsPersistence: SettingsPersistence = get()
-        val sandboxDir = "${settingsPersistence.getSettingsDir()}/jobs/${job.id}/sandbox/node_0"
-        val extSettings = try { settingsPersistence.load().extensions } catch (_: Exception) { null }
+        val scratchDiskManager: ScratchDiskManager = getKoin().getOrNull() ?: ScratchDiskManager()
+        val sandboxDir = scratchDiskManager.getJobNodeSandboxDir(job.id, "node_0", job.scratchDir)
+        val settingsPersistence: SettingsPersistence? = getKoin().getOrNull()
+        val extSettings = try { settingsPersistence?.load()?.extensions } catch (_: Exception) { null }
         val (allowedPaths, isDestructive) = resolveFileAccess(manifest, job.capabilityName, mutableParams, sandboxDir, extSettings)
 
         validateCapabilityParameters(manifest, job.capabilityName, mutableParams)

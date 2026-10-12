@@ -48,7 +48,8 @@ data class BackgroundJob(
     val isPausable: Boolean = false,
     val isCancellable: Boolean = true,
     val executionMetrics: JobExecutionMetrics? = null,
-    val maxConcurrentExecutions: Int? = null
+    val maxConcurrentExecutions: Int? = null,
+    val scratchDir: String? = null
 )
 
 @Serializable
