@@ -27,6 +27,8 @@ import org.wip.plugintoolkit.features.job.model.BackgroundJob
 import org.wip.plugintoolkit.features.job.model.JobStatus
 import org.wip.plugintoolkit.features.job.model.JobType
 import org.wip.plugintoolkit.features.plugin.logic.PluginManager
+import org.wip.plugintoolkit.features.plugin.sdui.PluginUiSessionHandle
+import org.wip.plugintoolkit.features.plugin.sdui.PluginUiSessionManager
 import org.wip.plugintoolkit.features.plugin.utils.SettingsUtils
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.capability_defaults_saved
@@ -39,7 +41,8 @@ class SinglePluginHostViewModel(
     val pluginEntry: PluginEntry,
     private val jobManager: JobManager,
     private val notificationService: NotificationService,
-    private val pluginManager: PluginManager
+    private val pluginManager: PluginManager,
+    private val uiSessionManager: PluginUiSessionManager? = null
 ) : ViewModel() {
 
     val manifest: PluginManifest = pluginEntry.getManifest().getOrThrow()
@@ -49,6 +52,9 @@ class SinglePluginHostViewModel(
 
     var selectedCapability by mutableStateOf<Capability?>(capabilities.firstOrNull())
     var saveResults by mutableStateOf(true)
+
+    var activeSessionHandle by mutableStateOf<PluginUiSessionHandle?>(null)
+        private set
 
     val parameterValues = mutableStateMapOf<String, String>()
     val manuallyModifiedParameters = mutableStateMapOf<String, Boolean>()
@@ -196,6 +202,11 @@ class SinglePluginHostViewModel(
         }
     }
 
+    fun closeActiveSession() {
+        activeSessionHandle?.close()
+        activeSessionHandle = null
+    }
+
     fun executeCapability() {
         val capability = selectedCapability ?: return
 
@@ -207,6 +218,25 @@ class SinglePluginHostViewModel(
             }
             notificationService.toast(msg)
             return
+        }
+
+        if (capability.isInteractive) {
+            val interactiveProcessor = pluginEntry.getInteractiveProcessor()?.getOrNull()
+            if (interactiveProcessor != null && uiSessionManager != null) {
+                val context = pluginManager.createPluginContext(
+                    pkg = pluginId,
+                    capabilityName = capability.name,
+                    manifest = manifest
+                )
+                activeSessionHandle = uiSessionManager.startSession(
+                    pluginId = pluginId,
+                    capabilityName = capability.name,
+                    context = context,
+                    processor = interactiveProcessor
+                )
+                notificationService.toast("Started interactive session for ${capability.name}")
+                return
+            }
         }
 
         viewModelScope.launch {

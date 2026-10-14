@@ -49,6 +49,7 @@ annotation class Capability(
     val description: String,
     val supportsPause: Boolean = false,
     val supportsCancel: Boolean = true,
+    val isInteractive: Boolean = false,
     val context: CapabilityContext = CapabilityContext.ANY,
     val maxConcurrentExecutions: Int = 0,
     @Deprecated("Use @RequiresSetting on the capability function instead")

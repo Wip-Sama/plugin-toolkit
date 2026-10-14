@@ -18,9 +18,11 @@ import kotlinx.serialization.json.JsonPrimitive
 import org.wip.plugintoolkit.api.Capability
 import org.wip.plugintoolkit.api.DataType
 import org.wip.plugintoolkit.api.ParameterMetadata
+import org.wip.plugintoolkit.api.PluginContext
 import org.wip.plugintoolkit.api.PluginEntry
 import org.wip.plugintoolkit.api.PluginInfo
 import org.wip.plugintoolkit.api.PluginManifest
+import org.wip.plugintoolkit.api.sdui.InteractiveUiProcessor
 import org.wip.plugintoolkit.api.PrimitiveType
 import org.wip.plugintoolkit.api.Requirements
 import org.wip.plugintoolkit.core.notification.NotificationService
@@ -32,6 +34,8 @@ import org.wip.plugintoolkit.features.job.model.JobType
 import org.wip.plugintoolkit.features.plugin.logic.PluginManager
 import org.wip.plugintoolkit.features.plugin.model.InstalledPlugin
 import org.wip.plugintoolkit.features.plugin.model.PluginSettingsStore
+import org.wip.plugintoolkit.features.plugin.sdui.PluginUiSessionManager
+import org.wip.plugintoolkit.features.plugin.sdui.PluginUiSessionHandle
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -135,12 +139,13 @@ class SinglePluginHostViewModelTest {
         unmockkAll()
     }
 
-    private fun createViewModel(): SinglePluginHostViewModel {
+    private fun createViewModel(customSessionManager: PluginUiSessionManager? = null): SinglePluginHostViewModel {
         return SinglePluginHostViewModel(
             pluginEntry = pluginEntry,
             jobManager = jobManager,
             notificationService = notificationService,
-            pluginManager = pluginManager
+            pluginManager = pluginManager,
+            uiSessionManager = customSessionManager
         )
     }
 
@@ -354,4 +359,67 @@ class SinglePluginHostViewModelTest {
         assertFalse(viewModel.isSetupRunning.value)
         assertTrue(viewModel.isSetupCompleted.value)
     }
+
+    @Test
+    fun testExecuteCapabilityInteractiveStartsSessionAndClosingCleansUp() = runTest(testDispatcher) {
+        val interactiveCap = Capability(
+            name = "interactiveDrawing",
+            description = "Draw interactively",
+            returnType = DataType.Primitive(PrimitiveType.STRING),
+            isInteractive = true
+        )
+        val manifestWithInteractive = testManifest.copy(
+            capabilities = listOf(interactiveCap)
+        )
+        every { pluginEntry.getManifest() } returns Result.success(manifestWithInteractive)
+        installedPluginsFlow.value = listOf(
+            InstalledPlugin(
+                pkg = "org.test.plugin",
+                name = "Test Plugin",
+                version = "1.0.0",
+                installPath = "/tmp",
+                isSetupCompleted = true
+            )
+        )
+
+        val mockSessionManager = mockk<PluginUiSessionManager>(relaxed = true)
+        val mockProcessor = mockk<InteractiveUiProcessor>(relaxed = true)
+        val mockContext = mockk<PluginContext>(relaxed = true)
+        val mockHandle = mockk<PluginUiSessionHandle>(relaxed = true)
+
+        val fakeEntry = object : PluginEntry by pluginEntry {
+            override fun getManifest(): Result<PluginManifest> = Result.success(manifestWithInteractive)
+            override fun getInteractiveProcessor(): Result<InteractiveUiProcessor>? = Result.success(mockProcessor)
+        }
+
+        every { pluginManager.createPluginContext(any(), any(), any(), any(), any(), any(), any()) } returns mockContext
+        every { mockSessionManager.startSession(any(), any(), any(), any()) } returns mockHandle
+
+        val viewModel = SinglePluginHostViewModel(
+            pluginEntry = fakeEntry,
+            jobManager = jobManager,
+            notificationService = notificationService,
+            pluginManager = pluginManager,
+            uiSessionManager = mockSessionManager
+        )
+        advanceUntilIdle()
+
+        assertEquals(interactiveCap, viewModel.selectedCapability)
+        assertNull(viewModel.activeSessionHandle)
+
+        viewModel.executeCapability()
+        advanceUntilIdle()
+
+        assertEquals(mockHandle, viewModel.activeSessionHandle)
+        verify { mockSessionManager.startSession("org.test.plugin", "interactiveDrawing", any(), mockProcessor) }
+        verify { notificationService.toast("Started interactive session for interactiveDrawing") }
+
+        // Test closing active session
+        viewModel.closeActiveSession()
+        advanceUntilIdle()
+
+        verify { mockHandle.close() }
+        assertNull(viewModel.activeSessionHandle)
+    }
 }
+

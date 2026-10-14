@@ -76,7 +76,7 @@ val guiModule: Module = module {
     single { PluginManagerViewModel(get(), get(), get(), get(), get(), get(), get(), get()) }
     factory { (pkg: String) -> PluginSettingsViewModel(pkg, get(), get()) }
     factory { JobViewModel(get()) }
-    factory { (entry: org.wip.plugintoolkit.api.PluginEntry) -> org.wip.plugintoolkit.features.plugin.viewmodel.SinglePluginHostViewModel(entry, get(), get(), get()) }
-    factory { org.wip.plugintoolkit.features.plugin.viewmodel.SinglePluginHostViewModel(get(), get(), get(), get()) }
+    factory { (entry: org.wip.plugintoolkit.api.PluginEntry) -> org.wip.plugintoolkit.features.plugin.viewmodel.SinglePluginHostViewModel(entry, get(), get(), get(), getOrNull()) }
+    factory { org.wip.plugintoolkit.features.plugin.viewmodel.SinglePluginHostViewModel(get(), get(), get(), get(), getOrNull()) }
     factory { AppViewModel(get(), get()) }
 }

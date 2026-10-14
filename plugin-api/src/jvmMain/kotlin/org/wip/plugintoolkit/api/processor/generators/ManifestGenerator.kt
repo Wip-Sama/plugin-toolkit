@@ -78,6 +78,8 @@ object ManifestGenerator {
                 capAnn.arguments.find { it.name?.asString() == "supportsPause" }?.value as? Boolean ?: false
             val supportsCancel =
                 capAnn.arguments.find { it.name?.asString() == "supportsCancel" }?.value as? Boolean ?: true
+            val isInteractive =
+                capAnn.arguments.find { it.name?.asString() == "isInteractive" }?.value as? Boolean ?: false
 
             val contextArg = capAnn.arguments.find { it.name?.asString() == "context" }?.value
             val contextName = when (contextArg) {
@@ -136,6 +138,7 @@ object ManifestGenerator {
             capabilitiesCode.add("description = %S,\n", capDesc)
             capabilitiesCode.add("isPausable = %L,\n", supportsPause || hasResumeState)
             capabilitiesCode.add("isCancellable = %L,\n", supportsCancel)
+            capabilitiesCode.add("isInteractive = %L,\n", isInteractive)
             capabilitiesCode.add(
                 "context = %T.%L,\n",
                 ClassName("org.wip.plugintoolkit.api", "CapabilityContext"),

@@ -34,6 +34,7 @@ kotlin {
             implementation(libs.filekit.dialogs)
 
             implementation(libs.filekit.dialogs.compose)
+            implementation(libs.coil.compose)
             implementation(libs.kermit)
             implementation(libs.ktor.client.core)
             implementation(libs.kotlinx.serialization.json)
@@ -65,6 +66,10 @@ kotlin {
 compose.resources {
     packageOfResClass = "plugintoolkit.composeapp.generated.resources"
     publicResClass = true
+}
+
+composeCompiler {
+    stabilityConfigurationFiles.add(layout.projectDirectory.file("compose_stability.conf"))
 }
 
 // ── Native DLL build ───────────────────────────────────────────────────────────

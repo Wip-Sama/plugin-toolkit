@@ -17,6 +17,7 @@ import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_PLUGIN_ENTRY
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_PLUGIN_FILESYSTEM
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_PLUGIN_LOGGER
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_PLUGIN_MANIFEST
+import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_INTERACTIVE_UI_PROCESSOR
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_PROGRESS_REPORTER
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_RESULT
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.PLUGIN_LOAD_ANNOTATION
@@ -90,6 +91,19 @@ object EntryGenerator {
                     .addModifiers(KModifier.OVERRIDE)
                     .build()
             )
+
+        val implementsInteractive = classDeclaration.superTypes.any {
+            it.resolve().declaration.qualifiedName?.asString() == "org.wip.plugintoolkit.api.sdui.InteractiveUiProcessor"
+        }
+        if (implementsInteractive) {
+            entryType.addFunction(
+                FunSpec.builder("getInteractiveProcessor")
+                    .addModifiers(KModifier.OVERRIDE)
+                    .returns(CN_RESULT.parameterizedBy(CN_INTERACTIVE_UI_PROCESSOR).copy(nullable = true))
+                    .addStatement("return Result.success(processor)")
+                    .build()
+            )
+        }
 
         val setupFunction = classDeclaration.getAllFunctions()
             .find { it.annotations.any { ann -> ann.hasQualifiedName(PLUGIN_SETUP_ANNOTATION) } }

@@ -52,6 +52,7 @@ import org.wip.plugintoolkit.api.PrimitiveType
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.job.model.JobProgress
 import org.wip.plugintoolkit.features.job.model.JobStatus
+import org.wip.plugintoolkit.features.plugin.sdui.PluginCustomUiCard
 import org.wip.plugintoolkit.features.plugin.viewmodel.SinglePluginHostViewModel
 import org.wip.plugintoolkit.shared.components.ToolkitButtonGroup
 import org.wip.plugintoolkit.shared.components.ToolkitTextField
@@ -337,6 +338,16 @@ fun SinglePluginRunnerView(
                             .verticalScroll(rememberScrollState())
                             .padding(ToolkitTheme.spacing.extraLarge)
                     ) {
+                        viewModel.activeSessionHandle?.let { handle ->
+                            PluginCustomUiCard(
+                                handle = handle,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(bottom = ToolkitTheme.spacing.extraLarge),
+                                onClose = { viewModel.closeActiveSession() }
+                            )
+                        }
+
                         CapabilityTester(
                             capability = selectedCapability,
                             parameterValues = viewModel.parameterValues.toMap(),

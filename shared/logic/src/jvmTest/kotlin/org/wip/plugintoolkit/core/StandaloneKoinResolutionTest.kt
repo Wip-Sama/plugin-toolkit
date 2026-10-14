@@ -16,6 +16,7 @@ import org.wip.plugintoolkit.features.plugin.logic.PluginLockProvider
 import org.wip.plugintoolkit.features.plugin.logic.PluginManager
 import org.wip.plugintoolkit.features.plugin.logic.PluginRegistry
 import org.wip.plugintoolkit.features.plugin.model.PluginSettingsStore
+import org.wip.plugintoolkit.features.plugin.sdui.PluginUiSessionManager
 import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
@@ -59,6 +60,7 @@ class StandaloneKoinResolutionTest : KoinTest {
         val lockProvider: PluginLockProvider = get()
         val systemNodeExecutorRegistry: SystemNodeExecutorRegistry = get()
         val sandboxCleanupManager: SandboxCleanupManager = get()
+        val uiSessionManager: PluginUiSessionManager = get()
 
         assertNotNull(jobManager)
         assertNotNull(pluginManager)
@@ -70,6 +72,7 @@ class StandaloneKoinResolutionTest : KoinTest {
         assertNotNull(lockProvider)
         assertNotNull(systemNodeExecutorRegistry)
         assertNotNull(sandboxCleanupManager)
+        assertNotNull(uiSessionManager)
     }
 
     @Test

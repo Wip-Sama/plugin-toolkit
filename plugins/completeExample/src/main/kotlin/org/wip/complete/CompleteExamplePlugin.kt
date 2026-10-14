@@ -7,6 +7,7 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.coroutines.flow.Flow
 import org.wip.plugintoolkit.api.ErrorDetail
 import org.wip.plugintoolkit.api.ExecutionResult
 import org.wip.plugintoolkit.api.OS
@@ -20,6 +21,17 @@ import org.wip.plugintoolkit.api.ProgressData
 import org.wip.plugintoolkit.api.PluginNetworkClient
 import org.wip.plugintoolkit.api.watchProcess
 import org.wip.plugintoolkit.api.ConditionOperator
+import org.wip.plugintoolkit.api.sdui.BoardLayer
+import org.wip.plugintoolkit.api.sdui.BoardTool
+import org.wip.plugintoolkit.api.sdui.InteractiveUiProcessor
+import org.wip.plugintoolkit.api.sdui.SemanticColor
+import org.wip.plugintoolkit.api.sdui.TypographyRole
+import org.wip.plugintoolkit.api.sdui.UiEvent
+import org.wip.plugintoolkit.api.sdui.UiModifier
+import org.wip.plugintoolkit.api.sdui.UiNodeTree
+import org.wip.plugintoolkit.api.sdui.UiSessionContext
+import org.wip.plugintoolkit.api.sdui.uiTree
+import kotlinx.coroutines.flow.channelFlow
 import org.wip.plugintoolkit.api.annotations.Capability
 import org.wip.plugintoolkit.api.annotations.CapabilityContext
 import org.wip.plugintoolkit.api.annotations.CapabilityInput
@@ -153,11 +165,11 @@ enum class FeatureMode {
 @PluginInfo(
     id = "org.wip.complete",
     name = "Complete Example Plugin",
-    version = "2.1.3",
-    description = "Complete showcase of plugin API features including settings, validation, signals, storage, file system, lifecycle hooks, and flow contexts.",
+    version = "2.2.0",
+    description = "Complete showcase of plugin API features including settings, validation, signals, storage, file system, lifecycle hooks, flow contexts, and server-driven interactive SDUI.",
     supportedOs = [OS.WINDOWS, OS.LINUX, OS.MACOS]
 )
-class CompleteExamplePlugin(val settings: CompleteExampleSettings) {
+class CompleteExamplePlugin(val settings: CompleteExampleSettings) : InteractiveUiProcessor {
 
     @PluginLoad
     fun onLoad(logger: PluginLogger): Result<Unit> {
@@ -534,5 +546,161 @@ class CompleteExamplePlugin(val settings: CompleteExampleSettings) {
     ): String {
         return "Engine: $engine, Temp: ${inferenceOptions.temperature}, MaxTokens: ${inferenceOptions.maxTokens}, " +
                 "Filter: ${inferenceOptions.postProcessing.applyFilter}, Intensity: ${inferenceOptions.postProcessing.filterIntensity}"
+    }
+
+    @Capability(
+        name = "interactiveDrawingAndControls",
+        description = "Interactive SDUI canvas showcasing reactive live controls, form synchronization, and vector drawing.",
+        isInteractive = true
+    )
+    fun interactiveDrawingAndControls(): String {
+        return "Interactive SDUI session active"
+    }
+
+    override fun openUiSession(
+        context: UiSessionContext,
+        events: Flow<UiEvent>
+    ): Flow<UiNodeTree> = channelFlow {
+        var canvasTitle = "Interactive Plugin Canvas"
+        var brushWidth = 4.0
+        var smoothing = true
+        var brushColor = SemanticColor.PRIMARY
+        var counter = 0
+        val layers = mutableListOf<BoardLayer>()
+
+        fun renderTree(): UiNodeTree = uiTree {
+            column(id = "interactiveRoot") {
+                card(id = "headerCard") {
+                    column {
+                        row {
+                            text(id = "titleText", text = canvasTitle, role = TypographyRole.TITLE_MEDIUM, color = SemanticColor.PRIMARY)
+                            badge(id = "statusBadge", text = "Live Reactive SDUI", color = SemanticColor.ACCENT)
+                        }
+                        divider(id = "headerDiv")
+                        text(
+                            id = "descText",
+                            text = "Draw on the vector board below or adjust controls to reactively update the server-driven UI tree.",
+                            role = TypographyRole.BODY_SMALL
+                        )
+                    }
+                }
+
+                card(id = "controlsCard") {
+                    column {
+                        textInput(
+                            id = "titleInput",
+                            text = canvasTitle,
+                            label = "Canvas Title",
+                            placeholder = "Enter title..."
+                        )
+                        row {
+                            dropdown(
+                                id = "colorDropdown",
+                                label = "Brush Color",
+                                options = mapOf(
+                                    "PRIMARY" to "Primary Blue",
+                                    "SECONDARY" to "Secondary Gray",
+                                    "ACCENT" to "Accent Teal",
+                                    "HIGHLIGHT" to "Warning Highlight",
+                                    "ERROR" to "Error Red"
+                                ),
+                                selectedKey = brushColor.name
+                            )
+                            toggle(
+                                id = "smoothToggle",
+                                label = "Spline Smoothing",
+                                checked = smoothing
+                            )
+                        }
+                        slider(
+                            id = "widthSlider",
+                            value = brushWidth,
+                            min = 1.0,
+                            max = 20.0,
+                            steps = 19
+                        )
+                        row {
+                            button(id = "clearBtn", label = "Clear Canvas")
+                            button(id = "counterBtn", label = "Taps: $counter")
+                        }
+                    }
+                }
+
+                board(
+                    id = "drawingBoard",
+                    layers = layers.toList(),
+                    activeTool = BoardTool.Brush(color = brushColor, strokeWidth = brushWidth.toFloat()),
+                    modifier = UiModifier(aspectRatio = 1.6f)
+                )
+
+                text(
+                    id = "footerStats",
+                    text = "Layers: ${layers.size} | Width: ${brushWidth.toInt()}px | Color: ${brushColor.name}",
+                    role = TypographyRole.LABEL,
+                    color = SemanticColor.ON_SURFACE
+                )
+            }
+        }
+
+        send(renderTree())
+
+        events.collect { event ->
+            when (event) {
+                is UiEvent.Click -> {
+                    when (event.nodeId) {
+                        "clearBtn" -> {
+                            layers.clear()
+                            send(renderTree())
+                        }
+                        "counterBtn" -> {
+                            counter++
+                            send(renderTree())
+                        }
+                    }
+                }
+                is UiEvent.TextChanged -> {
+                    if (event.nodeId == "titleInput") {
+                        canvasTitle = event.text
+                        send(renderTree())
+                    }
+                }
+                is UiEvent.ValueChanged -> {
+                    if (event.nodeId == "widthSlider") {
+                        brushWidth = event.value
+                        send(renderTree())
+                    }
+                }
+                is UiEvent.ToggleChanged -> {
+                    if (event.nodeId == "smoothToggle") {
+                        smoothing = event.checked
+                        send(renderTree())
+                    }
+                }
+                is UiEvent.OptionSelected -> {
+                    if (event.nodeId == "colorDropdown") {
+                        brushColor = try {
+                            SemanticColor.valueOf(event.selectedKey)
+                        } catch (e: Exception) {
+                            SemanticColor.PRIMARY
+                        }
+                        send(renderTree())
+                    }
+                }
+                is UiEvent.PathCommitted -> {
+                    if (event.nodeId == "drawingBoard") {
+                        layers.add(
+                            BoardLayer.PathLayer(
+                                id = "path_${layers.size + 1}",
+                                path = event.path
+                            )
+                        )
+                        send(renderTree())
+                    }
+                }
+                is UiEvent.Custom -> {
+                    // Custom extensions
+                }
+            }
+        }
     }
 }

@@ -32,6 +32,7 @@ import org.wip.plugintoolkit.features.plugin.logic.PluginLockProvider
 import org.wip.plugintoolkit.features.plugin.logic.PluginManager
 import org.wip.plugintoolkit.features.plugin.logic.PluginRegistry
 import org.wip.plugintoolkit.features.plugin.logic.PluginScanner
+import org.wip.plugintoolkit.features.plugin.sdui.PluginUiSessionManager
 import org.wip.plugintoolkit.features.repository.logic.RepoManager
 import org.wip.plugintoolkit.features.settings.logic.JvmSettingsPersistence
 import org.wip.plugintoolkit.features.settings.logic.SettingsPersistence
@@ -83,4 +84,5 @@ actual val logicModule: Module = module {
     single { ReactiveCapabilityLockTracker(get()) }
     single<SystemNodeExecutorRegistry> { DefaultSystemNodeExecutorRegistry(get()) }
     single { UpdateService(get(), get()) }
+    single { PluginUiSessionManager(get(named("AppScope"))) }
 }

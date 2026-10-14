@@ -88,6 +88,7 @@ object ProcessorConstants {
     val CN_EXECUTION_RESULT = ExecutionResult::class.asClassName()
     val CN_EXECUTION_RESULT_SUCCESS = ExecutionResult.Success::class.asClassName()
     val CN_EXECUTION_RESULT_ERROR = ExecutionResult.Error::class.asClassName()
+    val CN_INTERACTIVE_UI_PROCESSOR = org.wip.plugintoolkit.api.sdui.InteractiveUiProcessor::class.asClassName()
 
     // Common Types
     val CN_MAP = ClassName("kotlin.collections", "Map")

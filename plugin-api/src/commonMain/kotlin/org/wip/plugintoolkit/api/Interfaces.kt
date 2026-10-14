@@ -34,6 +34,11 @@ interface PluginEntry {
      */
     fun getProcessor(): Result<DataProcessor>
 
+    /**
+     * Optional interactive UI processor for plugins that provide reactive SDUI capabilities.
+     */
+    fun getInteractiveProcessor(): Result<org.wip.plugintoolkit.api.sdui.InteractiveUiProcessor>? = null
+
 
     /**
      * Set the debug mode for the plugin.

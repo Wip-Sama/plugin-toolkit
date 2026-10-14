@@ -1,3 +1,9 @@
+Version: 2.2.0
+Date: 14-10-2026
+Added:
+  - Added interactiveDrawingAndControls capability showcasing server-driven UI (SDUI) architecture.
+  - Implemented InteractiveUiProcessor with live reactive forms, dynamic Catmull-Rom vector canvas, and dual-channel event handling.
+---------------------------------------------------------------------------------
 Version: 2.1.4
 Date: 02-10-2026
 Added:

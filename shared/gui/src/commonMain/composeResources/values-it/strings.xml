@@ -1025,4 +1025,18 @@
     <string name="scratch_disk_priority_down">Diminuisci Priorità (Sposta Giù)</string>
     <string name="scratch_disk_status_ready">Pronto</string>
     <string name="scratch_disk_status_unavailable">Non disponibile / Sola lettura</string>
+
+    <!-- SDUI Interactive Component Strings -->
+    <string name="sdui_board_undo">Annulla</string>
+    <string name="sdui_board_redo">Ripristina</string>
+    <string name="sdui_board_clear">Pulisci</string>
+    <string name="sdui_board_pen">Penna</string>
+    <string name="sdui_board_eraser">Gomma</string>
+    <string name="sdui_board_select">Seleziona</string>
+    <string name="sdui_error_boundary_title">Errore Componente</string>
+    <string name="sdui_close_session">Chiudi Interfaccia</string>
+    <string name="sdui_interactive_mode">Modalità Interattiva</string>
+    <string name="sdui_loading_interface">Caricamento interfaccia...</string>
+    <string name="sdui_session_active">Sessione Attiva</string>
+    <string name="sdui_unsupported_node">Componente non supportato: %1$s</string>
 </resources>

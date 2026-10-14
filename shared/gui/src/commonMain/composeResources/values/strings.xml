@@ -1029,4 +1029,18 @@
     <string name="scratch_disk_priority_down">Decrease Priority (Move Down)</string>
     <string name="scratch_disk_status_ready">Ready</string>
     <string name="scratch_disk_status_unavailable">Unavailable / Read-Only</string>
+
+    <!-- SDUI Interactive Component Strings -->
+    <string name="sdui_board_undo">Undo</string>
+    <string name="sdui_board_redo">Redo</string>
+    <string name="sdui_board_clear">Clear</string>
+    <string name="sdui_board_pen">Pen</string>
+    <string name="sdui_board_eraser">Eraser</string>
+    <string name="sdui_board_select">Select</string>
+    <string name="sdui_error_boundary_title">Component Error</string>
+    <string name="sdui_close_session">Close Interface</string>
+    <string name="sdui_interactive_mode">Interactive Mode</string>
+    <string name="sdui_loading_interface">Loading interface...</string>
+    <string name="sdui_session_active">Active Session</string>
+    <string name="sdui_unsupported_node">Unsupported component: %1$s</string>
 </resources>

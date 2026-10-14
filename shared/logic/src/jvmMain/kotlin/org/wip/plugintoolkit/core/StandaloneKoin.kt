@@ -20,6 +20,7 @@ import org.wip.plugintoolkit.features.plugin.logic.PluginLifecycleManager
 import org.wip.plugintoolkit.features.plugin.logic.PluginLockProvider
 import org.wip.plugintoolkit.features.plugin.logic.PluginManager
 import org.wip.plugintoolkit.features.plugin.logic.PluginRegistry
+import org.wip.plugintoolkit.features.plugin.sdui.PluginUiSessionManager
 import org.wip.plugintoolkit.features.settings.logic.JvmSettingsPersistence
 import org.wip.plugintoolkit.features.settings.logic.SettingsPersistence
 import org.wip.plugintoolkit.features.settings.logic.SettingsRepository
@@ -67,4 +68,5 @@ fun createStandaloneLogicModule(): Module = module {
     single { ScratchDiskManager() }
     single { JobManager(get(named("LoomScope")), get()) }
     single<SystemNodeExecutorRegistry> { DefaultSystemNodeExecutorRegistry(get()) }
+    single { PluginUiSessionManager(get(named("AppScope"))) }
 }

@@ -2,6 +2,7 @@ package org.wip.complete
 
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
@@ -329,6 +330,66 @@ class CompleteExampleTest {
         assertTrue(output.contains("Filter: true"))
         assertTrue(output.contains("Intensity: 0.9"))
     }
+
+    @Test
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    fun testInteractiveUiProcessorSessionLifecycle() = runTest {
+        val settings = CompleteExampleSettings()
+        val plugin = CompleteExamplePlugin(settings)
+        val entry = CompleteExamplePluginPluginEntry(plugin)
+
+        val interactiveProcessor = entry.getInteractiveProcessor()?.getOrNull()
+        assertTrue(interactiveProcessor != null, "InteractiveUiProcessor must be non-null in generated entry")
+
+        val eventsFlow = kotlinx.coroutines.flow.MutableSharedFlow<org.wip.plugintoolkit.api.sdui.UiEvent>()
+        val emittedTrees = mutableListOf<org.wip.plugintoolkit.api.sdui.UiNodeTree>()
+
+        val testContext = TestPluginContext()
+        val sessionContext = object : org.wip.plugintoolkit.api.sdui.UiSessionContext, org.wip.plugintoolkit.api.PluginContext by testContext {
+            override fun completeSession(response: org.wip.plugintoolkit.api.PluginResponse) {}
+            override fun cancelSession(reason: String) {}
+        }
+
+        val job = launch {
+            interactiveProcessor.openUiSession(sessionContext, eventsFlow).collect {
+                emittedTrees.add(it)
+            }
+        }
+        advanceUntilIdle()
+
+        // Verify initial tree emitted
+        assertEquals(1, emittedTrees.size)
+        val initialTree = emittedTrees.first()
+        assertTrue(initialTree.root is org.wip.plugintoolkit.api.sdui.ColumnNode)
+
+        // Dispatch text change
+        eventsFlow.emit(org.wip.plugintoolkit.api.sdui.UiEvent.TextChanged("titleInput", "New Custom Canvas Title"))
+        advanceUntilIdle()
+        assertEquals(2, emittedTrees.size)
+
+        // Dispatch button tap
+        eventsFlow.emit(org.wip.plugintoolkit.api.sdui.UiEvent.Click("counterBtn"))
+        advanceUntilIdle()
+        assertEquals(3, emittedTrees.size)
+
+        // Dispatch path committed
+        val testPath = org.wip.plugintoolkit.api.sdui.VectorPathData(
+            strokeId = "test_stroke",
+            points = listOf(
+                org.wip.plugintoolkit.api.sdui.NormalizedPoint(0.1f, 0.1f),
+                org.wip.plugintoolkit.api.sdui.NormalizedPoint(0.5f, 0.5f)
+            ),
+            color = org.wip.plugintoolkit.api.sdui.SemanticColor.PRIMARY,
+            strokeWidth = 4f
+        )
+        eventsFlow.emit(org.wip.plugintoolkit.api.sdui.UiEvent.PathCommitted("drawingBoard", testPath))
+        advanceUntilIdle()
+        assertEquals(4, emittedTrees.size)
+
+        job.cancel()
+    }
 }
+
+
 
 
