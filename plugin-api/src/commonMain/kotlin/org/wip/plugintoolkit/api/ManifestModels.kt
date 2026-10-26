@@ -527,7 +527,7 @@ object CapabilityContextSerializer : KSerializer<CapabilityContext> by createSaf
 
 @Serializable(with = CapabilityContextSerializer::class)
 enum class CapabilityContext {
-    ANY, FLOW_ONLY, STANDALONE_ONLY, UNKNOWN
+    ANY, FLOW_ONLY, STANDALONE_ONLY, INTERACTIVE_ONLY, UNKNOWN
 }
 
 @Serializable

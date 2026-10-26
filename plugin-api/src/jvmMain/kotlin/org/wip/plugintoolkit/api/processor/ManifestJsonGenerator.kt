@@ -28,6 +28,7 @@ import org.wip.plugintoolkit.api.SettingMetadata
 import org.wip.plugintoolkit.api.parseSemanticTypes
 import org.wip.plugintoolkit.api.processor.GeneratorUtils.hasQualifiedName
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CAPABILITY_ANNOTATION
+import org.wip.plugintoolkit.api.processor.ProcessorConstants.INTERACTIVE_TOOL_ANNOTATION
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CAPABILITY_INPUT_ANNOTATION
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CAPABILITY_OUTPUT_ANNOTATION
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CAPABILITY_PARAM_ANNOTATION
@@ -58,18 +59,20 @@ object ManifestJsonGenerator {
         hasMigrations: Boolean = false
     ): String {
         val manifestCapabilities = functions.map { func ->
-            val capAnn = func.annotations.first { it.hasQualifiedName(CAPABILITY_ANNOTATION) }
+            val capAnn = func.annotations.first { it.hasQualifiedName(CAPABILITY_ANNOTATION) || it.hasQualifiedName(INTERACTIVE_TOOL_ANNOTATION) }
+            val isInteractiveTool = capAnn.hasQualifiedName(INTERACTIVE_TOOL_ANNOTATION)
             val capName = capAnn.arguments.find { it.name?.asString() == "name" }?.value as String
-            val capDesc = capAnn.arguments.find { it.name?.asString() == "description" }?.value as String
+            val capDesc = capAnn.arguments.find { it.name?.asString() == "description" }?.value as? String ?: ""
             val supportsPause =
                 capAnn.arguments.find { it.name?.asString() == "supportsPause" }?.value as? Boolean ?: false
             val supportsCancel =
                 capAnn.arguments.find { it.name?.asString() == "supportsCancel" }?.value as? Boolean ?: true
+            val isInteractive = isInteractiveTool || (capAnn.arguments.find { it.name?.asString() == "isInteractive" }?.value as? Boolean ?: false)
 
             val contextEnumKS =
                 capAnn.arguments.find { it.name?.asString() == "context" }?.value as? com.google.devtools.ksp.symbol.KSType
-            val contextName = contextEnumKS?.declaration?.simpleName?.asString() ?: "ANY"
-            val context = CapabilityContext.valueOf(contextName)
+            val rawContextName = contextEnumKS?.declaration?.simpleName?.asString() ?: "ANY"
+            val context = if (isInteractive && rawContextName == "ANY") CapabilityContext.INTERACTIVE_ONLY else CapabilityContext.valueOf(rawContextName)
             val requiresSettingsList =
                 (capAnn.arguments.find { it.name?.asString() == "requiresSettings" }?.value as? List<*>)?.filterIsInstance<String>()
                     ?: emptyList()
@@ -147,7 +150,6 @@ object ManifestJsonGenerator {
             val requiredLocksList = (reqLockAnn?.arguments?.find { it.name?.asString() == "locks" }?.value as? List<*>)?.filterIsInstance<String>() ?: emptyList()
 
             val maxConcurrentExecutions = (capAnn.arguments.find { it.name?.asString() == "maxConcurrentExecutions" }?.value as? Int)?.takeIf { it > 0 }
-            val isInteractive = capAnn.arguments.find { it.name?.asString() == "isInteractive" }?.value as? Boolean ?: false
 
             Capability(
                 name = capName,

@@ -11,6 +11,7 @@ import org.wip.plugintoolkit.api.processor.GeneratorUtils
 import org.wip.plugintoolkit.api.processor.GeneratorUtils.hasQualifiedName
 import org.wip.plugintoolkit.api.processor.ProcessorConstants
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CAPABILITY_ANNOTATION
+import org.wip.plugintoolkit.api.processor.ProcessorConstants.INTERACTIVE_TOOL_ANNOTATION
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_CAPABILITY
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_JSON
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_PARAMETER_CONSTRAINTS
@@ -71,22 +72,24 @@ object ManifestGenerator {
         capabilitiesCode.add("listOf(\n")
         capabilitiesCode.indent()
         functions.forEachIndexed { index, func ->
-            val capAnn = func.annotations.first { it.hasQualifiedName(CAPABILITY_ANNOTATION) }
+            val capAnn = func.annotations.first { it.hasQualifiedName(CAPABILITY_ANNOTATION) || it.hasQualifiedName(INTERACTIVE_TOOL_ANNOTATION) }
+            val isInteractiveTool = capAnn.hasQualifiedName(INTERACTIVE_TOOL_ANNOTATION)
             val capName = capAnn.arguments.find { it.name?.asString() == "name" }?.value as String
-            val capDesc = capAnn.arguments.find { it.name?.asString() == "description" }?.value as String
+            val capDesc = capAnn.arguments.find { it.name?.asString() == "description" }?.value as? String ?: ""
             val supportsPause =
                 capAnn.arguments.find { it.name?.asString() == "supportsPause" }?.value as? Boolean ?: false
             val supportsCancel =
                 capAnn.arguments.find { it.name?.asString() == "supportsCancel" }?.value as? Boolean ?: true
             val isInteractive =
-                capAnn.arguments.find { it.name?.asString() == "isInteractive" }?.value as? Boolean ?: false
+                isInteractiveTool || (capAnn.arguments.find { it.name?.asString() == "isInteractive" }?.value as? Boolean ?: false)
 
             val contextArg = capAnn.arguments.find { it.name?.asString() == "context" }?.value
-            val contextName = when (contextArg) {
+            val rawContextName = when (contextArg) {
                 is com.google.devtools.ksp.symbol.KSClassDeclaration -> contextArg.simpleName.asString()
                 is com.google.devtools.ksp.symbol.KSType -> contextArg.declaration.simpleName.asString()
                 else -> contextArg?.toString()?.substringAfterLast('.')?.substringAfterLast(':')?.trim() ?: "ANY"
             }
+            val contextName = if (isInteractive && rawContextName == "ANY") "INTERACTIVE_ONLY" else rawContextName
             val requiresSettingsList =
                 (capAnn.arguments.find { it.name?.asString() == "requiresSettings" }?.value as? List<*>)?.filterIsInstance<String>()
                     ?: emptyList()

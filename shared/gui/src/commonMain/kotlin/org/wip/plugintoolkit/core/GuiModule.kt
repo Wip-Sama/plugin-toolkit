@@ -78,5 +78,6 @@ val guiModule: Module = module {
     factory { JobViewModel(get()) }
     factory { (entry: org.wip.plugintoolkit.api.PluginEntry) -> org.wip.plugintoolkit.features.plugin.viewmodel.SinglePluginHostViewModel(entry, get(), get(), get(), getOrNull()) }
     factory { org.wip.plugintoolkit.features.plugin.viewmodel.SinglePluginHostViewModel(get(), get(), get(), get(), getOrNull()) }
+    factory { org.wip.plugintoolkit.features.plugin.viewmodel.InteractiveToolsViewModel(get(), getOrNull(), getOrNull()) }
     factory { AppViewModel(get(), get()) }
 }

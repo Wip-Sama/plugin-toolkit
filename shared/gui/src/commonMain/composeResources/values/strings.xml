@@ -511,6 +511,17 @@
     <string name="plugin_rerun_setup">Rerun Setup</string>
     <string name="plugin_open_folder">Open Folder</string>
     <string name="tab_plugin_manager">Plugin Manager</string>
+    <string name="tab_interactive_tools">Interactive</string>
+    <string name="interactive_tools_title">Interactive Tools</string>
+    <string name="interactive_tools_hint">Select an interactive tool from the sidebar to launch its interface</string>
+    <string name="interactive_tools_empty">No Interactive Tools Found</string>
+    <string name="interactive_tools_empty_desc">None of your installed plugins provide interactive Server-Driven UI tools. Interactive plugins allow real-time custom GUIs, dynamic forms, and drawing canvases.</string>
+    <string name="interactive_tools_search_placeholder">Search interactive tools...</string>
+    <string name="interactive_session_active">Active Session</string>
+    <string name="interactive_session_idle">Idle</string>
+    <string name="action_restart_session">Restart Session</string>
+    <string name="action_close_session">Close Session</string>
+    <string name="action_launch_session">Launch Session</string>
     <string name="action_export">Export</string>
     <string name="action_force_cancel">Force Cancel</string>
     <string name="setting_auto_scroll">Auto scroll</string>

@@ -157,7 +157,11 @@ fun FlowManagerView(
     }
 
     val activeCapabilities = remember(state.flows, loadedPlugins, installedPlugins) {
-        PluginLoader.getPlugins().flatMap { it.getManifest().getOrNull()?.capabilities?.map { cap -> cap.name } ?: emptyList() }.toSet()
+        PluginLoader.getPlugins().flatMap {
+            it.getManifest().getOrNull()?.capabilities
+                ?.filter { cap -> !cap.isInteractive && cap.context != org.wip.plugintoolkit.api.CapabilityContext.INTERACTIVE_ONLY }
+                ?.map { cap -> cap.name } ?: emptyList()
+        }.toSet()
     }
 
     val parentFlowsMap = remember(state.flows) {

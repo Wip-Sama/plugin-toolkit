@@ -174,6 +174,7 @@ private fun AppContentImpl(
                     is Screen.FlowRunner -> Screen.FlowRunner()
                     is Screen.Plugin -> Screen.Plugins
                     is Screen.PluginManager -> Screen.PluginManager()
+                    is Screen.InteractiveTools -> Screen.InteractiveTools()
                     else -> currentScreen
                 }
 

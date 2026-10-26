@@ -139,6 +139,12 @@ fun DirectExecutionSidebar(
             if (pluginId == null) {
                 val filteredPlugins = loadedPlugins.filter { plugin ->
                     val manifest = plugin.getManifest().getOrNull() ?: return@filter false
+                    val hasAutomatedCaps = manifest.capabilities.any {
+                        it.context != org.wip.plugintoolkit.api.CapabilityContext.FLOW_ONLY &&
+                            !it.isInteractive &&
+                            it.context != org.wip.plugintoolkit.api.CapabilityContext.INTERACTIVE_ONLY
+                    }
+                    if (!hasAutomatedCaps) return@filter false
                     val name = manifest.plugin.name
                     val id = manifest.plugin.id
                     name.contains(pluginSearchQuery, ignoreCase = true) || id.contains(pluginSearchQuery, ignoreCase = true)
@@ -209,6 +215,8 @@ fun DirectExecutionSidebar(
 
                     val filteredCapabilities = manifest.capabilities.filter { capability ->
                         capability.context != org.wip.plugintoolkit.api.CapabilityContext.FLOW_ONLY &&
+                            !capability.isInteractive &&
+                            capability.context != org.wip.plugintoolkit.api.CapabilityContext.INTERACTIVE_ONLY &&
                             (capability.name.contains(capabilitySearchQuery, ignoreCase = true) ||
                              (capability.description != null && capability.description.contains(capabilitySearchQuery, ignoreCase = true)))
                     }

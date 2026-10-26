@@ -227,6 +227,8 @@ private fun CapabilitiesPalette(
             val manifest = p.getManifest().getOrThrow()
             manifest.plugin to manifest.capabilities.filter {
                 it.context != org.wip.plugintoolkit.api.CapabilityContext.STANDALONE_ONLY &&
+                    !it.isInteractive &&
+                    it.context != org.wip.plugintoolkit.api.CapabilityContext.INTERACTIVE_ONLY &&
                     it.name.contains(searchQuery, ignoreCase = true)
             }
         }.filter { it.second.isNotEmpty() }

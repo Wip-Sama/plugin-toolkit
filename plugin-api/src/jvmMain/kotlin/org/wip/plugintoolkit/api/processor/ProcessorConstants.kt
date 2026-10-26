@@ -36,6 +36,7 @@ object ProcessorConstants {
     // Annotations
     const val PLUGIN_INFO_ANNOTATION = "$ANNOTATION_PACKAGE.PluginInfo"
     const val CAPABILITY_ANNOTATION = "$ANNOTATION_PACKAGE.Capability"
+    const val INTERACTIVE_TOOL_ANNOTATION = "$ANNOTATION_PACKAGE.InteractiveTool"
     const val CAPABILITY_PARAM_ANNOTATION = "$ANNOTATION_PACKAGE.CapabilityParam"
     const val CAPABILITY_INPUT_ANNOTATION = "$ANNOTATION_PACKAGE.CapabilityInput"
     const val CAPABILITY_OUTPUT_ANNOTATION = "$ANNOTATION_PACKAGE.CapabilityOutput"

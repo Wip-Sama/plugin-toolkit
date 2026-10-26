@@ -201,7 +201,11 @@ fun FlowEditorView(
         availablePlugins.forEach { entry ->
             val manifest = entry.getManifest().getOrNull()
             if (manifest != null) {
-                manifest.capabilities.filter { it.context != org.wip.plugintoolkit.api.CapabilityContext.STANDALONE_ONLY }.forEach { cap ->
+                manifest.capabilities.filter {
+                    it.context != org.wip.plugintoolkit.api.CapabilityContext.STANDALONE_ONLY &&
+                        !it.isInteractive &&
+                        it.context != org.wip.plugintoolkit.api.CapabilityContext.INTERACTIVE_ONLY
+                }.forEach { cap ->
                     list.add(PaletteNode.Capability(manifest.plugin, cap))
                 }
             }

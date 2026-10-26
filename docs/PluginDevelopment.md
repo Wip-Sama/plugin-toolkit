@@ -418,6 +418,34 @@ fun integerDivideCapability(
 - **Property Port Names**: If a property is not explicitly annotated with `@CapabilityResult`, it will still become an output port named after the property name with an empty description.
 - **Type Mapping**: The output port data types will be automatically inferred from the property types in the Kotlin class.
 
+#### Capability Execution Contexts & Interactive Tools
+
+Capabilities declare where they can be executed via the `context` attribute of `@Capability` (`CapabilityContext`):
+
+| Context | Enum Value | Where It Can Be Executed | Purpose & Restrictions |
+|---|---|---|---|
+| **Any (Default)** | `CapabilityContext.ANY` | Direct execution sidebar & Visual Flow Editor | General-purpose automated background capability. |
+| **Flow Only** | `CapabilityContext.FLOW_ONLY` | Visual Flow Editor palette | Helper or transform capability intended solely for flow graphs. |
+| **Standalone Only** | `CapabilityContext.STANDALONE_ONLY` | Direct execution sidebar | Direct runner task, omitted from flow palette. |
+| **Interactive Only** | `CapabilityContext.INTERACTIVE_ONLY` | Dedicated **Interactive** tab under **Runner** | Full SDUI interactive tool. Omitted from direct execution and flows. |
+
+##### Interactive SDUI Tools (`@InteractiveTool`)
+
+Plugins can provide full, reactive graphical user interfaces using declarative Server-Driven UI (SDUI). Unlike standard capabilities that run headlessly in background automated job workers, **Interactive Tools require continuous human interaction** (e.g. vector drawing boards, live canvas simulators, interactive inspectors).
+
+Because of this fundamental difference in execution model and user interaction:
+1. **Visual Flows Cannot Use Interactive Tools**: Visual flows are automated, headless batch execution pipelines. Attempting to place an interactive capability into a flow marks the node as unready (`node.isReady = false`) and breaks the flow (`flow.isBroken = true`).
+2. **Dedicated Interactive Tab**: In the host application, interactive tools are surfaced under the dedicated **Interactive** section in the navigation sidebar (under the **Runner** group alongside "Capabilities" and "Flows").
+3. **Declaration**: Annotate interactive methods with `@InteractiveTool` or `@Capability(isInteractive = true)`:
+   ```kotlin
+   @InteractiveTool(name = "Vector Canvas", description = "Live vector drawing surface")
+   fun drawingCanvas(): String {
+       // KSP automatically infers context = CapabilityContext.INTERACTIVE_ONLY
+       return "drawingCanvas"
+   }
+   ```
+4. **Architecture & DSL**: For full details on the declarative SDUI component tree, vector canvas, reactive state diffing, dual-loop concurrency, and lifecycle management, see the comprehensive [Interactive Plugins Guide](InteractivePlugins.md).
+
 ### 3. Changelog Management
 
 The toolkit automatically parses a `changelog.md` file and includes it in the plugin manifest. This allows the host application to display update details to users.

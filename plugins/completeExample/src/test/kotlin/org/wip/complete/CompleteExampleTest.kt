@@ -22,6 +22,7 @@ import org.wip.plugintoolkit.api.ProgressReporter
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class CompleteExampleTest {
@@ -387,6 +388,19 @@ class CompleteExampleTest {
         assertEquals(4, emittedTrees.size)
 
         job.cancel()
+    }
+
+    @Test
+    fun testInteractiveToolCapabilityManifestGeneration() {
+        val manifest = CompleteExamplePluginManifest.manifest
+        val interactiveCap = manifest.capabilities.find { it.name == "interactiveDrawingAndControls" }
+        assertNotNull(interactiveCap, "interactiveDrawingAndControls capability must exist in manifest")
+        assertTrue(interactiveCap.isInteractive, "Capability must be flagged as interactive")
+        assertEquals(
+            org.wip.plugintoolkit.api.CapabilityContext.INTERACTIVE_ONLY,
+            interactiveCap.context,
+            "Interactive capability must default to INTERACTIVE_ONLY context"
+        )
     }
 }
 

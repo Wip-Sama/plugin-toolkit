@@ -507,6 +507,17 @@
     <string name="plugin_rerun_setup">Esegui di Nuovo Setup</string>
     <string name="plugin_open_folder">Apri Cartella</string>
     <string name="tab_plugin_manager">Gestore Plugin</string>
+    <string name="tab_interactive_tools">Interattivo</string>
+    <string name="interactive_tools_title">Strumenti Interattivi</string>
+    <string name="interactive_tools_hint">Seleziona uno strumento interattivo dalla barra laterale per avviare la sua interfaccia</string>
+    <string name="interactive_tools_empty">Nessuno Strumento Interattivo Trovato</string>
+    <string name="interactive_tools_empty_desc">Nessuno dei plugin installati fornisce strumenti Server-Driven UI interattivi. I plugin interattivi consentono interfacce grafiche reattive, form dinamici e aree di disegno.</string>
+    <string name="interactive_tools_search_placeholder">Cerca strumenti interattivi...</string>
+    <string name="interactive_session_active">Sessione Attiva</string>
+    <string name="interactive_session_idle">Inattivo</string>
+    <string name="action_restart_session">Riavvia Sessione</string>
+    <string name="action_close_session">Chiudi Sessione</string>
+    <string name="action_launch_session">Avvia Sessione</string>
     <string name="action_export">Esporta</string>
     <string name="action_force_cancel">Forza Annullamento</string>
     <string name="setting_auto_scroll">Scorrimento automatico</string>

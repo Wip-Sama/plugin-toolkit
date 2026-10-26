@@ -48,6 +48,15 @@ When multiple elements are selected, operations apply across the entire selectio
 
 Plugins can declare capabilities with `context = CapabilityContext.FLOW_ONLY`. These capabilities are exclusively available as nodes within the Flow Editor palette and cannot be invoked as standalone runner jobs. This is ideal for helper, normalization, or intermediate transformation capabilities that only make sense within an orchestrated workflow.
 
+## Exclusion of Interactive Capabilities
+
+Visual flows are designed exclusively for deterministic, headless, automated batch execution pipelines. As such, **interactive capabilities and full SDUI tools** (`isInteractive = true` or `CapabilityContext.INTERACTIVE_ONLY`) **cannot be used in flows**:
+- Interactive capabilities are strictly omitted from the Flow Editor node palette (`PaletteSidebar`).
+- If an interactive capability is present in a flow configuration, the node validation marks it as unready (`node.isReady = false`) and the flow as broken (`flow.isBroken = true`).
+- The Flow Engine will refuse execution with an error indicating that interactive tools require real-time human interaction and cannot run in automated pipelines.
+- Interactive tools live and run exclusively in the host application's dedicated **Interactive** tab under the **Runner** sidebar.
+- For instructions on creating interactive capabilities, refer to the [Interactive Plugins Guide](InteractivePlugins.md).
+
 ## Control Flow & Loop Nodes
 
 The flow engine includes built-in system nodes for dynamic iterations and conditional branching without requiring disk-based subflow files:

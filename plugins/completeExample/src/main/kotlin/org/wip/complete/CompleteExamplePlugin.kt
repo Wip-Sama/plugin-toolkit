@@ -38,6 +38,7 @@ import org.wip.plugintoolkit.api.annotations.CapabilityInput
 import org.wip.plugintoolkit.api.annotations.CapabilityOutput
 import org.wip.plugintoolkit.api.annotations.CapabilityParam
 import org.wip.plugintoolkit.api.annotations.CapabilityResult
+import org.wip.plugintoolkit.api.annotations.InteractiveTool
 import org.wip.plugintoolkit.api.annotations.DependsOn
 import org.wip.plugintoolkit.api.annotations.ParameterGroup
 import org.wip.plugintoolkit.api.annotations.PluginAction
@@ -548,10 +549,9 @@ class CompleteExamplePlugin(val settings: CompleteExampleSettings) : Interactive
                 "Filter: ${inferenceOptions.postProcessing.applyFilter}, Intensity: ${inferenceOptions.postProcessing.filterIntensity}"
     }
 
-    @Capability(
+    @InteractiveTool(
         name = "interactiveDrawingAndControls",
-        description = "Interactive SDUI canvas showcasing reactive live controls, form synchronization, and vector drawing.",
-        isInteractive = true
+        description = "Interactive SDUI canvas showcasing reactive live controls, form synchronization, and vector drawing."
     )
     fun interactiveDrawingAndControls(): String {
         return "Interactive SDUI session active"

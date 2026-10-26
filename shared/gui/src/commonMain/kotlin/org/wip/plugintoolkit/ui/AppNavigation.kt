@@ -29,6 +29,7 @@ import org.wip.plugintoolkit.features.landingPage.ui.LandingPage
 import org.wip.plugintoolkit.features.navigation.GlobalRouter
 import org.wip.plugintoolkit.features.navigation.LocalGlobalRouter
 import org.wip.plugintoolkit.features.navigation.model.Screen
+import org.wip.plugintoolkit.features.plugin.ui.InteractiveToolsScreen
 import org.wip.plugintoolkit.features.plugin.ui.PluginManagerView
 import org.wip.plugintoolkit.features.plugin.ui.PluginSectionScreen
 import org.wip.plugintoolkit.features.plugin.ui.PluginSettingsDialog
@@ -195,6 +196,12 @@ fun AppNavigation(
                     )
                 }
                 is Screen.PluginRepo -> opaqueNavEntry(key) { PluginRepoView() }
+                is Screen.InteractiveTools -> opaqueNavEntry(key) {
+                    InteractiveToolsScreen(
+                        initialPluginId = key.pluginId,
+                        initialCapabilityName = key.capabilityName
+                    )
+                }
                 else -> opaqueNavEntry(key) { }
             }
         }

@@ -60,8 +60,25 @@ annotation class Capability(
  * Specifies the context in which a capability can be executed.
  */
 enum class CapabilityContext {
-    ANY, FLOW_ONLY, STANDALONE_ONLY
+    ANY, FLOW_ONLY, STANDALONE_ONLY, INTERACTIVE_ONLY
 }
+
+/**
+ * Marks a function as an interactive tool / full GUI.
+ *
+ * Interactive tools provide real-time declarative user interfaces (SDUI) via
+ * [InteractiveUiProcessor] and require user interaction. Because they are full GUIs,
+ * they cannot be executed as automated flow nodes or headless background capabilities.
+ *
+ * @property name The identifier for this interactive tool.
+ * @property description A description of what this interactive tool provides.
+ */
+@Target(AnnotationTarget.FUNCTION)
+@Retention(AnnotationRetention.SOURCE)
+annotation class InteractiveTool(
+    val name: String,
+    val description: String = ""
+)
 
 
 /**

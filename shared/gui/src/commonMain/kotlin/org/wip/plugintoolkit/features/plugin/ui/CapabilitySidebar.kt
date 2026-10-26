@@ -52,6 +52,8 @@ fun CapabilitySidebar(
 
     val filteredCapabilities = manifest.capabilities.filter { capability ->
         capability.context != org.wip.plugintoolkit.api.CapabilityContext.FLOW_ONLY &&
+            !capability.isInteractive &&
+            capability.context != org.wip.plugintoolkit.api.CapabilityContext.INTERACTIVE_ONLY &&
             (capability.name.contains(searchQuery, ignoreCase = true) ||
              (capability.description != null && capability.description.contains(searchQuery, ignoreCase = true)))
     }

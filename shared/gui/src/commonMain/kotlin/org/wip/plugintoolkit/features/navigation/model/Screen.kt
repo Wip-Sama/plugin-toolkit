@@ -37,6 +37,9 @@ sealed interface Screen : NavKey {
 
     @Serializable
     data object PluginRepo : Screen
+
+    @Serializable
+    data class InteractiveTools(val pluginId: String? = null, val capabilityName: String? = null) : Screen
 }
 
 /** Polymorphic serialization config required by rememberNavBackStack. */
@@ -53,6 +56,7 @@ val ScreenNavConfig = SavedStateConfiguration {
             subclass(Screen.Plugin::class, Screen.Plugin.serializer())
             subclass(Screen.PluginManager::class, Screen.PluginManager.serializer())
             subclass(Screen.PluginRepo::class, Screen.PluginRepo.serializer())
+            subclass(Screen.InteractiveTools::class, Screen.InteractiveTools.serializer())
         }
     }
 }

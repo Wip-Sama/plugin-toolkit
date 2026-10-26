@@ -150,6 +150,7 @@ fun FlowRunnerView(
         org.wip.plugintoolkit.features.plugin.logic.PluginLoader.getPlugins()
             .mapNotNull { it.getManifest().getOrNull() }
             .flatMap { it.capabilities }
+            .filter { !it.isInteractive && it.context != org.wip.plugintoolkit.api.CapabilityContext.INTERACTIVE_ONLY }
             .map { it.name }
             .toSet()
     }

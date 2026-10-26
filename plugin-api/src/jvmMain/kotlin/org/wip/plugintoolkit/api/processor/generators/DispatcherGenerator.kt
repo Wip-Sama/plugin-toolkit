@@ -15,6 +15,7 @@ import com.squareup.kotlinpoet.ksp.toTypeName
 import org.wip.plugintoolkit.api.processor.GeneratorUtils
 import org.wip.plugintoolkit.api.processor.GeneratorUtils.hasQualifiedName
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CAPABILITY_ANNOTATION
+import org.wip.plugintoolkit.api.processor.ProcessorConstants.INTERACTIVE_TOOL_ANNOTATION
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_BOOLEAN
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_DATA_PROCESSOR
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CN_EXECUTION_RESULT
@@ -87,7 +88,7 @@ object DispatcherGenerator {
         mapCode.indent()
 
         functions.forEachIndexed { index, func ->
-            val capAnn = func.annotations.first { it.hasQualifiedName(CAPABILITY_ANNOTATION) }
+            val capAnn = func.annotations.first { it.hasQualifiedName(CAPABILITY_ANNOTATION) || it.hasQualifiedName(INTERACTIVE_TOOL_ANNOTATION) }
             val capName = capAnn.arguments.find { it.name?.asString() == "name" }?.value as String
             val methodName = func.simpleName.asString()
 

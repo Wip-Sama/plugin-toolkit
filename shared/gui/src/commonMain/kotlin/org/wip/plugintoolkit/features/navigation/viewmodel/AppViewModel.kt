@@ -19,7 +19,9 @@ import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.nav_jobs
 import plugintoolkit.composeapp.generated.resources.nav_main
 import plugintoolkit.composeapp.generated.resources.settings
+import plugintoolkit.composeapp.generated.resources.tab_interactive_tools
 import plugintoolkit.composeapp.generated.resources.tab_plugin_manager
+import androidx.compose.material.icons.filled.TouchApp
 
 class AppViewModel(
     settingsRepository: SettingsRepository,
@@ -48,6 +50,8 @@ class AppViewModel(
                     id = Screen.Plugins, icon = Icons.Default.PlayCircle, title = "Capabilities".localized
                 ), SidebarElement(
                     id = Screen.FlowRunner(), icon = Icons.Default.PlayCircle, title = "Flows".localized
+                ), SidebarElement(
+                    id = Screen.InteractiveTools(), icon = Icons.Default.TouchApp, title = Res.string.tab_interactive_tools.localized
                 )
             )
         ), SidebarSectionData(

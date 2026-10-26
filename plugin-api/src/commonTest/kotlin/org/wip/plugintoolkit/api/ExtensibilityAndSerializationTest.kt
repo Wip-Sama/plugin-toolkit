@@ -62,6 +62,8 @@ class ExtensibilityAndSerializationTest {
         assertEquals(PrimitiveType.UNKNOWN, json.decodeFromString<PrimitiveType>("\"COMPLEX_NUMBER\""))
         assertEquals(ParameterRole.UNKNOWN, json.decodeFromString<ParameterRole>("\"FUTURE_ROLE\""))
         assertEquals(CapabilityContext.UNKNOWN, json.decodeFromString<CapabilityContext>("\"CLOUD_ONLY\""))
+        assertEquals(CapabilityContext.INTERACTIVE_ONLY, json.decodeFromString<CapabilityContext>("\"INTERACTIVE_ONLY\""))
+        assertEquals(CapabilityContext.INTERACTIVE_ONLY, json.decodeFromString<CapabilityContext>("\"interactive_only\""))
 
         // Case-insensitive tests
         assertEquals(OS.WINDOWS, json.decodeFromString<OS>("\"WINDOWS\""))

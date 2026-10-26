@@ -331,7 +331,7 @@ sealed class Node : BoardElement {
             locks: Map<String, Boolean>?,
             effectiveConnections: List<Connection>?
         ): Boolean {
-            if (isBroken) return false
+            if (isBroken || capability.isInteractive || capability.context == org.wip.plugintoolkit.api.CapabilityContext.INTERACTIVE_ONLY) return false
             val parameters = capability.parameters ?: return true
             val currentParamElements = inputs.associate { input ->
                 input.id to AnySerializer.toJsonElement(input.value ?: input.defaultValue)
@@ -1232,7 +1232,9 @@ data class Flow(
         settingsMap: Map<Long, Map<String, JsonElement>>? = null,
         locksMap: Map<Long, Map<String, Boolean>>? = null
     ): Boolean {
-        val hasBrokenNode = this.nodes.any { it is Node.CapabilityNode && it.isBroken }
+        val hasBrokenNode = this.nodes.any { 
+            it is Node.CapabilityNode && (it.isBroken || it.capability.isInteractive || it.capability.context == org.wip.plugintoolkit.api.CapabilityContext.INTERACTIVE_ONLY) 
+        }
         val hasMissingCapability =
             this.nodes.filterIsInstance<Node.CapabilityNode>().any { it.capability.name !in activeCapabilities }
         val hasMissingRequiredPort = this.nodes.filterIsInstance<Node.CapabilityNode>().any { capNode ->

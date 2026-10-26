@@ -19,6 +19,7 @@ import org.wip.plugintoolkit.api.Changelog
 import org.wip.plugintoolkit.api.OS
 import org.wip.plugintoolkit.api.processor.GeneratorUtils.hasQualifiedName
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.CAPABILITY_ANNOTATION
+import org.wip.plugintoolkit.api.processor.ProcessorConstants.INTERACTIVE_TOOL_ANNOTATION
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.PLUGIN_ACTION_ANNOTATION
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.PLUGIN_INFO_ANNOTATION
 import org.wip.plugintoolkit.api.processor.ProcessorConstants.PLUGIN_SETTING_ANNOTATION
@@ -111,7 +112,7 @@ class ManifestProcessor(
             .toList()
 
         val functions = classDeclaration.getAllFunctions().filter {
-            it.annotations.any { ann -> ann.hasQualifiedName(CAPABILITY_ANNOTATION) }
+            it.annotations.any { ann -> ann.hasQualifiedName(CAPABILITY_ANNOTATION) || ann.hasQualifiedName(INTERACTIVE_TOOL_ANNOTATION) }
         }.toList()
 
         val settingsProperties = settingsClasses.flatMap { clazz ->
@@ -175,7 +176,7 @@ class ManifestProcessor(
         // Validate parameter conditions for unknown targets and circular dependencies
         val availableSettingNames = settingsProperties.map { it.simpleName.asString() }.toSet()
         functions.forEach { func ->
-            val capAnn = func.annotations.first { it.hasQualifiedName(CAPABILITY_ANNOTATION) }
+            val capAnn = func.annotations.first { it.hasQualifiedName(CAPABILITY_ANNOTATION) || it.hasQualifiedName(INTERACTIVE_TOOL_ANNOTATION) }
             val capName = capAnn.arguments.find { it.name?.asString() == "name" }?.value as? String ?: func.simpleName.asString()
             val unpackedParams = GeneratorUtils.getCapabilityParameters(func, logger)
             val paramConditions = unpackedParams.associate { it.name to it.condition }

@@ -180,6 +180,9 @@ class JobWorker(
         if (cap?.context == org.wip.plugintoolkit.api.CapabilityContext.FLOW_ONLY) {
             throw IllegalStateException("Capability '${job.capabilityName}' is scoped only as a node in flows and cannot be executed directly.")
         }
+        if (cap?.isInteractive == true || cap?.context == org.wip.plugintoolkit.api.CapabilityContext.INTERACTIVE_ONLY) {
+            throw IllegalStateException("Capability '${job.capabilityName}' is an interactive UI tool and cannot be executed as a background automated capability job.")
+        }
         val mutableParams = job.parameters.toMutableMap()
         val scratchDiskManager: ScratchDiskManager = getKoin().getOrNull() ?: ScratchDiskManager()
         val sandboxDir = scratchDiskManager.getJobNodeSandboxDir(job.id, "node_0", job.scratchDir)
