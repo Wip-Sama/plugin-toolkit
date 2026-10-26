@@ -361,7 +361,12 @@ class CompleteExampleTest {
         // Verify initial tree emitted
         assertEquals(1, emittedTrees.size)
         val initialTree = emittedTrees.first()
-        assertTrue(initialTree.root is org.wip.plugintoolkit.api.sdui.ColumnNode)
+        assertTrue(initialTree.root is org.wip.plugintoolkit.api.sdui.ScaffoldNode)
+        val scaffold = initialTree.root as org.wip.plugintoolkit.api.sdui.ScaffoldNode
+        assertTrue(scaffold.content is org.wip.plugintoolkit.api.sdui.BoardNode)
+        assertEquals(1, scaffold.floatingPanels.size)
+        assertEquals("controlsPanel", scaffold.floatingPanels.first().id)
+        assertEquals(org.wip.plugintoolkit.api.sdui.FloatingAnchor.TOP_END, scaffold.floatingPanels.first().anchor)
 
         // Dispatch text change
         eventsFlow.emit(org.wip.plugintoolkit.api.sdui.UiEvent.TextChanged("titleInput", "New Custom Canvas Title"))
@@ -386,6 +391,22 @@ class CompleteExampleTest {
         eventsFlow.emit(org.wip.plugintoolkit.api.sdui.UiEvent.PathCommitted("drawingBoard", testPath))
         advanceUntilIdle()
         assertEquals(4, emittedTrees.size)
+
+        // Dispatch tool change
+        eventsFlow.emit(org.wip.plugintoolkit.api.sdui.UiEvent.OptionSelected("toolDropdown", "HIGHLIGHTER"))
+        advanceUntilIdle()
+        assertEquals(5, emittedTrees.size)
+        val highlighterTree = emittedTrees.last()
+        val highlighterBoard = (highlighterTree.root as org.wip.plugintoolkit.api.sdui.ScaffoldNode).content as org.wip.plugintoolkit.api.sdui.BoardNode
+        assertTrue(highlighterBoard.activeTool is org.wip.plugintoolkit.api.sdui.BoardTool.Highlighter)
+
+        // Dispatch color change
+        eventsFlow.emit(org.wip.plugintoolkit.api.sdui.UiEvent.OptionSelected("colorDropdown", "HIGHLIGHT"))
+        advanceUntilIdle()
+        assertEquals(6, emittedTrees.size)
+        val colorTree = emittedTrees.last()
+        val colorBoard = (colorTree.root as org.wip.plugintoolkit.api.sdui.ScaffoldNode).content as org.wip.plugintoolkit.api.sdui.BoardNode
+        assertEquals(org.wip.plugintoolkit.api.sdui.SemanticColor.HIGHLIGHT, (colorBoard.activeTool as org.wip.plugintoolkit.api.sdui.BoardTool.Highlighter).color)
 
         job.cancel()
     }

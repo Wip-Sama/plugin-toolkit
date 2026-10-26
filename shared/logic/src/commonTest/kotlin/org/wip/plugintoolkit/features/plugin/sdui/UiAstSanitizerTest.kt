@@ -10,6 +10,7 @@ import org.wip.plugintoolkit.api.sdui.UiNodeTree
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class UiAstSanitizerTest {
@@ -121,4 +122,34 @@ class UiAstSanitizerTest {
         val errorFill = assertIs<ErrorBoundaryNode>(sanitizedFill.root)
         assertTrue(errorFill.errorMessage.contains("Invalid fillMaxWidth"))
     }
+
+    @Test
+    fun testSanitizeScaffoldWithPanels() {
+        val scaffoldTree = UiNodeTree(
+            root = org.wip.plugintoolkit.api.sdui.ScaffoldNode(
+                id = "scaffold_root",
+                content = TextNode(id = "main_content", text = "Content"),
+                floatingPanels = listOf(
+                    org.wip.plugintoolkit.api.sdui.FloatingPanelNode(
+                        id = "floating_1",
+                        anchor = org.wip.plugintoolkit.api.sdui.FloatingAnchor.TOP_START,
+                        children = listOf(TextNode(id = "float_child", text = "Panel"))
+                    )
+                ),
+                leftSidebar = org.wip.plugintoolkit.api.sdui.SidebarNode(
+                    id = "sidebar_1",
+                    attachPoint = org.wip.plugintoolkit.api.sdui.SidebarAttachPoint.LEFT,
+                    children = listOf(TextNode(id = "side_child", text = "Sidebar"))
+                )
+            )
+        )
+        val sanitized = scaffoldTree.sanitize()
+        val root = assertIs<org.wip.plugintoolkit.api.sdui.ScaffoldNode>(sanitized.root)
+        assertEquals("scaffold_root", root.id)
+        assertIs<TextNode>(root.content)
+        assertEquals(1, root.floatingPanels.size)
+        assertNotNull(root.leftSidebar)
+        assertIs<org.wip.plugintoolkit.api.sdui.SidebarNode>(root.leftSidebar)
+    }
 }
+

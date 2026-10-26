@@ -1,20 +1,28 @@
 package org.wip.plugintoolkit.features.plugin.sdui
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -42,6 +50,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -56,9 +65,14 @@ import org.wip.plugintoolkit.api.sdui.ColumnNode
 import org.wip.plugintoolkit.api.sdui.DividerNode
 import org.wip.plugintoolkit.api.sdui.DropdownNode
 import org.wip.plugintoolkit.api.sdui.ErrorBoundaryNode
+import org.wip.plugintoolkit.api.sdui.FloatingAnchor
+import org.wip.plugintoolkit.api.sdui.FloatingPanelNode
 import org.wip.plugintoolkit.api.sdui.ImageNode
 import org.wip.plugintoolkit.api.sdui.RowNode
+import org.wip.plugintoolkit.api.sdui.ScaffoldNode
 import org.wip.plugintoolkit.api.sdui.ScrollableColumnNode
+import org.wip.plugintoolkit.api.sdui.SidebarAttachPoint
+import org.wip.plugintoolkit.api.sdui.SidebarNode
 import org.wip.plugintoolkit.api.sdui.SliderNode
 import org.wip.plugintoolkit.api.sdui.SpacingSize
 import org.wip.plugintoolkit.api.sdui.TextInputNode
@@ -180,6 +194,18 @@ fun RenderUiNode(
                     }
                 }
             }
+        }
+
+        is ScaffoldNode -> {
+            RenderScaffold(node = node, onEvent = onEvent, modifier = appliedModifier)
+        }
+
+        is FloatingPanelNode -> {
+            RenderFloatingPanel(node = node, onEvent = onEvent, modifier = appliedModifier)
+        }
+
+        is SidebarNode -> {
+            RenderSidebar(node = node, onEvent = onEvent, modifier = appliedModifier)
         }
 
         is TextNode -> {
@@ -499,9 +525,9 @@ fun TypographyRole.toTextStyle(): TextStyle = when (this) {
  * Map [AlignmentRole] to Horizontal alignment.
  */
 fun AlignmentRole.toHorizontalAlignment(): Alignment.Horizontal = when (this) {
-    AlignmentRole.START -> Alignment.Start
-    AlignmentRole.CENTER -> Alignment.CenterHorizontally
-    AlignmentRole.END -> Alignment.End
+    AlignmentRole.START, AlignmentRole.TOP_START, AlignmentRole.BOTTOM_START, AlignmentRole.CENTER_START -> Alignment.Start
+    AlignmentRole.CENTER, AlignmentRole.TOP_CENTER, AlignmentRole.BOTTOM_CENTER -> Alignment.CenterHorizontally
+    AlignmentRole.END, AlignmentRole.TOP_END, AlignmentRole.BOTTOM_END, AlignmentRole.CENTER_END -> Alignment.End
     else -> Alignment.Start
 }
 
@@ -509,18 +535,214 @@ fun AlignmentRole.toHorizontalAlignment(): Alignment.Horizontal = when (this) {
  * Map [AlignmentRole] to Vertical alignment.
  */
 fun AlignmentRole.toVerticalAlignment(): Alignment.Vertical = when (this) {
-    AlignmentRole.TOP, AlignmentRole.START -> Alignment.Top
-    AlignmentRole.CENTER -> Alignment.CenterVertically
-    AlignmentRole.BOTTOM, AlignmentRole.END -> Alignment.Bottom
+    AlignmentRole.TOP, AlignmentRole.TOP_START, AlignmentRole.TOP_CENTER, AlignmentRole.TOP_END -> Alignment.Top
+    AlignmentRole.CENTER, AlignmentRole.START, AlignmentRole.END, AlignmentRole.CENTER_START, AlignmentRole.CENTER_END -> Alignment.CenterVertically
+    AlignmentRole.BOTTOM, AlignmentRole.BOTTOM_START, AlignmentRole.BOTTOM_CENTER, AlignmentRole.BOTTOM_END -> Alignment.Bottom
 }
 
 /**
  * Map [AlignmentRole] to Box alignment.
  */
 fun AlignmentRole.toBoxAlignment(): Alignment = when (this) {
-    AlignmentRole.START, AlignmentRole.TOP -> Alignment.TopStart
+    AlignmentRole.START, AlignmentRole.TOP_START -> Alignment.TopStart
+    AlignmentRole.TOP, AlignmentRole.TOP_CENTER -> Alignment.TopCenter
+    AlignmentRole.TOP_END -> Alignment.TopEnd
+    AlignmentRole.CENTER_START -> Alignment.CenterStart
     AlignmentRole.CENTER -> Alignment.Center
-    AlignmentRole.END, AlignmentRole.BOTTOM -> Alignment.BottomEnd
+    AlignmentRole.CENTER_END -> Alignment.CenterEnd
+    AlignmentRole.BOTTOM_START -> Alignment.BottomStart
+    AlignmentRole.BOTTOM, AlignmentRole.BOTTOM_CENTER -> Alignment.BottomCenter
+    AlignmentRole.END, AlignmentRole.BOTTOM_END -> Alignment.BottomEnd
+}
+
+/**
+ * Map [FloatingAnchor] to Compose Box alignment.
+ */
+fun FloatingAnchor.toAlignment(): Alignment = when (this) {
+    FloatingAnchor.TOP_START -> Alignment.TopStart
+    FloatingAnchor.TOP_CENTER -> Alignment.TopCenter
+    FloatingAnchor.TOP_END -> Alignment.TopEnd
+    FloatingAnchor.CENTER_START -> Alignment.CenterStart
+    FloatingAnchor.CENTER -> Alignment.Center
+    FloatingAnchor.CENTER_END -> Alignment.CenterEnd
+    FloatingAnchor.BOTTOM_START -> Alignment.BottomStart
+    FloatingAnchor.BOTTOM_CENTER -> Alignment.BottomCenter
+    FloatingAnchor.BOTTOM_END -> Alignment.BottomEnd
+}
+
+@Composable
+private fun RenderScaffold(
+    node: ScaffoldNode,
+    onEvent: (UiEvent) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(modifier = modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            node.topBar?.let { top ->
+                SafeUiNodeRenderer(node = top, onEvent = onEvent, modifier = Modifier.fillMaxWidth())
+            }
+            Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                node.leftSidebar?.let { left ->
+                    SafeUiNodeRenderer(node = left, onEvent = onEvent, modifier = Modifier.fillMaxHeight())
+                }
+                Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
+                    SafeUiNodeRenderer(node = node.content, onEvent = onEvent, modifier = Modifier.fillMaxSize())
+                }
+                node.rightSidebar?.let { right ->
+                    SafeUiNodeRenderer(node = right, onEvent = onEvent, modifier = Modifier.fillMaxHeight())
+                }
+            }
+            node.bottomBar?.let { bottom ->
+                SafeUiNodeRenderer(node = bottom, onEvent = onEvent, modifier = Modifier.fillMaxWidth())
+            }
+        }
+
+        // Floating overlay panels positioned according to their anchors
+        node.floatingPanels.forEach { panel ->
+            key(panel.id) {
+                SafeUiNodeRenderer(
+                    node = panel,
+                    onEvent = onEvent,
+                    modifier = Modifier.align(panel.anchor.toAlignment())
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun RenderFloatingPanel(
+    node: FloatingPanelNode,
+    onEvent: (UiEvent) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var isCollapsed by remember(node.id) { mutableStateOf(node.isCollapsed) }
+
+    Surface(
+        modifier = modifier.padding(ToolkitTheme.spacing.medium),
+        shape = RoundedCornerShape(ToolkitTheme.dimensions.expressiveCardCornerRadius),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.95f),
+        shadowElevation = ToolkitTheme.dimensions.elevationMedium,
+        border = BorderStroke(ToolkitTheme.dimensions.borderThin, MaterialTheme.colorScheme.outlineVariant)
+    ) {
+        Column(
+            modifier = Modifier.padding(ToolkitTheme.spacing.medium),
+            verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
+        ) {
+            val showHeader = node.title != null || node.isCollapsible
+            if (showHeader) {
+                Row(
+                    modifier = Modifier
+                        .then(if (node.isCollapsible) Modifier.clip(ToolkitTheme.shapes.small).clickable { isCollapsed = !isCollapsed } else Modifier),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    node.title?.let { titleText ->
+                        Text(
+                            text = titleText,
+                            style = ToolkitTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.padding(end = ToolkitTheme.spacing.small)
+                        )
+                    }
+                    if (node.isCollapsible) {
+                        IconButton(
+                            onClick = { isCollapsed = !isCollapsed },
+                            modifier = Modifier.size(ToolkitTheme.dimensions.iconMedium)
+                        ) {
+                            Icon(
+                                imageVector = if (isCollapsed) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
+                                contentDescription = "Toggle panel",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
+                            )
+                        }
+                    }
+                }
+            }
+
+            AnimatedVisibility(visible = !isCollapsed) {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
+                ) {
+                    node.children.forEach { child ->
+                        key(child.id) {
+                            SafeUiNodeRenderer(node = child, onEvent = onEvent)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RenderSidebar(
+    node: SidebarNode,
+    onEvent: (UiEvent) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var isCollapsed by remember(node.id) { mutableStateOf(node.isCollapsed) }
+    val isHorizontal = node.attachPoint == SidebarAttachPoint.LEFT || node.attachPoint == SidebarAttachPoint.RIGHT
+
+    Surface(
+        modifier = if (isHorizontal) {
+            modifier.width(if (isCollapsed) ToolkitTheme.dimensions.sidebarCollapsedWidth else ToolkitTheme.dimensions.sidebarExpandedWidth).fillMaxHeight()
+        } else {
+            modifier.fillMaxWidth()
+        },
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        border = BorderStroke(ToolkitTheme.dimensions.borderThin, MaterialTheme.colorScheme.outlineVariant.copy(alpha = ToolkitTheme.opacity.divider))
+    ) {
+        Column(
+            modifier = Modifier.padding(ToolkitTheme.spacing.mediumSmall),
+            verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                if (!isCollapsed) {
+                    node.title?.let { titleText ->
+                        Text(
+                            text = titleText,
+                            style = ToolkitTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+                if (node.isCollapsible) {
+                    IconButton(
+                        onClick = { isCollapsed = !isCollapsed },
+                        modifier = Modifier.size(ToolkitTheme.dimensions.iconMedium)
+                    ) {
+                        Icon(
+                            imageVector = if (isCollapsed) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
+                            contentDescription = "Toggle sidebar",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
+                        )
+                    }
+                }
+            }
+
+            AnimatedVisibility(visible = !isCollapsed) {
+                Column(
+                    modifier = Modifier.verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
+                ) {
+                    node.children.forEach { child ->
+                        key(child.id) {
+                            SafeUiNodeRenderer(node = child, onEvent = onEvent)
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 /**

@@ -80,6 +80,52 @@ data class ScrollableColumnNode(
     override val modifier: UiModifier = UiModifier.None
 ) : UiNode
 
+/**
+ * Root workspace layout defining structural attach points for sidebars and floating panels.
+ */
+@Serializable
+@SerialName("scaffold")
+data class ScaffoldNode(
+    override val id: String,
+    val content: UiNode,
+    val leftSidebar: UiNode? = null,
+    val rightSidebar: UiNode? = null,
+    val topBar: UiNode? = null,
+    val bottomBar: UiNode? = null,
+    val floatingPanels: List<FloatingPanelNode> = emptyList(),
+    override val modifier: UiModifier = UiModifier.None
+) : UiNode
+
+/**
+ * Floating panel attached to an anchor (e.g. corner) with collapsible support.
+ */
+@Serializable
+@SerialName("floating_panel")
+data class FloatingPanelNode(
+    override val id: String,
+    val anchor: FloatingAnchor = FloatingAnchor.TOP_END,
+    val title: String? = null,
+    val children: List<UiNode> = emptyList(),
+    val isCollapsible: Boolean = true,
+    val isCollapsed: Boolean = false,
+    override val modifier: UiModifier = UiModifier.None
+) : UiNode
+
+/**
+ * Collapsible edge sidebar attached to a boundary (left, top, right, bottom).
+ */
+@Serializable
+@SerialName("sidebar")
+data class SidebarNode(
+    override val id: String,
+    val attachPoint: SidebarAttachPoint = SidebarAttachPoint.LEFT,
+    val title: String? = null,
+    val children: List<UiNode> = emptyList(),
+    val isCollapsible: Boolean = true,
+    val isCollapsed: Boolean = false,
+    override val modifier: UiModifier = UiModifier.None
+) : UiNode
+
 // ── Control Nodes ───────────────────────────────────────────────────────────
 
 @Serializable
@@ -201,6 +247,7 @@ data class BoardNode(
     val layers: List<BoardLayer> = emptyList(),
     val activeTool: BoardTool = BoardTool.Brush(),
     val clearRevision: Int = 0,
+    val showToolbar: Boolean = false,
     override val modifier: UiModifier = UiModifier.None
 ) : UiNode
 
@@ -271,6 +318,9 @@ object UiNodeSerializer : KSerializer<UiNode> {
             is BoxNode -> "box"
             is CardNode -> "card"
             is ScrollableColumnNode -> "scrollable_column"
+            is ScaffoldNode -> "scaffold"
+            is FloatingPanelNode -> "floating_panel"
+            is SidebarNode -> "sidebar"
             is TextNode -> "text"
             is ButtonNode -> "button"
             is TextInputNode -> "text_input"
@@ -291,6 +341,9 @@ object UiNodeSerializer : KSerializer<UiNode> {
             is BoxNode -> jsonEncoder.json.encodeToJsonElement(BoxNode.serializer(), value)
             is CardNode -> jsonEncoder.json.encodeToJsonElement(CardNode.serializer(), value)
             is ScrollableColumnNode -> jsonEncoder.json.encodeToJsonElement(ScrollableColumnNode.serializer(), value)
+            is ScaffoldNode -> jsonEncoder.json.encodeToJsonElement(ScaffoldNode.serializer(), value)
+            is FloatingPanelNode -> jsonEncoder.json.encodeToJsonElement(FloatingPanelNode.serializer(), value)
+            is SidebarNode -> jsonEncoder.json.encodeToJsonElement(SidebarNode.serializer(), value)
             is TextNode -> jsonEncoder.json.encodeToJsonElement(TextNode.serializer(), value)
             is ButtonNode -> jsonEncoder.json.encodeToJsonElement(ButtonNode.serializer(), value)
             is TextInputNode -> jsonEncoder.json.encodeToJsonElement(TextInputNode.serializer(), value)
@@ -323,6 +376,9 @@ object UiNodeSerializer : KSerializer<UiNode> {
             "box" -> BoxNode.serializer()
             "card" -> CardNode.serializer()
             "scrollable_column" -> ScrollableColumnNode.serializer()
+            "scaffold" -> ScaffoldNode.serializer()
+            "floating_panel" -> FloatingPanelNode.serializer()
+            "sidebar" -> SidebarNode.serializer()
             "text" -> TextNode.serializer()
             "button" -> ButtonNode.serializer()
             "text_input" -> TextInputNode.serializer()

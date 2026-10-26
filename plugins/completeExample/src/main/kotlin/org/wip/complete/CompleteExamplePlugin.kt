@@ -23,8 +23,10 @@ import org.wip.plugintoolkit.api.watchProcess
 import org.wip.plugintoolkit.api.ConditionOperator
 import org.wip.plugintoolkit.api.sdui.BoardLayer
 import org.wip.plugintoolkit.api.sdui.BoardTool
+import org.wip.plugintoolkit.api.sdui.FloatingAnchor
 import org.wip.plugintoolkit.api.sdui.InteractiveUiProcessor
 import org.wip.plugintoolkit.api.sdui.SemanticColor
+import org.wip.plugintoolkit.api.sdui.SpacingSize
 import org.wip.plugintoolkit.api.sdui.TypographyRole
 import org.wip.plugintoolkit.api.sdui.UiEvent
 import org.wip.plugintoolkit.api.sdui.UiModifier
@@ -565,80 +567,89 @@ class CompleteExamplePlugin(val settings: CompleteExampleSettings) : Interactive
         var brushWidth = 4.0
         var smoothing = true
         var brushColor = SemanticColor.PRIMARY
+        var activeToolType = "PEN"
         var counter = 0
         val layers = mutableListOf<BoardLayer>()
 
         fun renderTree(): UiNodeTree = uiTree {
-            column(id = "interactiveRoot") {
-                card(id = "headerCard") {
-                    column {
-                        row {
-                            text(id = "titleText", text = canvasTitle, role = TypographyRole.TITLE_MEDIUM, color = SemanticColor.PRIMARY)
-                            badge(id = "statusBadge", text = "Live Reactive SDUI", color = SemanticColor.ACCENT)
-                        }
-                        divider(id = "headerDiv")
-                        text(
-                            id = "descText",
-                            text = "Draw on the vector board below or adjust controls to reactively update the server-driven UI tree.",
-                            role = TypographyRole.BODY_SMALL
-                        )
-                    }
+            val activeBoardTool: BoardTool = when (activeToolType) {
+                "HIGHLIGHTER" -> BoardTool.Highlighter(color = brushColor, strokeWidth = (brushWidth * 2.5).toFloat())
+                "ERASER" -> BoardTool.Eraser(radius = (brushWidth * 2).toFloat())
+                else -> BoardTool.Brush(color = brushColor, strokeWidth = brushWidth.toFloat())
+            }
+
+            scaffold(id = "interactiveScaffold") {
+                // The big canvas covers the whole section without embedded separate toolbars
+                content {
+                    board(
+                        id = "drawingBoard",
+                        layers = layers.toList(),
+                        activeTool = activeBoardTool,
+                        showToolbar = false,
+                        modifier = UiModifier.None
+                    )
                 }
 
-                card(id = "controlsCard") {
-                    column {
-                        textInput(
-                            id = "titleInput",
-                            text = canvasTitle,
-                            label = "Canvas Title",
-                            placeholder = "Enter title..."
-                        )
-                        row {
-                            dropdown(
-                                id = "colorDropdown",
-                                label = "Brush Color",
-                                options = mapOf(
-                                    "PRIMARY" to "Primary Blue",
-                                    "SECONDARY" to "Secondary Gray",
-                                    "ACCENT" to "Accent Teal",
-                                    "HIGHLIGHT" to "Warning Highlight",
-                                    "ERROR" to "Error Red"
-                                ),
-                                selectedKey = brushColor.name
-                            )
-                            toggle(
-                                id = "smoothToggle",
-                                label = "Spline Smoothing",
-                                checked = smoothing
-                            )
-                        }
-                        slider(
-                            id = "widthSlider",
-                            value = brushWidth,
-                            min = 1.0,
-                            max = 20.0,
-                            steps = 19
-                        )
-                        row {
-                            button(id = "clearBtn", label = "Clear Canvas")
-                            button(id = "counterBtn", label = "Taps: $counter")
-                        }
+                // Floating collapsible controls panel in the corner
+                floatingPanel(
+                    id = "controlsPanel",
+                    anchor = FloatingAnchor.TOP_END,
+                    title = "Canvas Controls",
+                    isCollapsible = true,
+                    isCollapsed = false
+                ) {
+                    textInput(
+                        id = "titleInput",
+                        text = canvasTitle,
+                        label = "Canvas Title",
+                        placeholder = "Enter title..."
+                    )
+                    dropdown(
+                        id = "toolDropdown",
+                        label = "Drawing Tool",
+                        options = mapOf(
+                            "PEN" to "Pen",
+                            "HIGHLIGHTER" to "Highlighter",
+                            "ERASER" to "Eraser"
+                        ),
+                        selectedKey = activeToolType
+                    )
+                    dropdown(
+                        id = "colorDropdown",
+                        label = "Brush Color",
+                        options = mapOf(
+                            "PRIMARY" to "Primary Blue",
+                            "SECONDARY" to "Secondary Gray",
+                            "ACCENT" to "Accent Teal",
+                            "HIGHLIGHT" to "Warning Highlight",
+                            "ERROR" to "Error Red"
+                        ),
+                        selectedKey = brushColor.name
+                    )
+                    toggle(
+                        id = "smoothToggle",
+                        label = "Spline Smoothing",
+                        checked = smoothing
+                    )
+                    slider(
+                        id = "widthSlider",
+                        value = brushWidth,
+                        min = 1.0,
+                        max = 20.0,
+                        steps = 19,
+                        label = "Brush Width: ${brushWidth.toInt()}px"
+                    )
+                    row(spacing = SpacingSize.SMALL) {
+                        button(id = "clearBtn", label = "Clear Canvas", isPrimary = false, isDestructive = true)
+                        button(id = "counterBtn", label = "Taps: $counter")
                     }
+                    text(
+                        id = "footerStats",
+                        text = "Tool: $activeToolType | Color: ${brushColor.name} | Width: ${brushWidth.toInt()}px | Layers: ${layers.size}",
+                        role = TypographyRole.LABEL,
+                        color = SemanticColor.ON_SURFACE
+                    )
                 }
-
-                board(
-                    id = "drawingBoard",
-                    layers = layers.toList(),
-                    activeTool = BoardTool.Brush(color = brushColor, strokeWidth = brushWidth.toFloat()),
-                    modifier = UiModifier(aspectRatio = 1.6f)
-                )
-
-                text(
-                    id = "footerStats",
-                    text = "Layers: ${layers.size} | Width: ${brushWidth.toInt()}px | Color: ${brushColor.name}",
-                    role = TypographyRole.LABEL,
-                    color = SemanticColor.ON_SURFACE
-                )
             }
         }
 
@@ -677,7 +688,10 @@ class CompleteExamplePlugin(val settings: CompleteExampleSettings) : Interactive
                     }
                 }
                 is UiEvent.OptionSelected -> {
-                    if (event.nodeId == "colorDropdown") {
+                    if (event.nodeId == "toolDropdown") {
+                        activeToolType = event.selectedKey
+                        send(renderTree())
+                    } else if (event.nodeId == "colorDropdown") {
                         brushColor = try {
                             SemanticColor.valueOf(event.selectedKey)
                         } catch (e: Exception) {

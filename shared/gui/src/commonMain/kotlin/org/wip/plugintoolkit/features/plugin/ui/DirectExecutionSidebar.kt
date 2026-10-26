@@ -86,6 +86,7 @@ fun DirectExecutionSidebar(
     onCapabilitySelected: (Capability) -> Unit,
     router: GlobalRouter? = null,
     onNavigateToPluginSetting: ((pluginId: String, settingKey: String) -> Unit)? = null,
+    isInteractiveOnly: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val currentRouter = router ?: LocalGlobalRouter.current
@@ -139,12 +140,18 @@ fun DirectExecutionSidebar(
             if (pluginId == null) {
                 val filteredPlugins = loadedPlugins.filter { plugin ->
                     val manifest = plugin.getManifest().getOrNull() ?: return@filter false
-                    val hasAutomatedCaps = manifest.capabilities.any {
-                        it.context != org.wip.plugintoolkit.api.CapabilityContext.FLOW_ONLY &&
-                            !it.isInteractive &&
-                            it.context != org.wip.plugintoolkit.api.CapabilityContext.INTERACTIVE_ONLY
+                    val hasMatchingCaps = if (isInteractiveOnly) {
+                        manifest.capabilities.any {
+                            it.isInteractive || it.context == org.wip.plugintoolkit.api.CapabilityContext.INTERACTIVE_ONLY
+                        } || plugin.getInteractiveProcessor() != null
+                    } else {
+                        manifest.capabilities.any {
+                            it.context != org.wip.plugintoolkit.api.CapabilityContext.FLOW_ONLY &&
+                                !it.isInteractive &&
+                                it.context != org.wip.plugintoolkit.api.CapabilityContext.INTERACTIVE_ONLY
+                        }
                     }
-                    if (!hasAutomatedCaps) return@filter false
+                    if (!hasMatchingCaps) return@filter false
                     val name = manifest.plugin.name
                     val id = manifest.plugin.id
                     name.contains(pluginSearchQuery, ignoreCase = true) || id.contains(pluginSearchQuery, ignoreCase = true)
@@ -213,12 +220,33 @@ fun DirectExecutionSidebar(
                     val pluginLocksState by pluginManager.pluginLocksState.collectAsState()
                     val locks = pluginLocksState[pluginId] ?: pluginLocksState.values.fold(emptyMap<String, Boolean>()) { acc, map -> acc + map }
 
-                    val filteredCapabilities = manifest.capabilities.filter { capability ->
-                        capability.context != org.wip.plugintoolkit.api.CapabilityContext.FLOW_ONLY &&
-                            !capability.isInteractive &&
-                            capability.context != org.wip.plugintoolkit.api.CapabilityContext.INTERACTIVE_ONLY &&
-                            (capability.name.contains(capabilitySearchQuery, ignoreCase = true) ||
-                             (capability.description != null && capability.description.contains(capabilitySearchQuery, ignoreCase = true)))
+                    val filteredCapabilities = if (isInteractiveOnly) {
+                        val interactiveCaps = manifest.capabilities.filter { capability ->
+                            (capability.isInteractive || capability.context == org.wip.plugintoolkit.api.CapabilityContext.INTERACTIVE_ONLY) &&
+                                (capability.name.contains(capabilitySearchQuery, ignoreCase = true) ||
+                                 (capability.description != null && capability.description.contains(capabilitySearchQuery, ignoreCase = true)))
+                        }
+                        if (interactiveCaps.isEmpty() && plugin.getInteractiveProcessor() != null) {
+                            listOf(
+                                Capability(
+                                    name = manifest.plugin.id,
+                                    description = manifest.plugin.description,
+                                    returnType = org.wip.plugintoolkit.api.DataType.Primitive(org.wip.plugintoolkit.api.PrimitiveType.STRING),
+                                    isInteractive = true,
+                                    context = org.wip.plugintoolkit.api.CapabilityContext.INTERACTIVE_ONLY
+                                )
+                            )
+                        } else {
+                            interactiveCaps
+                        }
+                    } else {
+                        manifest.capabilities.filter { capability ->
+                            capability.context != org.wip.plugintoolkit.api.CapabilityContext.FLOW_ONLY &&
+                                !capability.isInteractive &&
+                                capability.context != org.wip.plugintoolkit.api.CapabilityContext.INTERACTIVE_ONLY &&
+                                (capability.name.contains(capabilitySearchQuery, ignoreCase = true) ||
+                                 (capability.description != null && capability.description.contains(capabilitySearchQuery, ignoreCase = true)))
+                        }
                     }
 
                     val capabilityElements = filteredCapabilities.map { capability ->
@@ -227,7 +255,8 @@ fun DirectExecutionSidebar(
                         SidebarElement(
                             id = capability,
                             icon = if (isLocked) Icons.Default.Lock else Icons.Default.Bolt,
-                            title = capability.name.localized
+                            title = capability.name.localized,
+                            description = capability.description?.localized
                         )
                     }
 

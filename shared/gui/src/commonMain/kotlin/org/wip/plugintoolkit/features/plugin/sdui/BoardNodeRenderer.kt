@@ -82,6 +82,11 @@ fun BoardNodeRenderer(
     val currentPoints = remember { mutableStateListOf<NormalizedPoint>() }
     val pendingCommittedStrokes = remember { mutableStateListOf<VectorPathData>() }
 
+    // Sync selectedTool whenever node.activeTool changes reactively from server
+    LaunchedEffect(node.activeTool) {
+        selectedTool = node.activeTool
+    }
+
     // Clear strokes when clearRevision increments
     LaunchedEffect(node.clearRevision) {
         if (node.clearRevision > 0) {
@@ -98,12 +103,12 @@ fun BoardNodeRenderer(
     val primaryColor = MaterialTheme.colorScheme.primary
     val secondaryColor = MaterialTheme.colorScheme.secondary
     val tertiaryColor = MaterialTheme.colorScheme.tertiary
-    val errorColor = MaterialTheme.colorScheme.error
+    val errorColor = ToolkitTheme.colors.red
     val outlineVariant = MaterialTheme.colorScheme.outlineVariant
     val surfaceColor = MaterialTheme.colorScheme.surfaceContainerLowest
     val onSurfaceColor = MaterialTheme.colorScheme.onSurface
     val outlineColor = MaterialTheme.colorScheme.outline
-    val highlightColor = ToolkitTheme.colors.warningContainer
+    val highlightColor = ToolkitTheme.colors.warning
 
     val resolveColor: (SemanticColor) -> Color = { color ->
         when (color) {
@@ -114,29 +119,38 @@ fun BoardNodeRenderer(
             SemanticColor.SURFACE -> surfaceColor
             SemanticColor.ON_SURFACE -> onSurfaceColor
             SemanticColor.OUTLINE -> outlineColor
-            SemanticColor.ACCENT -> primaryColor
+            SemanticColor.ACCENT -> tertiaryColor
             SemanticColor.HIGHLIGHT -> highlightColor
         }
     }
 
+    val hasFixedAspect = node.modifier.aspectRatio != null
+    val shouldApplyBorder = node.showToolbar || hasFixedAspect
+
     Column(
         modifier = modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(ToolkitTheme.dimensions.textFieldCornerRadius))
-            .background(surfaceColor)
-            .border(
-                width = ToolkitTheme.dimensions.borderUnselected,
-                color = outlineVariant,
-                shape = RoundedCornerShape(ToolkitTheme.dimensions.textFieldCornerRadius)
-            ),
+            .then(if (hasFixedAspect) Modifier.fillMaxWidth() else Modifier.fillMaxSize())
+            .then(
+                if (shouldApplyBorder) {
+                    Modifier
+                        .clip(RoundedCornerShape(ToolkitTheme.dimensions.textFieldCornerRadius))
+                        .border(
+                            width = ToolkitTheme.dimensions.borderUnselected,
+                            color = outlineVariant,
+                            shape = RoundedCornerShape(ToolkitTheme.dimensions.textFieldCornerRadius)
+                        )
+                } else Modifier
+            )
+            .background(surfaceColor),
         verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.xs)
     ) {
-        // Toolbar with tools and actions
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            color = MaterialTheme.colorScheme.surfaceContainer,
-            tonalElevation = ToolkitTheme.dimensions.cardElevation
-        ) {
+        // Optional built-in toolbar when showToolbar is true
+        if (node.showToolbar) {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = MaterialTheme.colorScheme.surfaceContainer,
+                tonalElevation = ToolkitTheme.dimensions.cardElevation
+            ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -253,12 +267,17 @@ fun BoardNodeRenderer(
                 }
             }
         }
+        }
 
-        // Drawing Canvas (16:9 responsive aspect ratio)
+        // Drawing Canvas (responsive aspect ratio or fill max space)
+        val canvasModifier = if (node.modifier.aspectRatio != null) {
+            Modifier.fillMaxWidth().aspectRatio(node.modifier.aspectRatio!!)
+        } else {
+            Modifier.fillMaxWidth().weight(1f)
+        }
+
         Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(16f / 9f)
+            modifier = canvasModifier
                 .background(surfaceColor)
         ) {
             Canvas(
@@ -338,7 +357,12 @@ fun BoardNodeRenderer(
 
                 // 3. Draw currently active in-progress stroke with Catmull-Rom smoothing
                 if (currentPoints.size >= 2) {
-                    val activeColor = if (selectedTool is BoardTool.Eraser) surfaceColor else primaryColor
+                    val activeColor = when (val t = selectedTool) {
+                        is BoardTool.Eraser -> surfaceColor
+                        is BoardTool.Brush -> resolveColor(t.color)
+                        is BoardTool.Highlighter -> resolveColor(t.color).copy(alpha = 0.5f)
+                        is BoardTool.Rectangle -> resolveColor(t.color)
+                    }
                     val activeWidth = when (val t = selectedTool) {
                         is BoardTool.Brush -> t.strokeWidth
                         is BoardTool.Highlighter -> t.strokeWidth

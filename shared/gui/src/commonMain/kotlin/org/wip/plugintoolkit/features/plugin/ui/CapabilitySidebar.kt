@@ -60,7 +60,7 @@ fun CapabilitySidebar(
 
     Surface(
         modifier = modifier
-            .width(ToolkitTheme.dimensions.containerWidthLarge)
+            .width(ToolkitTheme.dimensions.sidebarExpandedWidth)
             .fillMaxHeight(),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
         border = BorderStroke(ToolkitTheme.dimensions.borderUnselected, MaterialTheme.colorScheme.outlineVariant.copy(alpha = ToolkitTheme.opacity.divider))
@@ -166,14 +166,25 @@ fun CapabilitySidebar(
                                 tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Spacer(modifier = Modifier.width(ToolkitTheme.spacing.mediumSmall))
-                            Text(
-                                capability.name,
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    capability.name,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                if (!capability.description.isNullOrBlank()) {
+                                    Text(
+                                        capability.description,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
                         }
                     }
                 }

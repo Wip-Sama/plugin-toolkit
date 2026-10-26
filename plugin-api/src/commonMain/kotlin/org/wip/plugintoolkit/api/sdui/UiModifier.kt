@@ -40,6 +40,41 @@ enum class AlignmentRole {
     CENTER,
     END,
     TOP,
+    BOTTOM,
+    TOP_START,
+    TOP_CENTER,
+    TOP_END,
+    BOTTOM_START,
+    BOTTOM_CENTER,
+    BOTTOM_END,
+    CENTER_START,
+    CENTER_END
+}
+
+/**
+ * Anchor positions for floating SDUI panels.
+ */
+@Serializable
+enum class FloatingAnchor {
+    TOP_START,
+    TOP_CENTER,
+    TOP_END,
+    BOTTOM_START,
+    BOTTOM_CENTER,
+    BOTTOM_END,
+    CENTER_START,
+    CENTER_END,
+    CENTER
+}
+
+/**
+ * Edge attachment points for collapsible SDUI sidebars.
+ */
+@Serializable
+enum class SidebarAttachPoint {
+    LEFT,
+    TOP,
+    RIGHT,
     BOTTOM
 }
 

@@ -73,6 +73,7 @@ class UiNodeSerializationTest {
         assertIs<AssetReference.Relative>(boardNode.backgroundAsset)
         assertEquals("images/blueprint.png", (boardNode.backgroundAsset as AssetReference.Relative).path)
         assertEquals(1, boardNode.layers.size)
+        assertEquals(false, boardNode.showToolbar)
 
         val btnNode = rootCol.children[3] as ButtonNode
         assertEquals("Complete Annotation", btnNode.label)
@@ -154,4 +155,62 @@ class UiNodeSerializationTest {
         assertEquals(AlignmentRole.CENTER, modifier.alignment)
         assertEquals(false, modifier.enabled)
     }
+
+    @Test
+    fun testScaffoldWithFloatingPanelAndSidebarSerialization() {
+        val tree = uiTree {
+            scaffold(id = "editor_scaffold") {
+                content {
+                    board(id = "drawing_board")
+                }
+                floatingPanel(
+                    id = "tools_floating",
+                    anchor = FloatingAnchor.BOTTOM_END,
+                    title = "Brush Settings",
+                    isCollapsible = true,
+                    isCollapsed = false
+                ) {
+                    slider(id = "size_slider", value = 8.0, min = 1.0, max = 30.0, label = "Stroke")
+                    button(id = "reset_btn", label = "Reset")
+                }
+                sidebar(
+                    id = "left_nav",
+                    attachPoint = SidebarAttachPoint.LEFT,
+                    title = "Toolbox",
+                    isCollapsible = true,
+                    isCollapsed = false
+                ) {
+                    text(id = "nav_label", text = "Tools")
+                }
+            }
+        }
+
+        val encoded = json.encodeToString(tree)
+        val decoded = json.decodeFromString<UiNodeTree>(encoded)
+
+        assertIs<ScaffoldNode>(decoded.root)
+        val scaffold = decoded.root as ScaffoldNode
+        assertEquals("editor_scaffold", scaffold.id)
+        assertIs<BoardNode>(scaffold.content)
+        assertEquals("drawing_board", (scaffold.content as BoardNode).id)
+
+        assertEquals(1, scaffold.floatingPanels.size)
+        val panel = scaffold.floatingPanels[0]
+        assertEquals("tools_floating", panel.id)
+        assertEquals(FloatingAnchor.BOTTOM_END, panel.anchor)
+        assertEquals("Brush Settings", panel.title)
+        assertTrue(panel.isCollapsible)
+        assertEquals(false, panel.isCollapsed)
+        assertEquals(2, panel.children.size)
+
+        assertNotNull(scaffold.leftSidebar)
+        assertIs<SidebarNode>(scaffold.leftSidebar)
+        val sidebar = scaffold.leftSidebar as SidebarNode
+        assertEquals("left_nav", sidebar.id)
+        assertEquals(SidebarAttachPoint.LEFT, sidebar.attachPoint)
+        assertEquals("Toolbox", sidebar.title)
+        assertTrue(sidebar.isCollapsible)
+        assertEquals(1, sidebar.children.size)
+    }
 }
+

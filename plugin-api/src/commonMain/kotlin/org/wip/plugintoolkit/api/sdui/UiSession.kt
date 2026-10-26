@@ -183,9 +183,10 @@ abstract class UiContainerBuilder {
         layers: List<BoardLayer> = emptyList(),
         activeTool: BoardTool = BoardTool.Brush(),
         clearRevision: Int = 0,
+        showToolbar: Boolean = false,
         modifier: UiModifier = UiModifier.None
     ) {
-        add(BoardNode(id = id, backgroundAsset = backgroundAsset, layers = layers, activeTool = activeTool, clearRevision = clearRevision, modifier = modifier))
+        add(BoardNode(id = id, backgroundAsset = backgroundAsset, layers = layers, activeTool = activeTool, clearRevision = clearRevision, showToolbar = showToolbar, modifier = modifier))
     }
 
     fun badge(
@@ -204,10 +205,63 @@ abstract class UiContainerBuilder {
         add(DividerNode(id = id, modifier = modifier))
     }
 
+    fun box(
+        id: String = generateNodeId("box"),
+        modifier: UiModifier = UiModifier.None,
+        block: BoxBuilder.() -> Unit
+    ) {
+        val builder = BoxBuilder(id, modifier).apply(block)
+        add(builder.build())
+    }
+
+    fun scaffold(
+        id: String = generateNodeId("scaffold"),
+        modifier: UiModifier = UiModifier.None,
+        block: ScaffoldBuilder.() -> Unit
+    ) {
+        val builder = ScaffoldBuilder(id, modifier).apply(block)
+        add(builder.build())
+    }
+
+    fun floatingPanel(
+        id: String = generateNodeId("floating"),
+        anchor: FloatingAnchor = FloatingAnchor.TOP_END,
+        title: String? = null,
+        isCollapsible: Boolean = true,
+        isCollapsed: Boolean = false,
+        modifier: UiModifier = UiModifier.None,
+        block: FloatingPanelBuilder.() -> Unit
+    ) {
+        val builder = FloatingPanelBuilder(id, anchor, title, isCollapsible, isCollapsed, modifier).apply(block)
+        add(builder.build())
+    }
+
+    fun sidebar(
+        id: String = generateNodeId("sidebar"),
+        attachPoint: SidebarAttachPoint = SidebarAttachPoint.LEFT,
+        title: String? = null,
+        isCollapsible: Boolean = true,
+        isCollapsed: Boolean = false,
+        modifier: UiModifier = UiModifier.None,
+        block: SidebarBuilder.() -> Unit
+    ) {
+        val builder = SidebarBuilder(id, attachPoint, title, isCollapsible, isCollapsed, modifier).apply(block)
+        add(builder.build())
+    }
+
+    internal fun buildChildren(): List<UiNode> = children.toList()
+
     companion object {
         private var counter = 0
         internal fun generateNodeId(prefix: String): String = "${prefix}_${++counter}"
     }
+}
+
+class BoxBuilder(
+    val id: String,
+    val modifier: UiModifier
+) : UiContainerBuilder() {
+    fun build(): BoxNode = BoxNode(id = id, children = children.toList(), modifier = modifier)
 }
 
 class ColumnBuilder(
@@ -240,6 +294,187 @@ class ScrollableColumnBuilder(
     val modifier: UiModifier
 ) : UiContainerBuilder() {
     fun build(): ScrollableColumnNode = ScrollableColumnNode(id = id, spacing = spacing, modifier = modifier, children = children.toList())
+}
+
+class FloatingPanelBuilder(
+    val id: String,
+    val anchor: FloatingAnchor,
+    val title: String?,
+    val isCollapsible: Boolean,
+    val isCollapsed: Boolean,
+    val modifier: UiModifier
+) : UiContainerBuilder() {
+    fun build(): FloatingPanelNode = FloatingPanelNode(
+        id = id,
+        anchor = anchor,
+        title = title,
+        isCollapsible = isCollapsible,
+        isCollapsed = isCollapsed,
+        modifier = modifier,
+        children = children.toList()
+    )
+}
+
+class SidebarBuilder(
+    val id: String,
+    val attachPoint: SidebarAttachPoint,
+    val title: String?,
+    val isCollapsible: Boolean,
+    val isCollapsed: Boolean,
+    val modifier: UiModifier
+) : UiContainerBuilder() {
+    fun build(): SidebarNode = SidebarNode(
+        id = id,
+        attachPoint = attachPoint,
+        title = title,
+        isCollapsible = isCollapsible,
+        isCollapsed = isCollapsed,
+        modifier = modifier,
+        children = children.toList()
+    )
+}
+
+@UiDslMarker
+class ScaffoldBuilder(
+    val id: String,
+    val modifier: UiModifier
+) {
+    private var contentNode: UiNode? = null
+    private var leftSidebarNode: UiNode? = null
+    private var rightSidebarNode: UiNode? = null
+    private var topBarNode: UiNode? = null
+    private var bottomBarNode: UiNode? = null
+    private val floatingPanels = mutableListOf<FloatingPanelNode>()
+
+    fun content(node: UiNode) {
+        contentNode = node
+    }
+
+    fun content(block: UiContainerBuilder.() -> Unit) {
+        val container = object : UiContainerBuilder() {}
+        container.block()
+        contentNode = when {
+            container.buildChildren().isEmpty() -> ColumnNode(id = "${id}_content_empty")
+            container.buildChildren().size == 1 -> container.buildChildren().first()
+            else -> ColumnNode(id = "${id}_content", children = container.buildChildren())
+        }
+    }
+
+    fun leftSidebar(node: UiNode) {
+        leftSidebarNode = node
+    }
+
+    fun leftSidebar(
+        id: String = "${this.id}_left",
+        title: String? = null,
+        isCollapsible: Boolean = true,
+        isCollapsed: Boolean = false,
+        modifier: UiModifier = UiModifier.None,
+        block: SidebarBuilder.() -> Unit
+    ) {
+        leftSidebarNode = SidebarBuilder(id, SidebarAttachPoint.LEFT, title, isCollapsible, isCollapsed, modifier).apply(block).build()
+    }
+
+    fun rightSidebar(node: UiNode) {
+        rightSidebarNode = node
+    }
+
+    fun rightSidebar(
+        id: String = "${this.id}_right",
+        title: String? = null,
+        isCollapsible: Boolean = true,
+        isCollapsed: Boolean = false,
+        modifier: UiModifier = UiModifier.None,
+        block: SidebarBuilder.() -> Unit
+    ) {
+        rightSidebarNode = SidebarBuilder(id, SidebarAttachPoint.RIGHT, title, isCollapsible, isCollapsed, modifier).apply(block).build()
+    }
+
+    fun sidebar(
+        id: String = "${this.id}_sidebar",
+        attachPoint: SidebarAttachPoint = SidebarAttachPoint.LEFT,
+        title: String? = null,
+        isCollapsible: Boolean = true,
+        isCollapsed: Boolean = false,
+        modifier: UiModifier = UiModifier.None,
+        block: SidebarBuilder.() -> Unit
+    ) {
+        val node = SidebarBuilder(id, attachPoint, title, isCollapsible, isCollapsed, modifier).apply(block).build()
+        when (attachPoint) {
+            SidebarAttachPoint.LEFT -> leftSidebarNode = node
+            SidebarAttachPoint.RIGHT -> rightSidebarNode = node
+            SidebarAttachPoint.TOP -> topBarNode = node
+            SidebarAttachPoint.BOTTOM -> bottomBarNode = node
+        }
+    }
+
+    fun sidebar(node: SidebarNode) {
+        when (node.attachPoint) {
+            SidebarAttachPoint.LEFT -> leftSidebarNode = node
+            SidebarAttachPoint.RIGHT -> rightSidebarNode = node
+            SidebarAttachPoint.TOP -> topBarNode = node
+            SidebarAttachPoint.BOTTOM -> bottomBarNode = node
+        }
+    }
+
+    fun topBar(node: UiNode) {
+        topBarNode = node
+    }
+
+    fun topBar(block: UiContainerBuilder.() -> Unit) {
+        val container = object : UiContainerBuilder() {}
+        container.block()
+        topBarNode = when {
+            container.buildChildren().isEmpty() -> null
+            container.buildChildren().size == 1 -> container.buildChildren().first()
+            else -> RowNode(id = "${id}_top", children = container.buildChildren())
+        }
+    }
+
+    fun bottomBar(node: UiNode) {
+        bottomBarNode = node
+    }
+
+    fun bottomBar(block: UiContainerBuilder.() -> Unit) {
+        val container = object : UiContainerBuilder() {}
+        container.block()
+        bottomBarNode = when {
+            container.buildChildren().isEmpty() -> null
+            container.buildChildren().size == 1 -> container.buildChildren().first()
+            else -> RowNode(id = "${id}_bottom", children = container.buildChildren())
+        }
+    }
+
+    fun floatingPanel(panel: FloatingPanelNode) {
+        floatingPanels.add(panel)
+    }
+
+    fun floatingPanel(
+        id: String = "${this.id}_floating_${floatingPanels.size + 1}",
+        anchor: FloatingAnchor = FloatingAnchor.TOP_END,
+        title: String? = null,
+        isCollapsible: Boolean = true,
+        isCollapsed: Boolean = false,
+        modifier: UiModifier = UiModifier.None,
+        block: FloatingPanelBuilder.() -> Unit
+    ) {
+        val builder = FloatingPanelBuilder(id, anchor, title, isCollapsible, isCollapsed, modifier).apply(block)
+        floatingPanels.add(builder.build())
+    }
+
+    fun build(): ScaffoldNode {
+        val content = contentNode ?: ColumnNode(id = "${id}_empty_content")
+        return ScaffoldNode(
+            id = id,
+            content = content,
+            leftSidebar = leftSidebarNode,
+            rightSidebar = rightSidebarNode,
+            topBar = topBarNode,
+            bottomBar = bottomBarNode,
+            floatingPanels = floatingPanels.toList(),
+            modifier = modifier
+        )
+    }
 }
 
 /**

@@ -4,8 +4,11 @@ import org.wip.plugintoolkit.api.sdui.BoxNode
 import org.wip.plugintoolkit.api.sdui.CardNode
 import org.wip.plugintoolkit.api.sdui.ColumnNode
 import org.wip.plugintoolkit.api.sdui.ErrorBoundaryNode
+import org.wip.plugintoolkit.api.sdui.FloatingPanelNode
 import org.wip.plugintoolkit.api.sdui.RowNode
+import org.wip.plugintoolkit.api.sdui.ScaffoldNode
 import org.wip.plugintoolkit.api.sdui.ScrollableColumnNode
+import org.wip.plugintoolkit.api.sdui.SidebarNode
 import org.wip.plugintoolkit.api.sdui.SliderNode
 import org.wip.plugintoolkit.api.sdui.UiNode
 import org.wip.plugintoolkit.api.sdui.UiNodeTree
@@ -96,6 +99,18 @@ object UiAstSanitizer {
                 is BoxNode -> node.copy(children = node.children.map { sanitizeNode(it, depth + 1) })
                 is CardNode -> node.copy(children = node.children.map { sanitizeNode(it, depth + 1) })
                 is ScrollableColumnNode -> node.copy(children = node.children.map { sanitizeNode(it, depth + 1) })
+                is ScaffoldNode -> node.copy(
+                    content = sanitizeNode(node.content, depth + 1),
+                    leftSidebar = node.leftSidebar?.let { sanitizeNode(it, depth + 1) },
+                    rightSidebar = node.rightSidebar?.let { sanitizeNode(it, depth + 1) },
+                    topBar = node.topBar?.let { sanitizeNode(it, depth + 1) },
+                    bottomBar = node.bottomBar?.let { sanitizeNode(it, depth + 1) },
+                    floatingPanels = node.floatingPanels.map {
+                        sanitizeNode(it, depth + 1) as? FloatingPanelNode ?: it
+                    }
+                )
+                is FloatingPanelNode -> node.copy(children = node.children.map { sanitizeNode(it, depth + 1) })
+                is SidebarNode -> node.copy(children = node.children.map { sanitizeNode(it, depth + 1) })
                 else -> node
             }
         }
