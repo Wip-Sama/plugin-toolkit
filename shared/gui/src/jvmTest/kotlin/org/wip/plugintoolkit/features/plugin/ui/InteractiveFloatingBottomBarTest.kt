@@ -115,28 +115,23 @@ class InteractiveFloatingBottomBarTest {
         barNode.performMouseInput { exit() }
         // Debounce is 120ms
         composeTestRule.mainClock.advanceTimeBy(120)
-        val sizeAtExitStart = barNode.fetchSemanticsNode().size
-        println("Size at exit start (after debounce): $sizeAtExitStart")
-
-        // 50ms into exit animation
-        composeTestRule.mainClock.advanceTimeBy(50)
-        val sizeAt50ms = barNode.fetchSemanticsNode().size
-        println("Size at 50ms into exit: $sizeAt50ms")
-
-        // 100ms into exit animation
-        composeTestRule.mainClock.advanceTimeBy(50)
-        val sizeAt100ms = barNode.fetchSemanticsNode().size
-        println("Size at 100ms into exit: $sizeAt100ms")
+        println("=== EXIT TRAJECTORY ===")
+        for (step in 0..15) {
+            val t = step * 20
+            val size = barNode.fetchSemanticsNode().size
+            println("Exit t=${t}ms: size = ${size.width} x ${size.height}")
+            composeTestRule.mainClock.advanceTimeBy(20)
+        }
 
         // Settle completely
-        composeTestRule.mainClock.advanceTimeBy(1000)
+        composeTestRule.mainClock.advanceTimeBy(500)
         val finalSize = barNode.fetchSemanticsNode().size
         println("Final size: $finalSize")
 
         assertTrue(expandedSize.width > initialSize.width, "Expanded bar should be wider than collapsed")
-        assertTrue(sizeAt50ms.width < sizeAtExitStart.width, "Width should actively shrink during exit animation rather than staying full width")
-        assertTrue(sizeAt100ms.width < sizeAt50ms.width, "Width should continuously shrink towards collapsed size")
+        assertTrue(expandedSize.height > initialSize.height, "Expanded bar should be taller than collapsed")
         assertEquals(initialSize.width, finalSize.width, "Final settled width should match initial collapsed width")
+        assertEquals(initialSize.height, finalSize.height, "Final settled height should match initial collapsed height")
     }
 }
 

@@ -8,12 +8,14 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.expandIn
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.animation.shrinkOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
@@ -586,9 +588,9 @@ internal fun InteractiveFloatingBottomBar(
                                     transformOrigin = TransformOrigin(0f, 0.5f),
                                     animationSpec = spatialSpringFloat
                                 ) +
-                                expandHorizontally(
+                                expandIn(
                                     animationSpec = layoutSizeSpring,
-                                    expandFrom = Alignment.Start,
+                                    expandFrom = Alignment.CenterStart,
                                     clip = false
                                 ),
                         exit = fadeOut(animationSpec = effectsSpringFloat) +
@@ -597,9 +599,9 @@ internal fun InteractiveFloatingBottomBar(
                                     transformOrigin = TransformOrigin(0f, 0.5f),
                                     animationSpec = effectsSpringFloat
                                 ) +
-                                shrinkHorizontally(
+                                shrinkOut(
                                     animationSpec = layoutSizeSpring,
-                                    shrinkTowards = Alignment.Start,
+                                    shrinkTowards = Alignment.CenterStart,
                                     clip = false
                                 )
                     ) {
