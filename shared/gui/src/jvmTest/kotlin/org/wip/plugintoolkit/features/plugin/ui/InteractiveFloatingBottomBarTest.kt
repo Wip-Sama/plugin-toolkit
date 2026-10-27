@@ -73,3 +73,4 @@ class InteractiveFloatingBottomBarTest {
         composeTestRule.onNodeWithText("Interactive Canvas").assertIsDisplayed()
     }
 }
+

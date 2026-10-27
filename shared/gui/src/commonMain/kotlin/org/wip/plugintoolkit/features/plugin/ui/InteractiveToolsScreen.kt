@@ -100,6 +100,7 @@ import androidx.compose.animation.animateColor
 import androidx.compose.animation.core.animateDp
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.updateTransition
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Dedicated host screen for running interactive SDUI plugin tools.
@@ -289,9 +290,9 @@ private val EXPANDED_BOTTOM_OFFSET = 20.dp
 private val COLLAPSED_BOTTOM_OFFSET = 0.dp
 private val COLLAPSED_ICON_CONTAINER_SIZE = 20.dp
 private val EXPANDED_ICON_CONTAINER_SIZE = 36.dp
-private const val ACTION_ENTER_EXIT_SCALE = 0.85f
-private const val ARROW_ENTER_EXIT_SCALE = 0.7f
-private const val HOVER_EXIT_DEBOUNCE_MS = 120L
+private const val ACTION_ENTER_EXIT_SCALE = 0f
+private const val ARROW_ENTER_EXIT_SCALE = 0f
+private val HOVER_EXIT_DEBOUNCE_MS = 120L.milliseconds
 private const val COLLAPSED_HANDLE_ALPHA = 0.7f
 private const val EXPANDED_HANDLE_ALPHA = 0.35f
 private val DOCKED_HANDLE_WIDTH = 36.dp
@@ -506,14 +507,26 @@ internal fun InteractiveFloatingBottomBar(
                         transition.AnimatedVisibility(
                             visible = { hovered -> hovered && pluginName.isNotBlank() },
                             enter = fadeIn(animationSpec = effectsSpringFloat) +
+                                    scaleIn(
+                                        initialScale = 0f,
+                                        transformOrigin = TransformOrigin(0f, 0f),
+                                        animationSpec = spatialSpringFloat
+                                    ) +
                                     expandVertically(
                                         animationSpec = layoutSizeSpring,
-                                        expandFrom = Alignment.Top
+                                        expandFrom = Alignment.Top,
+                                        clip = false
                                     ),
                             exit = fadeOut(animationSpec = effectsSpringFloat) +
+                                    scaleOut(
+                                        targetScale = 0f,
+                                        transformOrigin = TransformOrigin(0f, 0f),
+                                        animationSpec = effectsSpringFloat
+                                    ) +
                                     shrinkVertically(
                                         animationSpec = layoutSizeSpring,
-                                        shrinkTowards = Alignment.Top
+                                        shrinkTowards = Alignment.Top,
+                                        clip = false
                                     )
                         ) {
                             Text(
@@ -527,6 +540,7 @@ internal fun InteractiveFloatingBottomBar(
                     }
 
                     // Collapsed up-arrow indicator
+
                     transition.AnimatedVisibility(
                         visible = { hovered -> !hovered },
                         enter = fadeIn(animationSpec = effectsSpringFloat) +
@@ -537,7 +551,8 @@ internal fun InteractiveFloatingBottomBar(
                                 ) +
                                 expandHorizontally(
                                     animationSpec = layoutSizeSpring,
-                                    expandFrom = Alignment.Start
+                                    expandFrom = Alignment.Start,
+                                    clip = false
                                 ),
                         exit = fadeOut(animationSpec = effectsSpringFloat) +
                                 scaleOut(
@@ -547,7 +562,8 @@ internal fun InteractiveFloatingBottomBar(
                                 ) +
                                 shrinkHorizontally(
                                     animationSpec = layoutSizeSpring,
-                                    shrinkTowards = Alignment.Start
+                                    shrinkTowards = Alignment.Start,
+                                    clip = false
                                 )
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -572,11 +588,13 @@ internal fun InteractiveFloatingBottomBar(
                                 ) +
                                 expandHorizontally(
                                     animationSpec = layoutSizeSpring,
-                                    expandFrom = Alignment.Start
+                                    expandFrom = Alignment.Start,
+                                    clip = false
                                 ) +
                                 expandVertically(
                                     animationSpec = layoutSizeSpring,
-                                    expandFrom = Alignment.CenterVertically
+                                    expandFrom = Alignment.CenterVertically,
+                                    clip = false
                                 ),
                         exit = fadeOut(animationSpec = effectsSpringFloat) +
                                 scaleOut(
@@ -586,11 +604,13 @@ internal fun InteractiveFloatingBottomBar(
                                 ) +
                                 shrinkHorizontally(
                                     animationSpec = layoutSizeSpring,
-                                    shrinkTowards = Alignment.Start
+                                    shrinkTowards = Alignment.Start,
+                                    clip = false
                                 ) +
                                 shrinkVertically(
                                     animationSpec = layoutSizeSpring,
-                                    shrinkTowards = Alignment.CenterVertically
+                                    shrinkTowards = Alignment.CenterVertically,
+                                    clip = false
                                 )
                     ) {
                         Row(
