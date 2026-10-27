@@ -590,11 +590,6 @@ internal fun InteractiveFloatingBottomBar(
                                     animationSpec = layoutSizeSpring,
                                     expandFrom = Alignment.Start,
                                     clip = false
-                                ) +
-                                expandVertically(
-                                    animationSpec = layoutSizeSpring,
-                                    expandFrom = Alignment.CenterVertically,
-                                    clip = false
                                 ),
                         exit = fadeOut(animationSpec = effectsSpringFloat) +
                                 scaleOut(
@@ -605,11 +600,6 @@ internal fun InteractiveFloatingBottomBar(
                                 shrinkHorizontally(
                                     animationSpec = layoutSizeSpring,
                                     shrinkTowards = Alignment.Start,
-                                    clip = false
-                                ) +
-                                shrinkVertically(
-                                    animationSpec = layoutSizeSpring,
-                                    shrinkTowards = Alignment.CenterVertically,
                                     clip = false
                                 )
                     ) {
