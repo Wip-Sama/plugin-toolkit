@@ -1,16 +1,22 @@
 package org.wip.plugintoolkit.features.plugin.ui
 
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -90,6 +96,10 @@ import plugintoolkit.composeapp.generated.resources.interactive_tools_empty
 import plugintoolkit.composeapp.generated.resources.interactive_tools_hint
 import plugintoolkit.composeapp.generated.resources.interactive_tools_title
 import plugintoolkit.composeapp.generated.resources.search_capabilities_placeholder
+import androidx.compose.animation.animateColor
+import androidx.compose.animation.core.animateDp
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.updateTransition
 
 /**
  * Dedicated host screen for running interactive SDUI plugin tools.
@@ -269,13 +279,28 @@ fun InteractiveToolsScreen(
     }
 }
 
-/**
- * Low-presence floating bottom bar for active interactive tools.
- * Sits as a subtle docked tab at the bottom edge, expanding and animating up smoothly into a floating pill when hovered (Image 4).
- */
+private const val SPATIAL_SPRING_STIFFNESS = 900f
+private const val EFFECTS_SPRING_STIFFNESS = 900f
+private val COLLAPSED_CORNER_RADIUS = 14.dp
+private val EXPANDED_CORNER_RADIUS = 28.dp
+private val COLLAPSED_BOTTOM_CORNER_RADIUS = 0.dp
+private val EXPANDED_BOTTOM_CORNER_RADIUS = 28.dp
+private val EXPANDED_BOTTOM_OFFSET = 20.dp
+private val COLLAPSED_BOTTOM_OFFSET = 0.dp
+private val COLLAPSED_ICON_CONTAINER_SIZE = 20.dp
+private val EXPANDED_ICON_CONTAINER_SIZE = 36.dp
+private const val ACTION_ENTER_EXIT_SCALE = 0.85f
+private const val ARROW_ENTER_EXIT_SCALE = 0.7f
+private const val HOVER_EXIT_DEBOUNCE_MS = 120L
+private const val COLLAPSED_HANDLE_ALPHA = 0.7f
+private const val EXPANDED_HANDLE_ALPHA = 0.35f
+private val DOCKED_HANDLE_WIDTH = 36.dp
+private val DOCKED_HANDLE_HEIGHT = 4.dp
+private val ACTION_DIVIDER_HEIGHT = 28.dp
+
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
-private fun InteractiveFloatingBottomBar(
+internal fun InteractiveFloatingBottomBar(
     toolName: String,
     pluginName: String,
     onRestart: () -> Unit,
@@ -286,58 +311,117 @@ private fun InteractiveFloatingBottomBar(
     val hoverScope = rememberCoroutineScope()
     var exitJob by remember { mutableStateOf<Job?>(null) }
 
-    // M3 Expressive Spatial Springs: X/Y position, scaling, size, corner radius
-    // Employs snappy take-offs, bouncy overshoot (LowBouncy), and gradual softer landings
+    val transition = updateTransition(targetState = isHovered, label = "floatingBottomBarTransition")
+
+    // Expressive bouncy spring when expanding on hover
     val spatialSpringDp = remember {
         spring<Dp>(
             dampingRatio = Spring.DampingRatioLowBouncy,
-            stiffness = Spring.StiffnessMediumLow
+            stiffness = SPATIAL_SPRING_STIFFNESS
         )
     }
-    val spatialSpringSize = remember {
+    // Critically damped (NoBouncy) spring for collapse to dock immediately without overshoot
+    val spatialSpringDpNoBouncy = remember {
+        spring<Dp>(
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness = SPATIAL_SPRING_STIFFNESS
+        )
+    }
+    // Critically damped (NoBouncy) spring for layout bounds in AnimatedVisibility
+    // so exit animations complete immediately without hanging on sub-pixel oscillation.
+    val layoutSizeSpring = remember {
         spring<IntSize>(
-            dampingRatio = Spring.DampingRatioLowBouncy,
-            stiffness = Spring.StiffnessMediumLow
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness = SPATIAL_SPRING_STIFFNESS,
+            visibilityThreshold = IntSize(1, 1)
         )
     }
-
-    // M3 Expressive Effects Springs: Opacity, color blending, crossfades
-    // Strict damping with zero overshoot (NoBouncy) to prevent visual artifacts and flickering
+    val spatialSpringFloat = remember {
+        spring<Float>(
+            dampingRatio = Spring.DampingRatioLowBouncy,
+            stiffness = SPATIAL_SPRING_STIFFNESS
+        )
+    }
     val effectsSpringFloat = remember {
         spring<Float>(
             dampingRatio = Spring.DampingRatioNoBouncy,
-            stiffness = Spring.StiffnessMedium
+            stiffness = EFFECTS_SPRING_STIFFNESS
+        )
+    }
+    val effectsSpringColor = remember {
+        spring<Color>(
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness = EFFECTS_SPRING_STIFFNESS
         )
     }
 
-    val bottomOffset by animateDpAsState(
-        targetValue = if (isHovered) 20.dp else 0.dp,
-        animationSpec = spatialSpringDp,
+    val bottomOffset by transition.animateDp(
+        transitionSpec = { if (targetState) spatialSpringDp else spatialSpringDpNoBouncy },
         label = "bottomOffset"
-    )
-    val cornerRadius by animateDpAsState(
-        targetValue = if (isHovered) 28.dp else 14.dp,
-        animationSpec = spatialSpringDp,
+    ) { hovered ->
+        if (hovered) EXPANDED_BOTTOM_OFFSET else COLLAPSED_BOTTOM_OFFSET
+    }
+    val cornerRadius by transition.animateDp(
+        transitionSpec = { if (targetState) spatialSpringDp else spatialSpringDpNoBouncy },
         label = "cornerRadius"
-    )
-    val bottomCornerRadius by animateDpAsState(
-        targetValue = if (isHovered) 28.dp else 0.dp,
-        animationSpec = spatialSpringDp,
+    ) { hovered ->
+        if (hovered) EXPANDED_CORNER_RADIUS else COLLAPSED_CORNER_RADIUS
+    }
+    val bottomCornerRadius by transition.animateDp(
+        transitionSpec = { if (targetState) spatialSpringDp else spatialSpringDpNoBouncy },
         label = "bottomCornerRadius"
-    )
-    val verticalPadding by animateDpAsState(
-        targetValue = if (isHovered) ToolkitTheme.spacing.smallMedium else ToolkitTheme.spacing.extraSmall,
-        animationSpec = spatialSpringDp,
+    ) { hovered ->
+        if (hovered) EXPANDED_BOTTOM_CORNER_RADIUS else COLLAPSED_BOTTOM_CORNER_RADIUS
+    }
+    val verticalPadding by transition.animateDp(
+        transitionSpec = { if (targetState) spatialSpringDp else spatialSpringDpNoBouncy },
         label = "verticalPadding"
-    )
-    val handleBarAlpha by animateFloatAsState(
-        targetValue = if (isHovered) 0.35f else 0.7f,
-        animationSpec = effectsSpringFloat,
+    ) { hovered ->
+        if (hovered) ToolkitTheme.spacing.smallMedium else ToolkitTheme.spacing.extraSmall
+    }
+    val handleBottomPadding by transition.animateDp(
+        transitionSpec = { if (targetState) spatialSpringDp else spatialSpringDpNoBouncy },
+        label = "handleBottomPadding"
+    ) { hovered ->
+        if (hovered) ToolkitTheme.spacing.extraSmall else 0.dp
+    }
+    val handleBarAlpha by transition.animateFloat(
+        transitionSpec = { effectsSpringFloat },
         label = "handleBarAlpha"
-    )
+    ) { hovered ->
+        if (hovered) EXPANDED_HANDLE_ALPHA else COLLAPSED_HANDLE_ALPHA
+    }
+    val iconContainerSize by transition.animateDp(
+        transitionSpec = { if (targetState) spatialSpringDp else spatialSpringDpNoBouncy },
+        label = "iconContainerSize"
+    ) { hovered ->
+        if (hovered) EXPANDED_ICON_CONTAINER_SIZE else COLLAPSED_ICON_CONTAINER_SIZE
+    }
+    val iconSize by transition.animateDp(
+        transitionSpec = { if (targetState) spatialSpringDp else spatialSpringDpNoBouncy },
+        label = "iconSize"
+    ) { hovered ->
+        if (hovered) ToolkitTheme.dimensions.iconMediumSmall else ToolkitTheme.dimensions.iconSmall
+    }
+    val elevation by transition.animateDp(
+        transitionSpec = { if (targetState) spatialSpringDp else spatialSpringDpNoBouncy },
+        label = "elevation"
+    ) { hovered ->
+        if (hovered) ToolkitTheme.dimensions.elevationMedium else ToolkitTheme.dimensions.cardElevation
+    }
+    val iconBgColor by transition.animateColor(
+        transitionSpec = { effectsSpringColor },
+        label = "iconBgColor"
+    ) { hovered ->
+        if (hovered) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
+    }
+    val titleColor by transition.animateColor(
+        transitionSpec = { effectsSpringColor },
+        label = "titleColor"
+    ) { hovered ->
+        if (hovered) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
+    }
 
-    // Outer hit-box stays grounded at the bottom edge so the 20.dp gap below the floating Surface
-    // remains inside the hover area, avoiding rapid cursor re-interception loops.
     Box(
         modifier = modifier
             .onPointerEvent(PointerEventType.Enter) {
@@ -347,7 +431,7 @@ private fun InteractiveFloatingBottomBar(
             .onPointerEvent(PointerEventType.Exit) {
                 exitJob?.cancel()
                 exitJob = hoverScope.launch {
-                    delay(120)
+                    delay(HOVER_EXIT_DEBOUNCE_MS)
                     isHovered = false
                 }
             }
@@ -355,9 +439,7 @@ private fun InteractiveFloatingBottomBar(
         contentAlignment = Alignment.BottomCenter
     ) {
         Surface(
-            modifier = Modifier
-                .padding(bottom = bottomOffset.coerceAtLeast(0.dp))
-                .animateContentSize(animationSpec = spatialSpringSize),
+            modifier = Modifier.padding(bottom = bottomOffset.coerceAtLeast(0.dp)),
             shape = RoundedCornerShape(
                 topStart = cornerRadius.coerceAtLeast(0.dp),
                 topEnd = cornerRadius.coerceAtLeast(0.dp),
@@ -365,8 +447,8 @@ private fun InteractiveFloatingBottomBar(
                 bottomEnd = bottomCornerRadius.coerceAtLeast(0.dp)
             ),
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            tonalElevation = if (isHovered) ToolkitTheme.dimensions.elevationMedium else ToolkitTheme.dimensions.cardElevation,
-            shadowElevation = if (isHovered) ToolkitTheme.dimensions.elevationMedium else 3.dp,
+            tonalElevation = elevation.coerceAtLeast(0.dp),
+            shadowElevation = elevation.coerceAtLeast(0.dp),
             border = BorderStroke(
                 width = ToolkitTheme.dimensions.borderThin,
                 color = MaterialTheme.colorScheme.outlineVariant
@@ -376,44 +458,100 @@ private fun InteractiveFloatingBottomBar(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier.padding(
                     horizontal = ToolkitTheme.spacing.medium,
-                    vertical = verticalPadding
+                    vertical = verticalPadding.coerceAtLeast(0.dp)
                 )
             ) {
-                // Docked handle bar (Image 4 left drawing)
+                // Docked handle bar
                 Box(
                     modifier = Modifier
-                        .padding(bottom = if (isHovered) ToolkitTheme.spacing.extraSmall else 0.dp)
-                        .size(width = 36.dp, height = 4.dp)
+                        .padding(bottom = handleBottomPadding.coerceAtLeast(0.dp))
+                        .size(width = DOCKED_HANDLE_WIDTH, height = DOCKED_HANDLE_HEIGHT)
                         .clip(CircleShape)
                         .background(MaterialTheme.colorScheme.outline.copy(alpha = handleBarAlpha))
                 )
 
-                AnimatedContent(
-                    targetState = isHovered,
-                    transitionSpec = {
-                        fadeIn(animationSpec = effectsSpringFloat) togetherWith
-                            fadeOut(animationSpec = effectsSpringFloat)
-                    },
-                    contentAlignment = Alignment.Center,
-                    label = "floatingBarContent"
-                ) { hovered ->
-                    if (!hovered) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.extraSmall),
-                            modifier = Modifier.padding(top = ToolkitTheme.spacing.extraSmall)
-                        ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center,
+                    modifier = Modifier.padding(top = ToolkitTheme.spacing.extraSmall)
+                ) {
+                    // Persistent TouchApp Icon in adaptive container
+                    Surface(
+                        shape = CircleShape,
+                        color = iconBgColor,
+                        modifier = Modifier.size(iconContainerSize.coerceAtLeast(0.dp))
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
                             Icon(
                                 imageVector = Icons.Default.TouchApp,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
+                                modifier = Modifier.size(iconSize.coerceAtLeast(0.dp))
                             )
+                        }
+                    }
+
+                    Spacer(Modifier.width(ToolkitTheme.spacing.small))
+
+                    // Tool title & optional plugin subtitle
+                    Column(verticalArrangement = Arrangement.Center) {
+                        Text(
+                            text = toolName,
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.SemiBold,
+                            color = titleColor,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        transition.AnimatedVisibility(
+                            visible = { hovered -> hovered && pluginName.isNotBlank() },
+                            enter = fadeIn(animationSpec = effectsSpringFloat) +
+                                    expandVertically(
+                                        animationSpec = layoutSizeSpring,
+                                        expandFrom = Alignment.Top
+                                    ),
+                            exit = fadeOut(animationSpec = effectsSpringFloat) +
+                                    shrinkVertically(
+                                        animationSpec = layoutSizeSpring,
+                                        shrinkTowards = Alignment.Top
+                                    )
+                        ) {
                             Text(
-                                text = toolName,
+                                text = pluginName,
                                 style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
+                        }
+                    }
+
+                    // Collapsed up-arrow indicator
+                    transition.AnimatedVisibility(
+                        visible = { hovered -> !hovered },
+                        enter = fadeIn(animationSpec = effectsSpringFloat) +
+                                scaleIn(
+                                    initialScale = ARROW_ENTER_EXIT_SCALE,
+                                    transformOrigin = TransformOrigin(0.5f, 0.5f),
+                                    animationSpec = effectsSpringFloat
+                                ) +
+                                expandHorizontally(
+                                    animationSpec = layoutSizeSpring,
+                                    expandFrom = Alignment.Start
+                                ),
+                        exit = fadeOut(animationSpec = effectsSpringFloat) +
+                                scaleOut(
+                                    targetScale = ARROW_ENTER_EXIT_SCALE,
+                                    transformOrigin = TransformOrigin(0.5f, 0.5f),
+                                    animationSpec = effectsSpringFloat
+                                ) +
+                                shrinkHorizontally(
+                                    animationSpec = layoutSizeSpring,
+                                    shrinkTowards = Alignment.Start
+                                )
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Spacer(Modifier.width(ToolkitTheme.spacing.extraSmall))
                             Icon(
                                 imageVector = Icons.Default.KeyboardArrowUp,
                                 contentDescription = null,
@@ -421,78 +559,87 @@ private fun InteractiveFloatingBottomBar(
                                 modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
                             )
                         }
-                    } else {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.mediumSmall),
-                        modifier = Modifier.padding(top = ToolkitTheme.spacing.extraSmall)
+                    }
+
+                    // Expanded action controls (VerticalDivider, Restart Button, Close Button)
+                    transition.AnimatedVisibility(
+                        visible = { hovered -> hovered },
+                        enter = fadeIn(animationSpec = effectsSpringFloat) +
+                                scaleIn(
+                                    initialScale = ACTION_ENTER_EXIT_SCALE,
+                                    transformOrigin = TransformOrigin(0f, 0.5f),
+                                    animationSpec = spatialSpringFloat
+                                ) +
+                                expandHorizontally(
+                                    animationSpec = layoutSizeSpring,
+                                    expandFrom = Alignment.Start
+                                ) +
+                                expandVertically(
+                                    animationSpec = layoutSizeSpring,
+                                    expandFrom = Alignment.CenterVertically
+                                ),
+                        exit = fadeOut(animationSpec = effectsSpringFloat) +
+                                scaleOut(
+                                    targetScale = ACTION_ENTER_EXIT_SCALE,
+                                    transformOrigin = TransformOrigin(0f, 0.5f),
+                                    animationSpec = effectsSpringFloat
+                                ) +
+                                shrinkHorizontally(
+                                    animationSpec = layoutSizeSpring,
+                                    shrinkTowards = Alignment.Start
+                                ) +
+                                shrinkVertically(
+                                    animationSpec = layoutSizeSpring,
+                                    shrinkTowards = Alignment.CenterVertically
+                                )
                     ) {
-                        Surface(
-                            shape = CircleShape,
-                            color = MaterialTheme.colorScheme.primaryContainer,
-                            modifier = Modifier.size(36.dp)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Box(contentAlignment = Alignment.Center) {
+                            Spacer(Modifier.width(ToolkitTheme.spacing.mediumSmall))
+
+                            VerticalDivider(
+                                modifier = Modifier
+                                    .height(ACTION_DIVIDER_HEIGHT)
+                                    .width(ToolkitTheme.dimensions.borderThin),
+                                color = MaterialTheme.colorScheme.outlineVariant
+                            )
+
+                            Spacer(Modifier.width(ToolkitTheme.spacing.smallMedium))
+
+                            FilledTonalButton(
+                                onClick = onRestart,
+                                contentPadding = PaddingValues(
+                                    horizontal = ToolkitTheme.spacing.mediumSmall,
+                                    vertical = 0.dp
+                                ),
+                                modifier = Modifier.height(ToolkitTheme.dimensions.standardButtonHeight)
+                            ) {
                                 Icon(
-                                    imageVector = Icons.Default.TouchApp,
+                                    imageVector = Icons.Default.Refresh,
                                     contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(ToolkitTheme.dimensions.iconMediumSmall)
+                                    modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
+                                )
+                                Spacer(Modifier.width(ToolkitTheme.spacing.extraSmall))
+                                Text(
+                                    text = stringResource(Res.string.action_restart_session),
+                                    style = MaterialTheme.typography.labelMedium
                                 )
                             }
-                        }
 
-                        Column {
-                            Text(
-                                text = toolName,
-                                style = MaterialTheme.typography.labelLarge,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = pluginName,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
+                            Spacer(Modifier.width(ToolkitTheme.spacing.smallMedium))
 
-                        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
-
-                        VerticalDivider(
-                            modifier = Modifier
-                                .height(28.dp)
-                                .width(ToolkitTheme.dimensions.borderThin),
-                            color = MaterialTheme.colorScheme.outlineVariant
-                        )
-
-                        FilledTonalButton(
-                            onClick = onRestart,
-                            contentPadding = PaddingValues(horizontal = ToolkitTheme.spacing.mediumSmall, vertical = 0.dp),
-                            modifier = Modifier.height(ToolkitTheme.dimensions.standardButtonHeight)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Refresh,
-                                contentDescription = null,
-                                modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
-                            )
-                            Spacer(Modifier.width(ToolkitTheme.spacing.extraSmall))
-                            Text(
-                                text = stringResource(Res.string.action_restart_session),
-                                style = MaterialTheme.typography.labelMedium
-                            )
-                        }
-
-                        IconButton(
-                            onClick = onClose,
-                            modifier = Modifier.size(ToolkitTheme.dimensions.standardButtonHeight)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Close,
-                                contentDescription = stringResource(Res.string.action_close_session),
-                                modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall),
-                                tint = MaterialTheme.colorScheme.error
-                            )
-                        }
+                            IconButton(
+                                onClick = onClose,
+                                modifier = Modifier.size(ToolkitTheme.dimensions.standardButtonHeight)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = stringResource(Res.string.action_close_session),
+                                    modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall),
+                                    tint = MaterialTheme.colorScheme.error
+                                )
+                            }
                         }
                     }
                 }
