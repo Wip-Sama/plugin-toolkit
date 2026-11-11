@@ -1,8 +1,21 @@
 package org.wip.plugintoolkit.features.plugin.sdui
 
+import org.wip.plugintoolkit.api.sdui.AssetReference
+import org.wip.plugintoolkit.api.sdui.BoardLayer
+import org.wip.plugintoolkit.api.sdui.BoardNode
+import org.wip.plugintoolkit.api.sdui.BoardShapeType
+import org.wip.plugintoolkit.api.sdui.BoardViewportConfig
 import org.wip.plugintoolkit.api.sdui.ColumnNode
 import org.wip.plugintoolkit.api.sdui.ErrorBoundaryNode
+import org.wip.plugintoolkit.api.sdui.FloatingAnchor
+import org.wip.plugintoolkit.api.sdui.FloatingPanelNode
+import org.wip.plugintoolkit.api.sdui.NormalizedPoint
+import org.wip.plugintoolkit.api.sdui.NormalizedSize
 import org.wip.plugintoolkit.api.sdui.RowNode
+import org.wip.plugintoolkit.api.sdui.ScaffoldNode
+import org.wip.plugintoolkit.api.sdui.SemanticColor
+import org.wip.plugintoolkit.api.sdui.SidebarAttachPoint
+import org.wip.plugintoolkit.api.sdui.SidebarNode
 import org.wip.plugintoolkit.api.sdui.SliderNode
 import org.wip.plugintoolkit.api.sdui.TextNode
 import org.wip.plugintoolkit.api.sdui.UiModifier
@@ -121,35 +134,183 @@ class UiAstSanitizerTest {
         val sanitizedFill = invalidFillMaxWidthTree.sanitize()
         val errorFill = assertIs<ErrorBoundaryNode>(sanitizedFill.root)
         assertTrue(errorFill.errorMessage.contains("Invalid fillMaxWidth"))
+
+        val invalidFillMaxHeightTree = UiNodeTree(
+            root = ColumnNode(
+                id = "over_height",
+                children = emptyList(),
+                modifier = UiModifier(fillMaxHeight = 1.5f)
+            )
+        )
+        val sanitizedFillHeight = invalidFillMaxHeightTree.sanitize()
+        val errorFillHeight = assertIs<ErrorBoundaryNode>(sanitizedFillHeight.root)
+        assertTrue(errorFillHeight.errorMessage.contains("Invalid fillMaxHeight"))
+
+        val invalidAspectRatioTree = UiNodeTree(
+            root = TextNode(
+                id = "zero_aspect",
+                text = "Zero aspect",
+                modifier = UiModifier(aspectRatio = 0f)
+            )
+        )
+        val sanitizedAspect = invalidAspectRatioTree.sanitize()
+        val errorAspect = assertIs<ErrorBoundaryNode>(sanitizedAspect.root)
+        assertTrue(errorAspect.errorMessage.contains("Invalid aspectRatio"))
+
+        val invalidWidthBoundsTree = UiNodeTree(
+            root = TextNode(
+                id = "bad_bounds",
+                text = "Bad width bounds",
+                modifier = UiModifier(minWidthDp = 300, maxWidthDp = 100)
+            )
+        )
+        val sanitizedBounds = invalidWidthBoundsTree.sanitize()
+        val errorBounds = assertIs<ErrorBoundaryNode>(sanitizedBounds.root)
+        assertTrue(errorBounds.errorMessage.contains("minWidthDp"))
+
+        val invalidNegativeHeightTree = UiNodeTree(
+            root = TextNode(
+                id = "neg_height_dp",
+                text = "Negative height",
+                modifier = UiModifier(heightDp = -20)
+            )
+        )
+        val sanitizedNegHeight = invalidNegativeHeightTree.sanitize()
+        val errorNegHeight = assertIs<ErrorBoundaryNode>(sanitizedNegHeight.root)
+        assertTrue(errorNegHeight.errorMessage.contains("Invalid heightDp"))
+    }
+
+    @Test
+    fun testBlankNodeIdReplacedWithErrorBoundary() {
+        val tree = UiNodeTree(
+            root = TextNode(
+                id = "   ",
+                text = "Blank ID"
+            )
+        )
+        val sanitized = tree.sanitize()
+        val errorNode = assertIs<ErrorBoundaryNode>(sanitized.root)
+        assertTrue(errorNode.errorMessage.contains("Node ID must not be blank"))
+    }
+
+    @Test
+    fun testValidExtendedModifierPassesThrough() {
+        val tree = UiNodeTree(
+            root = TextNode(
+                id = "styled_node",
+                text = "Styled",
+                modifier = UiModifier.None
+                    .size(120, 48)
+                    .widthIn(min = 80, max = 240)
+                    .heightIn(min = 32, max = 96)
+                    .background(SemanticColor.SURFACE)
+                    .border(SemanticColor.OUTLINE)
+                    .clipRounded()
+            )
+        )
+        val sanitized = tree.sanitize()
+        assertEquals(tree, sanitized)
     }
 
     @Test
     fun testSanitizeScaffoldWithPanels() {
         val scaffoldTree = UiNodeTree(
-            root = org.wip.plugintoolkit.api.sdui.ScaffoldNode(
+            root = ScaffoldNode(
                 id = "scaffold_root",
                 content = TextNode(id = "main_content", text = "Content"),
                 floatingPanels = listOf(
-                    org.wip.plugintoolkit.api.sdui.FloatingPanelNode(
+                    FloatingPanelNode(
                         id = "floating_1",
-                        anchor = org.wip.plugintoolkit.api.sdui.FloatingAnchor.TOP_START,
+                        anchor = FloatingAnchor.TOP_START,
                         children = listOf(TextNode(id = "float_child", text = "Panel"))
                     )
                 ),
-                leftSidebar = org.wip.plugintoolkit.api.sdui.SidebarNode(
+                leftSidebar = SidebarNode(
                     id = "sidebar_1",
-                    attachPoint = org.wip.plugintoolkit.api.sdui.SidebarAttachPoint.LEFT,
+                    attachPoint = SidebarAttachPoint.LEFT,
                     children = listOf(TextNode(id = "side_child", text = "Sidebar"))
                 )
             )
         )
         val sanitized = scaffoldTree.sanitize()
-        val root = assertIs<org.wip.plugintoolkit.api.sdui.ScaffoldNode>(sanitized.root)
+        val root = assertIs<ScaffoldNode>(sanitized.root)
         assertEquals("scaffold_root", root.id)
         assertIs<TextNode>(root.content)
         assertEquals(1, root.floatingPanels.size)
         assertNotNull(root.leftSidebar)
-        assertIs<org.wip.plugintoolkit.api.sdui.SidebarNode>(root.leftSidebar)
+        assertIs<SidebarNode>(root.leftSidebar)
+    }
+
+    @Test
+    fun testBoardNodeDuplicateLayerIdsReplacedWithErrorBoundary() {
+        val tree = UiNodeTree(
+            root = BoardNode(
+                id = "board_dup",
+                layers = listOf(
+                    BoardLayer.TextLayer(id = "layer_1", text = "First", position = NormalizedPoint(0.2f, 0.2f)),
+                    BoardLayer.ShapeLayer(
+                        id = "layer_1",
+                        shapeType = BoardShapeType.RECTANGLE,
+                        position = NormalizedPoint(0.4f, 0.4f),
+                        size = NormalizedSize(0.2f, 0.2f)
+                    )
+                )
+            )
+        )
+        val sanitized = tree.sanitize()
+        val errorNode = assertIs<ErrorBoundaryNode>(sanitized.root)
+        assertTrue(errorNode.errorMessage.contains("Invalid or duplicate BoardLayer ID"))
+    }
+
+    @Test
+    fun testBoardNodeClampsLayerCoordinatesAndSanitizesComponentLayerContent() {
+        val tree = UiNodeTree(
+            root = BoardNode(
+                id = "board_clamp",
+                viewportConfig = BoardViewportConfig(
+                    minScale = 0.05f,
+                    maxScale = 10.0f,
+                    initialScale = 8.0f,
+                    gridStep = 0.001f
+                ),
+                layers = listOf(
+                    BoardLayer.ImageLayer(
+                        id = "img_out_of_bounds",
+                        asset = AssetReference.Relative("page.png"),
+                        position = NormalizedPoint(-0.5f, 1.5f),
+                        size = NormalizedSize(0.0f, 2.0f),
+                        opacity = 2.0f
+                    ),
+                    BoardLayer.ComponentLayer(
+                        id = "comp_with_bad_slider",
+                        position = NormalizedPoint(0.5f, 0.5f),
+                        size = NormalizedSize(0.3f, 0.3f),
+                        content = SliderNode(
+                            id = "nested_bad_slider",
+                            value = 10.0,
+                            min = 50.0,
+                            max = 5.0
+                        )
+                    )
+                )
+            )
+        )
+
+        val sanitized = tree.sanitize()
+        val board = assertIs<BoardNode>(sanitized.root)
+        assertEquals(0.25f, board.viewportConfig.minScale)
+        assertEquals(4.0f, board.viewportConfig.maxScale)
+        assertEquals(4.0f, board.viewportConfig.initialScale)
+        assertEquals(0.01f, board.viewportConfig.gridStep)
+
+        val imgLayer = assertIs<BoardLayer.ImageLayer>(board.layers[0])
+        assertEquals(NormalizedPoint(0.0f, 1.0f), imgLayer.position)
+        assertEquals(NormalizedSize(0.01f, 1.0f), imgLayer.size)
+        assertEquals(1.0f, imgLayer.opacity)
+
+        val compLayer = assertIs<BoardLayer.ComponentLayer>(board.layers[1])
+        val nestedError = assertIs<ErrorBoundaryNode>(compLayer.content)
+        assertTrue(nestedError.errorMessage.contains("Malformed slider range"))
     }
 }
 

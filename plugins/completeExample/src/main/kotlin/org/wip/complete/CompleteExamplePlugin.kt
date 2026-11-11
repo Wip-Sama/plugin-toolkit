@@ -21,10 +21,15 @@ import org.wip.plugintoolkit.api.ProgressData
 import org.wip.plugintoolkit.api.PluginNetworkClient
 import org.wip.plugintoolkit.api.watchProcess
 import org.wip.plugintoolkit.api.ConditionOperator
+import org.wip.plugintoolkit.api.sdui.BoardGridStyle
 import org.wip.plugintoolkit.api.sdui.BoardLayer
+import org.wip.plugintoolkit.api.sdui.BoardShapeType
 import org.wip.plugintoolkit.api.sdui.BoardTool
+import org.wip.plugintoolkit.api.sdui.BoardViewportConfig
 import org.wip.plugintoolkit.api.sdui.FloatingAnchor
 import org.wip.plugintoolkit.api.sdui.InteractiveUiProcessor
+import org.wip.plugintoolkit.api.sdui.NormalizedPoint
+import org.wip.plugintoolkit.api.sdui.NormalizedSize
 import org.wip.plugintoolkit.api.sdui.SemanticColor
 import org.wip.plugintoolkit.api.sdui.SpacingSize
 import org.wip.plugintoolkit.api.sdui.TypographyRole
@@ -563,52 +568,118 @@ class CompleteExamplePlugin(val settings: CompleteExampleSettings) : Interactive
         context: UiSessionContext,
         events: Flow<UiEvent>
     ): Flow<UiNodeTree> = channelFlow {
-        var canvasTitle = "Interactive Plugin Canvas"
+        var canvasTitle = "Interactive Spatial Board"
         var brushWidth = 4.0
-        var smoothing = true
+        var snapToGrid = false
         var brushColor = SemanticColor.PRIMARY
-        var activeToolType = "PEN"
+        var activeToolType = "SELECT"
         var counter = 0
-        val layers = mutableListOf<BoardLayer>()
+        var clearRevision = 0
+        var selectedLayerIds = setOf<String>()
+        val layers = mutableListOf<BoardLayer>(
+            BoardLayer.ShapeLayer(
+                id = "callout_1",
+                shapeType = BoardShapeType.CALLOUT_BUBBLE,
+                position = NormalizedPoint(0.08f, 0.12f),
+                size = NormalizedSize(0.28f, 0.18f),
+                strokeColor = SemanticColor.PRIMARY,
+                fillColor = SemanticColor.SURFACE,
+                text = "Double-click text to edit!",
+                zIndex = 1
+            ),
+            BoardLayer.TextLayer(
+                id = "text_1",
+                text = "Editable Overlay Caption",
+                position = NormalizedPoint(0.12f, 0.36f),
+                color = SemanticColor.ON_SURFACE,
+                backgroundColor = SemanticColor.SURFACE,
+                borderColor = SemanticColor.OUTLINE,
+                role = TypographyRole.TITLE_MEDIUM,
+                zIndex = 2
+            )
+        )
 
         fun renderTree(): UiNodeTree = uiTree {
             val activeBoardTool: BoardTool = when (activeToolType) {
+                "SELECT" -> BoardTool.Select()
+                "PAN" -> BoardTool.Pan
+                "TEXT" -> BoardTool.PlaceText(defaultText = "New Caption", color = brushColor)
+                "SHAPE" -> BoardTool.Shape(
+                    shapeType = BoardShapeType.CALLOUT_BUBBLE,
+                    strokeColor = brushColor,
+                    fillColor = SemanticColor.SURFACE,
+                    strokeWidth = brushWidth.toFloat()
+                )
                 "HIGHLIGHTER" -> BoardTool.Highlighter(color = brushColor, strokeWidth = (brushWidth * 2.5).toFloat())
                 "ERASER" -> BoardTool.Eraser(radius = (brushWidth * 2).toFloat())
                 else -> BoardTool.Brush(color = brushColor, strokeWidth = brushWidth.toFloat())
             }
 
-            scaffold(id = "interactiveScaffold") {
-                // The big canvas covers the whole section without embedded separate toolbars
+            scaffold(id = "interactiveScaffold", modifier = UiModifier.fillMaxSize()) {
                 content {
                     board(
                         id = "drawingBoard",
-                        layers = layers.toList(),
                         activeTool = activeBoardTool,
-                        showToolbar = false,
-                        modifier = UiModifier.None
-                    )
+                        viewportConfig = BoardViewportConfig(
+                            gridStyle = BoardGridStyle.DOTS,
+                            snapToGrid = snapToGrid,
+                            gridStep = 0.05f
+                        ),
+                        selectedLayerIds = selectedLayerIds,
+                        clearRevision = clearRevision,
+                        showToolbar = true,
+                        showZoomControls = true,
+                        modifier = UiModifier.fillMaxSize()
+                    ) {
+                        layers.forEach { layer(it) }
+                        componentLayer(
+                            id = "inspector_widget",
+                            position = NormalizedPoint(0.08f, 0.62f),
+                            size = NormalizedSize(0.32f, 0.24f),
+                            zIndex = 3
+                        ) {
+                            column(spacing = SpacingSize.EXTRA_SMALL) {
+                                text(
+                                    text = canvasTitle,
+                                    role = TypographyRole.TITLE_MEDIUM,
+                                    color = SemanticColor.PRIMARY
+                                )
+                                text(
+                                    text = "Selected: ${selectedLayerIds.joinToString().ifEmpty { "None" }}",
+                                    role = TypographyRole.BODY_SMALL
+                                )
+                                button(
+                                    id = "boardWidgetBtn",
+                                    label = "Widget Taps: $counter",
+                                    action = "increment_counter"
+                                )
+                            }
+                        }
+                    }
                 }
 
-                // Floating collapsible controls panel in the corner
                 floatingPanel(
                     id = "controlsPanel",
                     anchor = FloatingAnchor.TOP_END,
-                    title = "Canvas Controls",
+                    title = "Board Controls",
                     isCollapsible = true,
                     isCollapsed = false
                 ) {
                     textInput(
                         id = "titleInput",
                         text = canvasTitle,
-                        label = "Canvas Title",
+                        label = "Board Title",
                         placeholder = "Enter title..."
                     )
                     dropdown(
                         id = "toolDropdown",
-                        label = "Drawing Tool",
+                        label = "Active Tool",
                         options = mapOf(
-                            "PEN" to "Pen",
+                            "SELECT" to "Select / Move / Edit",
+                            "PAN" to "Pan Camera",
+                            "TEXT" to "Place Text",
+                            "SHAPE" to "Draw Callout Bubble",
+                            "PEN" to "Freehand Pen",
                             "HIGHLIGHTER" to "Highlighter",
                             "ERASER" to "Eraser"
                         ),
@@ -616,7 +687,7 @@ class CompleteExamplePlugin(val settings: CompleteExampleSettings) : Interactive
                     )
                     dropdown(
                         id = "colorDropdown",
-                        label = "Brush Color",
+                        label = "Active Color",
                         options = mapOf(
                             "PRIMARY" to "Primary Blue",
                             "SECONDARY" to "Secondary Gray",
@@ -627,9 +698,9 @@ class CompleteExamplePlugin(val settings: CompleteExampleSettings) : Interactive
                         selectedKey = brushColor.name
                     )
                     toggle(
-                        id = "smoothToggle",
-                        label = "Spline Smoothing",
-                        checked = smoothing
+                        id = "snapToggle",
+                        label = "Snap to Grid",
+                        checked = snapToGrid
                     )
                     slider(
                         id = "widthSlider",
@@ -637,15 +708,25 @@ class CompleteExamplePlugin(val settings: CompleteExampleSettings) : Interactive
                         min = 1.0,
                         max = 20.0,
                         steps = 19,
-                        label = "Brush Width: ${brushWidth.toInt()}px"
+                        label = "Stroke Width: ${brushWidth.toInt()}px"
                     )
                     row(spacing = SpacingSize.SMALL) {
-                        button(id = "clearBtn", label = "Clear Canvas", isPrimary = false, isDestructive = true)
-                        button(id = "counterBtn", label = "Taps: $counter")
+                        button(
+                            id = "clearBtn",
+                            label = "Clear Board",
+                            action = "clear_canvas",
+                            isPrimary = false,
+                            isDestructive = true
+                        )
+                        button(
+                            id = "counterBtn",
+                            label = "Taps: $counter",
+                            action = "increment_counter"
+                        )
                     }
                     text(
                         id = "footerStats",
-                        text = "Tool: $activeToolType | Color: ${brushColor.name} | Width: ${brushWidth.toInt()}px | Layers: ${layers.size}",
+                        text = "Tool: $activeToolType | Color: ${brushColor.name} | Layers: ${layers.size + 1}",
                         role = TypographyRole.LABEL,
                         color = SemanticColor.ON_SURFACE
                     )
@@ -658,12 +739,14 @@ class CompleteExamplePlugin(val settings: CompleteExampleSettings) : Interactive
         events.collect { event ->
             when (event) {
                 is UiEvent.Click -> {
-                    when (event.nodeId) {
-                        "clearBtn" -> {
+                    when (event.action ?: event.nodeId) {
+                        "clear_canvas", "clearBtn" -> {
                             layers.clear()
+                            selectedLayerIds = emptySet()
+                            clearRevision++
                             send(renderTree())
                         }
-                        "counterBtn" -> {
+                        "increment_counter", "counterBtn", "boardWidgetBtn" -> {
                             counter++
                             send(renderTree())
                         }
@@ -682,8 +765,8 @@ class CompleteExamplePlugin(val settings: CompleteExampleSettings) : Interactive
                     }
                 }
                 is UiEvent.ToggleChanged -> {
-                    if (event.nodeId == "smoothToggle") {
-                        smoothing = event.checked
+                    if (event.nodeId == "snapToggle") {
+                        snapToGrid = event.checked
                         send(renderTree())
                     }
                 }
@@ -705,14 +788,119 @@ class CompleteExamplePlugin(val settings: CompleteExampleSettings) : Interactive
                         layers.add(
                             BoardLayer.PathLayer(
                                 id = "path_${layers.size + 1}",
-                                path = event.path
+                                path = event.path,
+                                zIndex = layers.size + 1
                             )
                         )
                         send(renderTree())
                     }
                 }
+                is UiEvent.BoardLayerSelected -> {
+                    selectedLayerIds = event.selectedLayerIds.toSet()
+                    send(renderTree())
+                }
+                is UiEvent.BoardLayerMoved -> {
+                    val idx = layers.indexOfFirst { it.id == event.layerId }
+                    if (idx >= 0) {
+                        val updated = when (val existing = layers[idx]) {
+                            is BoardLayer.TextLayer -> existing.copy(position = event.position)
+                            is BoardLayer.ImageLayer -> existing.copy(position = event.position)
+                            is BoardLayer.ShapeLayer -> existing.copy(position = event.position)
+                            is BoardLayer.ComponentLayer -> existing.copy(position = event.position)
+                            is BoardLayer.PathLayer -> existing
+                        }
+                        layers[idx] = updated
+                        send(renderTree())
+                    }
+                }
+                is UiEvent.BoardLayerResized -> {
+                    val idx = layers.indexOfFirst { it.id == event.layerId }
+                    if (idx >= 0) {
+                        val updated = when (val existing = layers[idx]) {
+                            is BoardLayer.TextLayer -> existing.copy(position = event.position, size = event.size)
+                            is BoardLayer.ImageLayer -> existing.copy(position = event.position, size = event.size)
+                            is BoardLayer.ShapeLayer -> existing.copy(position = event.position, size = event.size)
+                            is BoardLayer.ComponentLayer -> existing.copy(position = event.position, size = event.size)
+                            is BoardLayer.PathLayer -> existing
+                        }
+                        layers[idx] = updated
+                        send(renderTree())
+                    }
+                }
+                is UiEvent.BoardTextEdited -> {
+                    val idx = layers.indexOfFirst { it.id == event.layerId }
+                    if (idx >= 0) {
+                        val existing = layers[idx]
+                        if (existing is BoardLayer.TextLayer) {
+                            layers[idx] = existing.copy(text = event.text)
+                            send(renderTree())
+                        }
+                    }
+                }
+                is UiEvent.BoardTextPlaced -> {
+                    val newId = "text_${layers.size + 1}"
+                    layers.add(
+                        BoardLayer.TextLayer(
+                            id = newId,
+                            text = event.text,
+                            position = event.position,
+                            color = brushColor,
+                            backgroundColor = SemanticColor.SURFACE,
+                            borderColor = brushColor,
+                            zIndex = layers.size + 1
+                        )
+                    )
+                    selectedLayerIds = setOf(newId)
+                    activeToolType = "SELECT"
+                    send(renderTree())
+                }
+                is UiEvent.BoardShapeCommitted -> {
+                    val newId = "shape_${layers.size + 1}"
+                    layers.add(
+                        BoardLayer.ShapeLayer(
+                            id = newId,
+                            shapeType = event.shapeType,
+                            position = event.position,
+                            size = event.size,
+                            strokeColor = event.strokeColor,
+                            fillColor = event.fillColor,
+                            strokeWidth = event.strokeWidth,
+                            zIndex = layers.size + 1
+                        )
+                    )
+                    selectedLayerIds = setOf(newId)
+                    activeToolType = "SELECT"
+                    send(renderTree())
+                }
+                is UiEvent.BoardLayerDeleted -> {
+                    val toDelete = event.layerIds.toSet()
+                    layers.removeAll { it.id in toDelete }
+                    selectedLayerIds = selectedLayerIds - toDelete
+                    send(renderTree())
+                }
+                is UiEvent.BoardCanvasClicked -> {
+                    selectedLayerIds = emptySet()
+                    send(renderTree())
+                }
                 is UiEvent.Custom -> {
-                    // Custom extensions
+                    if (event.action == "SELECT_TOOL") {
+                        activeToolType = when (event.payload?.jsonPrimitive?.content) {
+                            "select" -> "SELECT"
+                            "pan" -> "PAN"
+                            "text" -> "TEXT"
+                            "shape" -> "SHAPE"
+                            "brush" -> "PEN"
+                            "highlighter" -> "HIGHLIGHTER"
+                            "eraser" -> "ERASER"
+                            else -> activeToolType
+                        }
+                        send(renderTree())
+                    } else if (event.action == "CLEAR") {
+                        layers.clear()
+                        selectedLayerIds = emptySet()
+                        clearRevision++
+                        send(renderTree())
+                    }
                 }
             }
         }

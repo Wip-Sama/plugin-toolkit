@@ -1,5 +1,7 @@
 package org.wip.plugintoolkit.features.plugin.sdui
 
+import org.wip.plugintoolkit.api.sdui.BoardLayer
+import org.wip.plugintoolkit.api.sdui.BoardNode
 import org.wip.plugintoolkit.api.sdui.BoxNode
 import org.wip.plugintoolkit.api.sdui.CardNode
 import org.wip.plugintoolkit.api.sdui.ColumnNode
@@ -52,6 +54,15 @@ object UiAstSanitizer {
 
             nodeCount++
 
+            // Check for blank node IDs
+            if (node.id.isBlank()) {
+                return ErrorBoundaryNode(
+                    id = "blank_id_$nodeCount",
+                    errorMessage = "Node ID must not be blank",
+                    failedNodeType = node::class.simpleName
+                )
+            }
+
             // Check for duplicate node.id collisions
             if (node.id in seenIds) {
                 return ErrorBoundaryNode(
@@ -64,19 +75,78 @@ object UiAstSanitizer {
 
             // Validate modifier properties
             val weight = node.modifier.weight
-            if (weight != null && (weight < 0f || weight.isNaN())) {
+            if (weight != null && (weight <= 0f || weight.isNaN() || weight.isInfinite())) {
                 return ErrorBoundaryNode(
                     id = node.id,
-                    errorMessage = "Invalid layout weight: $weight (must be >= 0.0)",
+                    errorMessage = "Invalid layout weight: $weight (must be > 0.0 and finite)",
                     failedNodeType = node::class.simpleName
                 )
             }
 
             val fillMaxWidth = node.modifier.fillMaxWidth
-            if (fillMaxWidth != null && (fillMaxWidth < 0f || fillMaxWidth.isNaN())) {
+            if (fillMaxWidth != null && (fillMaxWidth < 0f || fillMaxWidth > 1f || fillMaxWidth.isNaN())) {
                 return ErrorBoundaryNode(
                     id = node.id,
-                    errorMessage = "Invalid fillMaxWidth: $fillMaxWidth (must be >= 0.0)",
+                    errorMessage = "Invalid fillMaxWidth: $fillMaxWidth (must be in 0.0..1.0)",
+                    failedNodeType = node::class.simpleName
+                )
+            }
+
+            val fillMaxHeight = node.modifier.fillMaxHeight
+            if (fillMaxHeight != null && (fillMaxHeight < 0f || fillMaxHeight > 1f || fillMaxHeight.isNaN())) {
+                return ErrorBoundaryNode(
+                    id = node.id,
+                    errorMessage = "Invalid fillMaxHeight: $fillMaxHeight (must be in 0.0..1.0)",
+                    failedNodeType = node::class.simpleName
+                )
+            }
+
+            val aspectRatio = node.modifier.aspectRatio
+            if (aspectRatio != null && (aspectRatio <= 0f || aspectRatio.isNaN() || aspectRatio.isInfinite())) {
+                return ErrorBoundaryNode(
+                    id = node.id,
+                    errorMessage = "Invalid aspectRatio: $aspectRatio (must be > 0.0 and finite)",
+                    failedNodeType = node::class.simpleName
+                )
+            }
+
+            val widthDp = node.modifier.widthDp
+            val heightDp = node.modifier.heightDp
+            val minWidthDp = node.modifier.minWidthDp
+            val maxWidthDp = node.modifier.maxWidthDp
+            val minHeightDp = node.modifier.minHeightDp
+            val maxHeightDp = node.modifier.maxHeightDp
+            if (widthDp != null && widthDp < 0) {
+                return ErrorBoundaryNode(
+                    id = node.id,
+                    errorMessage = "Invalid widthDp: $widthDp (must be >= 0)",
+                    failedNodeType = node::class.simpleName
+                )
+            }
+            if (heightDp != null && heightDp < 0) {
+                return ErrorBoundaryNode(
+                    id = node.id,
+                    errorMessage = "Invalid heightDp: $heightDp (must be >= 0)",
+                    failedNodeType = node::class.simpleName
+                )
+            }
+            if ((minWidthDp != null && minWidthDp < 0) ||
+                (maxWidthDp != null && maxWidthDp < 0) ||
+                (minWidthDp != null && maxWidthDp != null && minWidthDp > maxWidthDp)
+            ) {
+                return ErrorBoundaryNode(
+                    id = node.id,
+                    errorMessage = "Invalid width bounds: minWidthDp=$minWidthDp, maxWidthDp=$maxWidthDp",
+                    failedNodeType = node::class.simpleName
+                )
+            }
+            if ((minHeightDp != null && minHeightDp < 0) ||
+                (maxHeightDp != null && maxHeightDp < 0) ||
+                (minHeightDp != null && maxHeightDp != null && minHeightDp > maxHeightDp)
+            ) {
+                return ErrorBoundaryNode(
+                    id = node.id,
+                    errorMessage = "Invalid height bounds: minHeightDp=$minHeightDp, maxHeightDp=$maxHeightDp",
                     failedNodeType = node::class.simpleName
                 )
             }
@@ -111,6 +181,59 @@ object UiAstSanitizer {
                 )
                 is FloatingPanelNode -> node.copy(children = node.children.map { sanitizeNode(it, depth + 1) })
                 is SidebarNode -> node.copy(children = node.children.map { sanitizeNode(it, depth + 1) })
+                is BoardNode -> {
+                    val seenLayerIds = mutableSetOf<String>()
+                    val sanitizedLayers = mutableListOf<BoardLayer>()
+                    for (layer in node.layers) {
+                        if (layer.id.isBlank() || !seenLayerIds.add(layer.id)) {
+                            return ErrorBoundaryNode(
+                                id = node.id,
+                                errorMessage = "Invalid or duplicate BoardLayer ID '${layer.id}' in BoardNode '${node.id}'",
+                                failedNodeType = "BoardNode"
+                            )
+                        }
+                        val sanitizedLayer = when (layer) {
+                            is BoardLayer.PathLayer -> layer.copy(
+                                path = layer.path.copy(
+                                    points = layer.path.points.map { it.coercedInBounds() }
+                                )
+                            )
+                            is BoardLayer.TextLayer -> layer.copy(
+                                position = layer.position.coercedInBounds(),
+                                size = layer.size?.coercedInBounds()
+                            )
+                            is BoardLayer.ImageLayer -> layer.copy(
+                                position = layer.position.coercedInBounds(),
+                                size = layer.size.coercedInBounds(),
+                                opacity = layer.opacity.coerceIn(0f, 1f)
+                            )
+                            is BoardLayer.ShapeLayer -> layer.copy(
+                                position = layer.position.coercedInBounds(),
+                                size = layer.size.coercedInBounds()
+                            )
+                            is BoardLayer.ComponentLayer -> layer.copy(
+                                position = layer.position.coercedInBounds(),
+                                size = layer.size?.coercedInBounds(),
+                                content = sanitizeNode(layer.content, depth + 1)
+                            )
+                        }
+                        sanitizedLayers.add(sanitizedLayer)
+                    }
+                    val vp = node.viewportConfig
+                    val safeMinScale = if (vp.minScale.isNaN() || vp.minScale.isInfinite()) 0.25f else vp.minScale.coerceIn(0.25f, 4.0f)
+                    val safeMaxScale = if (vp.maxScale.isNaN() || vp.maxScale.isInfinite()) 4.0f else vp.maxScale.coerceIn(safeMinScale, 4.0f)
+                    val safeInitialScale = if (vp.initialScale.isNaN() || vp.initialScale.isInfinite()) 1.0f else vp.initialScale.coerceIn(safeMinScale, safeMaxScale)
+                    val safeGridStep = if (vp.gridStep.isNaN() || vp.gridStep.isInfinite()) 0.025f else vp.gridStep.coerceIn(0.01f, 0.25f)
+                    node.copy(
+                        layers = sanitizedLayers,
+                        viewportConfig = vp.copy(
+                            minScale = safeMinScale,
+                            maxScale = safeMaxScale,
+                            initialScale = safeInitialScale,
+                            gridStep = safeGridStep
+                        )
+                    )
+                }
                 else -> node
             }
         }

@@ -100,11 +100,12 @@ abstract class UiContainerBuilder {
     fun button(
         label: String,
         id: String = generateNodeId("btn"),
+        action: String? = null,
         isPrimary: Boolean = true,
         isDestructive: Boolean = false,
         modifier: UiModifier = UiModifier.None
     ) {
-        add(ButtonNode(id = id, label = label, isPrimary = isPrimary, isDestructive = isDestructive, modifier = modifier))
+        add(ButtonNode(id = id, label = label, action = action, isPrimary = isPrimary, isDestructive = isDestructive, modifier = modifier))
     }
 
     fun textInput(
@@ -180,13 +181,36 @@ abstract class UiContainerBuilder {
     fun board(
         id: String = generateNodeId("board"),
         backgroundAsset: AssetReference? = null,
+        viewportConfig: BoardViewportConfig = BoardViewportConfig(),
         layers: List<BoardLayer> = emptyList(),
+        selectedLayerIds: Set<String> = emptySet(),
         activeTool: BoardTool = BoardTool.Brush(),
         clearRevision: Int = 0,
         showToolbar: Boolean = false,
-        modifier: UiModifier = UiModifier.None
+        showZoomControls: Boolean = true,
+        modifier: UiModifier = UiModifier.None,
+        block: (BoardBuilder.() -> Unit)? = null
     ) {
-        add(BoardNode(id = id, backgroundAsset = backgroundAsset, layers = layers, activeTool = activeTool, clearRevision = clearRevision, showToolbar = showToolbar, modifier = modifier))
+        val builtLayers = if (block != null) {
+            val builder = BoardBuilder(layers.toMutableList()).apply(block)
+            builder.buildLayers()
+        } else {
+            layers
+        }
+        add(
+            BoardNode(
+                id = id,
+                backgroundAsset = backgroundAsset,
+                viewportConfig = viewportConfig,
+                layers = builtLayers,
+                selectedLayerIds = selectedLayerIds,
+                activeTool = activeTool,
+                clearRevision = clearRevision,
+                showToolbar = showToolbar,
+                showZoomControls = showZoomControls,
+                modifier = modifier
+            )
+        )
     }
 
     fun badge(
@@ -475,6 +499,180 @@ class ScaffoldBuilder(
             modifier = modifier
         )
     }
+}
+
+/**
+ * Declarative builder for spatial [BoardLayer] elements inside a [BoardNode].
+ */
+@UiDslMarker
+class BoardBuilder(
+    private val layers: MutableList<BoardLayer> = mutableListOf()
+) {
+    fun layer(layer: BoardLayer) {
+        layers.add(layer)
+    }
+
+    fun imageLayer(
+        id: String = UiContainerBuilder.generateNodeId("img_layer"),
+        asset: AssetReference,
+        position: NormalizedPoint = NormalizedPoint(0f, 0f),
+        size: NormalizedSize = NormalizedSize(1f, 1f),
+        opacity: Float = 1f,
+        contentDescription: String? = null,
+        zIndex: Int = layers.size,
+        visible: Boolean = true,
+        locked: Boolean = false,
+        selectable: Boolean = true,
+        draggable: Boolean = true,
+        resizable: Boolean = true
+    ) {
+        layers.add(
+            BoardLayer.ImageLayer(
+                id = id,
+                asset = asset,
+                position = position,
+                size = size,
+                opacity = opacity,
+                contentDescription = contentDescription,
+                zIndex = zIndex,
+                visible = visible,
+                locked = locked,
+                selectable = selectable,
+                draggable = draggable,
+                resizable = resizable
+            )
+        )
+    }
+
+    fun textLayer(
+        id: String = UiContainerBuilder.generateNodeId("txt_layer"),
+        text: String,
+        position: NormalizedPoint,
+        size: NormalizedSize? = null,
+        color: SemanticColor = SemanticColor.PRIMARY,
+        backgroundColor: SemanticColor? = null,
+        borderColor: SemanticColor? = null,
+        role: TypographyRole = TypographyRole.BODY_LARGE,
+        zIndex: Int = layers.size,
+        visible: Boolean = true,
+        locked: Boolean = false,
+        selectable: Boolean = true,
+        draggable: Boolean = true,
+        editable: Boolean = true
+    ) {
+        layers.add(
+            BoardLayer.TextLayer(
+                id = id,
+                text = text,
+                position = position,
+                size = size,
+                color = color,
+                backgroundColor = backgroundColor,
+                borderColor = borderColor,
+                role = role,
+                zIndex = zIndex,
+                visible = visible,
+                locked = locked,
+                selectable = selectable,
+                draggable = draggable,
+                editable = editable
+            )
+        )
+    }
+
+    fun shapeLayer(
+        id: String = UiContainerBuilder.generateNodeId("shape_layer"),
+        shapeType: BoardShapeType = BoardShapeType.ROUNDED_RECT,
+        position: NormalizedPoint,
+        size: NormalizedSize,
+        strokeColor: SemanticColor = SemanticColor.PRIMARY,
+        fillColor: SemanticColor? = null,
+        strokeWidth: Float = 2f,
+        text: String? = null,
+        zIndex: Int = layers.size,
+        visible: Boolean = true,
+        locked: Boolean = false,
+        selectable: Boolean = true,
+        draggable: Boolean = true,
+        resizable: Boolean = true
+    ) {
+        layers.add(
+            BoardLayer.ShapeLayer(
+                id = id,
+                shapeType = shapeType,
+                position = position,
+                size = size,
+                strokeColor = strokeColor,
+                fillColor = fillColor,
+                strokeWidth = strokeWidth,
+                text = text,
+                zIndex = zIndex,
+                visible = visible,
+                locked = locked,
+                selectable = selectable,
+                draggable = draggable,
+                resizable = resizable
+            )
+        )
+    }
+
+    fun pathLayer(
+        id: String = UiContainerBuilder.generateNodeId("path_layer"),
+        path: VectorPathData,
+        zIndex: Int = layers.size,
+        visible: Boolean = true,
+        locked: Boolean = false,
+        selectable: Boolean = false
+    ) {
+        layers.add(
+            BoardLayer.PathLayer(
+                id = id,
+                path = path,
+                zIndex = zIndex,
+                visible = visible,
+                locked = locked,
+                selectable = selectable
+            )
+        )
+    }
+
+    fun componentLayer(
+        id: String = UiContainerBuilder.generateNodeId("comp_layer"),
+        position: NormalizedPoint,
+        size: NormalizedSize? = null,
+        zIndex: Int = layers.size,
+        visible: Boolean = true,
+        locked: Boolean = false,
+        selectable: Boolean = true,
+        draggable: Boolean = true,
+        resizable: Boolean = false,
+        block: UiContainerBuilder.() -> Unit
+    ) {
+        val container = object : UiContainerBuilder() {}
+        container.block()
+        val children = container.buildChildren()
+        val contentNode = when {
+            children.isEmpty() -> ColumnNode(id = "${id}_empty")
+            children.size == 1 -> children.first()
+            else -> ColumnNode(id = "${id}_col", children = children)
+        }
+        layers.add(
+            BoardLayer.ComponentLayer(
+                id = id,
+                position = position,
+                size = size,
+                content = contentNode,
+                zIndex = zIndex,
+                visible = visible,
+                locked = locked,
+                selectable = selectable,
+                draggable = draggable,
+                resizable = resizable
+            )
+        )
+    }
+
+    internal fun buildLayers(): List<BoardLayer> = layers.toList()
 }
 
 /**

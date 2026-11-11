@@ -50,6 +50,8 @@ class PluginUiSessionHandle(
     val sessionId: String,
     val pluginId: String,
     val capabilityName: String,
+    val fileSystem: PluginFileSystem? = null,
+    val cacheFileSystem: PluginFileSystem? = null,
     private val sessionScope: CoroutineScope,
     private val transactionalChannel: Channel<UiEvent>,
     private val continuousChannel: Channel<UiEvent>,
@@ -75,6 +77,14 @@ class PluginUiSessionHandle(
             is UiEvent.PathCommitted,
             is UiEvent.OptionSelected,
             is UiEvent.ToggleChanged,
+            is UiEvent.BoardLayerSelected,
+            is UiEvent.BoardLayerMoved,
+            is UiEvent.BoardLayerResized,
+            is UiEvent.BoardTextEdited,
+            is UiEvent.BoardTextPlaced,
+            is UiEvent.BoardShapeCommitted,
+            is UiEvent.BoardLayerDeleted,
+            is UiEvent.BoardCanvasClicked,
             is UiEvent.Custom -> {
                 transactionalChannel.trySend(event)
             }
@@ -171,6 +181,8 @@ class PluginUiSessionManager(
             sessionId = sessionId,
             pluginId = pluginId,
             capabilityName = capabilityName,
+            fileSystem = context.fileSystem,
+            cacheFileSystem = context.cacheFileSystem,
             sessionScope = sessionScope,
             transactionalChannel = transactionalChannel,
             continuousChannel = continuousChannel,

@@ -143,6 +143,7 @@ data class TextNode(
 data class ButtonNode(
     override val id: String,
     val label: String,
+    val action: String? = null,
     val isPrimary: Boolean = true,
     val isDestructive: Boolean = false,
     override val modifier: UiModifier = UiModifier.None
@@ -244,10 +245,13 @@ data class DividerNode(
 data class BoardNode(
     override val id: String,
     val backgroundAsset: AssetReference? = null,
+    val viewportConfig: BoardViewportConfig = BoardViewportConfig(),
     val layers: List<BoardLayer> = emptyList(),
+    val selectedLayerIds: Set<String> = emptySet(),
     val activeTool: BoardTool = BoardTool.Brush(),
     val clearRevision: Int = 0,
     val showToolbar: Boolean = false,
+    val showZoomControls: Boolean = true,
     override val modifier: UiModifier = UiModifier.None
 ) : UiNode
 
@@ -394,6 +398,11 @@ object UiNodeSerializer : KSerializer<UiNode> {
             "unknown" -> UnknownNodeCustomSerializer
             else -> UnknownNodeCustomSerializer
         }
-        return input.json.decodeFromJsonElement(deserializer, element)
+        val targetElement = if (element is JsonObject && deserializer !== UnknownNodeCustomSerializer) {
+            JsonObject(element.filterKeys { it != "type" })
+        } else {
+            element
+        }
+        return input.json.decodeFromJsonElement(deserializer, targetElement)
     }
 }

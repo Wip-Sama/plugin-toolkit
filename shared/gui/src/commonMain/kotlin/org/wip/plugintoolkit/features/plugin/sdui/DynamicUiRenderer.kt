@@ -2,6 +2,8 @@ package org.wip.plugintoolkit.features.plugin.sdui
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -11,9 +13,12 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -22,7 +27,6 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -34,6 +38,7 @@ import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -50,13 +55,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import org.jetbrains.compose.resources.stringResource
 import org.wip.plugintoolkit.api.sdui.AlignmentRole
+import org.wip.plugintoolkit.api.sdui.BadgeNode
 import org.wip.plugintoolkit.api.sdui.BoardNode
 import org.wip.plugintoolkit.api.sdui.BoxNode
 import org.wip.plugintoolkit.api.sdui.ButtonNode
@@ -67,6 +74,7 @@ import org.wip.plugintoolkit.api.sdui.DropdownNode
 import org.wip.plugintoolkit.api.sdui.ErrorBoundaryNode
 import org.wip.plugintoolkit.api.sdui.FloatingAnchor
 import org.wip.plugintoolkit.api.sdui.FloatingPanelNode
+import org.wip.plugintoolkit.api.sdui.IconNode
 import org.wip.plugintoolkit.api.sdui.ImageNode
 import org.wip.plugintoolkit.api.sdui.RowNode
 import org.wip.plugintoolkit.api.sdui.ScaffoldNode
@@ -86,6 +94,8 @@ import org.wip.plugintoolkit.api.sdui.UnknownNode
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.sdui_error_boundary_title
+import plugintoolkit.composeapp.generated.resources.sdui_toggle_panel
+import plugintoolkit.composeapp.generated.resources.sdui_toggle_sidebar
 import plugintoolkit.composeapp.generated.resources.sdui_unsupported_node
 
 /**
@@ -109,6 +119,8 @@ fun RenderUiNode(
     onEvent: (UiEvent) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    if (!node.modifier.visible) return
+
     val appliedModifier = modifier.applyUiModifier(node.modifier)
 
     when (node) {
@@ -120,7 +132,16 @@ fun RenderUiNode(
             ) {
                 node.children.forEach { child ->
                     key(child.id) {
-                        SafeUiNodeRenderer(node = child, onEvent = onEvent)
+                        var childModifier: Modifier = Modifier
+                        child.modifier.weight?.let { weight ->
+                            if (weight > 0f) {
+                                childModifier = childModifier.weight(weight)
+                            }
+                        }
+                        child.modifier.alignment?.let { align ->
+                            childModifier = childModifier.align(align.toHorizontalAlignment())
+                        }
+                        SafeUiNodeRenderer(node = child, onEvent = onEvent, modifier = childModifier)
                     }
                 }
             }
@@ -134,7 +155,16 @@ fun RenderUiNode(
             ) {
                 node.children.forEach { child ->
                     key(child.id) {
-                        SafeUiNodeRenderer(node = child, onEvent = onEvent)
+                        var childModifier: Modifier = Modifier
+                        child.modifier.weight?.let { weight ->
+                            if (weight > 0f) {
+                                childModifier = childModifier.weight(weight)
+                            }
+                        }
+                        child.modifier.alignment?.let { align ->
+                            childModifier = childModifier.align(align.toVerticalAlignment())
+                        }
+                        SafeUiNodeRenderer(node = child, onEvent = onEvent, modifier = childModifier)
                     }
                 }
             }
@@ -147,7 +177,11 @@ fun RenderUiNode(
             ) {
                 node.children.forEach { child ->
                     key(child.id) {
-                        SafeUiNodeRenderer(node = child, onEvent = onEvent)
+                        var childModifier: Modifier = Modifier
+                        child.modifier.alignment?.let { align ->
+                            childModifier = childModifier.align(align.toBoxAlignment())
+                        }
+                        SafeUiNodeRenderer(node = child, onEvent = onEvent, modifier = childModifier)
                     }
                 }
             }
@@ -176,7 +210,11 @@ fun RenderUiNode(
                     }
                     node.children.forEach { child ->
                         key(child.id) {
-                            SafeUiNodeRenderer(node = child, onEvent = onEvent)
+                            var childModifier: Modifier = Modifier
+                            child.modifier.alignment?.let { align ->
+                                childModifier = childModifier.align(align.toHorizontalAlignment())
+                            }
+                            SafeUiNodeRenderer(node = child, onEvent = onEvent, modifier = childModifier)
                         }
                     }
                 }
@@ -186,11 +224,16 @@ fun RenderUiNode(
         is ScrollableColumnNode -> {
             Column(
                 modifier = appliedModifier.verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(node.spacing.toDp())
+                verticalArrangement = Arrangement.spacedBy(node.spacing.toDp()),
+                horizontalAlignment = node.modifier.alignment?.toHorizontalAlignment() ?: Alignment.Start
             ) {
                 node.children.forEach { child ->
                     key(child.id) {
-                        SafeUiNodeRenderer(node = child, onEvent = onEvent)
+                        var childModifier: Modifier = Modifier
+                        child.modifier.alignment?.let { align ->
+                            childModifier = childModifier.align(align.toHorizontalAlignment())
+                        }
+                        SafeUiNodeRenderer(node = child, onEvent = onEvent, modifier = childModifier)
                     }
                 }
             }
@@ -220,7 +263,8 @@ fun RenderUiNode(
         is ButtonNode -> {
             if (node.isPrimary) {
                 Button(
-                    onClick = { onEvent(UiEvent.Click(node.id)) },
+                    onClick = { onEvent(UiEvent.Click(node.id, node.action)) },
+                    enabled = node.modifier.enabled,
                     modifier = appliedModifier,
                     colors = if (node.isDestructive) {
                         ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
@@ -232,7 +276,8 @@ fun RenderUiNode(
                 }
             } else {
                 OutlinedButton(
-                    onClick = { onEvent(UiEvent.Click(node.id)) },
+                    onClick = { onEvent(UiEvent.Click(node.id, node.action)) },
+                    enabled = node.modifier.enabled,
                     modifier = appliedModifier,
                     colors = if (node.isDestructive) {
                         ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
@@ -257,6 +302,7 @@ fun RenderUiNode(
             ) {
                 Switch(
                     checked = node.checked,
+                    enabled = node.modifier.enabled,
                     onCheckedChange = { isChecked ->
                         onEvent(UiEvent.ToggleChanged(node.id, isChecked))
                     }
@@ -277,6 +323,7 @@ fun RenderUiNode(
                 }
                 Slider(
                     value = node.value.toFloat(),
+                    enabled = node.modifier.enabled,
                     onValueChange = { newValue ->
                         onEvent(UiEvent.ValueChanged(node.id, newValue.toDouble()))
                     },
@@ -291,8 +338,8 @@ fun RenderUiNode(
         }
 
         is ImageNode -> {
-            AsyncImage(
-                model = node.asset,
+            PluginAssetImage(
+                asset = node.asset,
                 contentDescription = node.contentDescription,
                 modifier = appliedModifier
             )
@@ -328,10 +375,10 @@ fun RenderUiNode(
             }
         }
 
-        is org.wip.plugintoolkit.api.sdui.BadgeNode -> {
+        is BadgeNode -> {
             Surface(
                 modifier = appliedModifier,
-                color = node.color.toComposeColor().copy(alpha = 0.2f),
+                color = node.color.toComposeColor().copy(alpha = ToolkitTheme.opacity.borderLow),
                 shape = RoundedCornerShape(ToolkitTheme.dimensions.buttonGroupInnerCorner)
             ) {
                 Text(
@@ -346,7 +393,7 @@ fun RenderUiNode(
             }
         }
 
-        is org.wip.plugintoolkit.api.sdui.IconNode -> {
+        is IconNode -> {
             Icon(
                 imageVector = Icons.Default.Info,
                 contentDescription = node.name,
@@ -396,6 +443,7 @@ private fun RenderTextInput(
             localText = newText
             onEvent(UiEvent.TextChanged(node.id, newText))
         },
+        enabled = node.modifier.enabled,
         label = node.label?.let { { Text(it) } },
         placeholder = node.placeholder?.let { { Text(it) } },
         singleLine = node.singleLine,
@@ -417,24 +465,29 @@ private fun RenderDropdown(
     val selectedLabel = node.options[node.selectedKey] ?: node.selectedKey
 
     ExposedDropdownMenuBox(
-        expanded = expanded,
-        onExpandedChange = { expanded = !expanded },
+        expanded = expanded && node.modifier.enabled,
+        onExpandedChange = {
+            if (node.modifier.enabled) {
+                expanded = !expanded
+            }
+        },
         modifier = modifier
     ) {
         OutlinedTextField(
             value = selectedLabel,
             onValueChange = {},
             readOnly = true,
+            enabled = node.modifier.enabled,
             label = node.label?.let { { Text(it) } },
-            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded && node.modifier.enabled) },
             colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),
             modifier = Modifier
-                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable, true)
+                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable, node.modifier.enabled)
                 .fillMaxWidth()
         )
 
         ExposedDropdownMenu(
-            expanded = expanded,
+            expanded = expanded && node.modifier.enabled,
             onDismissRequest = { expanded = false }
         ) {
             node.options.forEach { (key, label) ->
@@ -497,7 +550,7 @@ private fun RenderErrorBoundaryNode(
  */
 @Composable
 fun SpacingSize.toDp(): Dp = when (this) {
-    SpacingSize.NONE -> 0.dp
+    SpacingSize.NONE -> ToolkitTheme.spacing.none
     SpacingSize.EXTRA_SMALL -> ToolkitTheme.spacing.xxs
     SpacingSize.SMALL -> ToolkitTheme.spacing.xs
     SpacingSize.MEDIUM_SMALL -> ToolkitTheme.spacing.sm
@@ -576,7 +629,7 @@ private fun RenderScaffold(
     onEvent: (UiEvent) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Box(modifier = modifier.fillMaxSize()) {
+    Box(modifier = modifier.fillMaxSize().clipToBounds()) {
         Column(modifier = Modifier.fillMaxSize()) {
             node.topBar?.let { top ->
                 SafeUiNodeRenderer(node = top, onEvent = onEvent, modifier = Modifier.fillMaxWidth())
@@ -585,7 +638,7 @@ private fun RenderScaffold(
                 node.leftSidebar?.let { left ->
                     SafeUiNodeRenderer(node = left, onEvent = onEvent, modifier = Modifier.fillMaxHeight())
                 }
-                Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
+                Box(modifier = Modifier.weight(1f).fillMaxHeight().clipToBounds()) {
                     SafeUiNodeRenderer(node = node.content, onEvent = onEvent, modifier = Modifier.fillMaxSize())
                 }
                 node.rightSidebar?.let { right ->
@@ -616,12 +669,12 @@ private fun RenderFloatingPanel(
     onEvent: (UiEvent) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var isCollapsed by remember(node.id) { mutableStateOf(node.isCollapsed) }
+    var isCollapsed by remember(node.id, node.isCollapsed) { mutableStateOf(node.isCollapsed) }
 
     Surface(
         modifier = modifier.padding(ToolkitTheme.spacing.medium),
         shape = RoundedCornerShape(ToolkitTheme.dimensions.expressiveCardCornerRadius),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.95f),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = ToolkitTheme.opacity.almostOpaque),
         shadowElevation = ToolkitTheme.dimensions.elevationMedium,
         border = BorderStroke(ToolkitTheme.dimensions.borderThin, MaterialTheme.colorScheme.outlineVariant)
     ) {
@@ -653,7 +706,7 @@ private fun RenderFloatingPanel(
                         ) {
                             Icon(
                                 imageVector = if (isCollapsed) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
-                                contentDescription = "Toggle panel",
+                                contentDescription = stringResource(Res.string.sdui_toggle_panel),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
                             )
@@ -683,7 +736,7 @@ private fun RenderSidebar(
     onEvent: (UiEvent) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var isCollapsed by remember(node.id) { mutableStateOf(node.isCollapsed) }
+    var isCollapsed by remember(node.id, node.isCollapsed) { mutableStateOf(node.isCollapsed) }
     val isHorizontal = node.attachPoint == SidebarAttachPoint.LEFT || node.attachPoint == SidebarAttachPoint.RIGHT
 
     Surface(
@@ -696,7 +749,7 @@ private fun RenderSidebar(
         border = BorderStroke(ToolkitTheme.dimensions.borderThin, MaterialTheme.colorScheme.outlineVariant.copy(alpha = ToolkitTheme.opacity.divider))
     ) {
         Column(
-            modifier = Modifier.padding(ToolkitTheme.spacing.mediumSmall),
+            modifier = Modifier.padding(ToolkitTheme.spacing.sm),
             verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
         ) {
             Row(
@@ -721,7 +774,7 @@ private fun RenderSidebar(
                     ) {
                         Icon(
                             imageVector = if (isCollapsed) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
-                            contentDescription = "Toggle sidebar",
+                            contentDescription = stringResource(Res.string.sdui_toggle_sidebar),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
                         )
@@ -757,11 +810,41 @@ fun Modifier.applyUiModifier(uiModifier: UiModifier): Modifier {
     uiModifier.fillMaxHeight?.let { factor ->
         mod = mod.fillMaxHeight(factor)
     }
-    if (uiModifier.padding != SpacingSize.NONE) {
-        mod = mod.padding(uiModifier.padding.toDp())
+    uiModifier.widthDp?.let { width ->
+        mod = mod.width(width.dp)
+    }
+    uiModifier.heightDp?.let { height ->
+        mod = mod.height(height.dp)
+    }
+    val minW = uiModifier.minWidthDp?.dp ?: Dp.Unspecified
+    val maxW = uiModifier.maxWidthDp?.dp ?: Dp.Unspecified
+    if (minW != Dp.Unspecified || maxW != Dp.Unspecified) {
+        mod = mod.widthIn(min = minW, max = maxW)
+    }
+    val minH = uiModifier.minHeightDp?.dp ?: Dp.Unspecified
+    val maxH = uiModifier.maxHeightDp?.dp ?: Dp.Unspecified
+    if (minH != Dp.Unspecified || maxH != Dp.Unspecified) {
+        mod = mod.heightIn(min = minH, max = maxH)
     }
     uiModifier.aspectRatio?.let { ratio ->
         mod = mod.aspectRatio(ratio)
+    }
+    val cornerShape = if (uiModifier.clipRounded) {
+        ToolkitTheme.shapes.medium
+    } else {
+        RoundedCornerShape(ToolkitTheme.spacing.none)
+    }
+    if (uiModifier.clipRounded) {
+        mod = mod.clip(cornerShape)
+    }
+    uiModifier.backgroundColor?.let { bgColor ->
+        mod = mod.background(bgColor.toComposeColor(), cornerShape)
+    }
+    uiModifier.borderColor?.let { bColor ->
+        mod = mod.border(ToolkitTheme.dimensions.borderUnselected, bColor.toComposeColor(), cornerShape)
+    }
+    if (uiModifier.padding != SpacingSize.NONE) {
+        mod = mod.padding(uiModifier.padding.toDp())
     }
     return mod
 }

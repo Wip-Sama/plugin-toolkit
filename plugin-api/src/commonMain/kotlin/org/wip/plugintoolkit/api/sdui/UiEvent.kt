@@ -22,10 +22,15 @@ sealed interface UiEvent {
 
     /**
      * Discrete user action (button click, card tap, etc.).
+     *
+     * @property action Optional semantic action identifier configured on the source node.
      */
     @Serializable
     @SerialName("click")
-    data class Click(override val nodeId: String) : UiEvent
+    data class Click(
+        override val nodeId: String,
+        val action: String? = null
+    ) : UiEvent
 
     /**
      * Vector drawing stroke finalized and committed (onPointerUp).
@@ -78,6 +83,96 @@ sealed interface UiEvent {
     ) : UiEvent
 
     /**
+     * Selection change on a spatial [BoardNode].
+     */
+    @Serializable
+    @SerialName("board_layer_selected")
+    data class BoardLayerSelected(
+        override val nodeId: String,
+        val selectedLayerIds: List<String>
+    ) : UiEvent
+
+    /**
+     * Layer drag-move committed on a spatial [BoardNode].
+     */
+    @Serializable
+    @SerialName("board_layer_moved")
+    data class BoardLayerMoved(
+        override val nodeId: String,
+        val layerId: String,
+        val position: NormalizedPoint
+    ) : UiEvent
+
+    /**
+     * Layer resize committed on a spatial [BoardNode].
+     */
+    @Serializable
+    @SerialName("board_layer_resized")
+    data class BoardLayerResized(
+        override val nodeId: String,
+        val layerId: String,
+        val position: NormalizedPoint,
+        val size: NormalizedSize
+    ) : UiEvent
+
+    /**
+     * Inline text editing committed on a [BoardLayer.TextLayer] or [BoardLayer.ShapeLayer].
+     */
+    @Serializable
+    @SerialName("board_text_edited")
+    data class BoardTextEdited(
+        override val nodeId: String,
+        val layerId: String,
+        val text: String
+    ) : UiEvent
+
+    /**
+     * New text placement requested on a spatial [BoardNode] using [BoardTool.PlaceText].
+     */
+    @Serializable
+    @SerialName("board_text_placed")
+    data class BoardTextPlaced(
+        override val nodeId: String,
+        val position: NormalizedPoint,
+        val text: String
+    ) : UiEvent
+
+    /**
+     * New geometric shape committed on a spatial [BoardNode] using [BoardTool.Shape] or [BoardTool.Rectangle].
+     */
+    @Serializable
+    @SerialName("board_shape_committed")
+    data class BoardShapeCommitted(
+        override val nodeId: String,
+        val shapeType: BoardShapeType,
+        val position: NormalizedPoint,
+        val size: NormalizedSize,
+        val strokeColor: SemanticColor = SemanticColor.PRIMARY,
+        val fillColor: SemanticColor? = null,
+        val strokeWidth: Float = 2f
+    ) : UiEvent
+
+    /**
+     * Deletion requested for one or more selected layers on a spatial [BoardNode].
+     */
+    @Serializable
+    @SerialName("board_layer_deleted")
+    data class BoardLayerDeleted(
+        override val nodeId: String,
+        val layerIds: List<String>
+    ) : UiEvent
+
+    /**
+     * Click on empty space of a spatial [BoardNode] at a normalized position.
+     */
+    @Serializable
+    @SerialName("board_canvas_clicked")
+    data class BoardCanvasClicked(
+        override val nodeId: String,
+        val position: NormalizedPoint
+    ) : UiEvent
+
+    /**
      * Custom event payload for domain-specific controls.
      */
     @Serializable
@@ -105,6 +200,14 @@ object UiEventSerializer : KSerializer<UiEvent> {
             is UiEvent.ToggleChanged -> "toggle_changed"
             is UiEvent.TextChanged -> "text_changed"
             is UiEvent.ValueChanged -> "value_changed"
+            is UiEvent.BoardLayerSelected -> "board_layer_selected"
+            is UiEvent.BoardLayerMoved -> "board_layer_moved"
+            is UiEvent.BoardLayerResized -> "board_layer_resized"
+            is UiEvent.BoardTextEdited -> "board_text_edited"
+            is UiEvent.BoardTextPlaced -> "board_text_placed"
+            is UiEvent.BoardShapeCommitted -> "board_shape_committed"
+            is UiEvent.BoardLayerDeleted -> "board_layer_deleted"
+            is UiEvent.BoardCanvasClicked -> "board_canvas_clicked"
             is UiEvent.Custom -> "custom"
         }
         val element = when (value) {
@@ -114,6 +217,14 @@ object UiEventSerializer : KSerializer<UiEvent> {
             is UiEvent.ToggleChanged -> jsonEncoder.json.encodeToJsonElement(UiEvent.ToggleChanged.serializer(), value)
             is UiEvent.TextChanged -> jsonEncoder.json.encodeToJsonElement(UiEvent.TextChanged.serializer(), value)
             is UiEvent.ValueChanged -> jsonEncoder.json.encodeToJsonElement(UiEvent.ValueChanged.serializer(), value)
+            is UiEvent.BoardLayerSelected -> jsonEncoder.json.encodeToJsonElement(UiEvent.BoardLayerSelected.serializer(), value)
+            is UiEvent.BoardLayerMoved -> jsonEncoder.json.encodeToJsonElement(UiEvent.BoardLayerMoved.serializer(), value)
+            is UiEvent.BoardLayerResized -> jsonEncoder.json.encodeToJsonElement(UiEvent.BoardLayerResized.serializer(), value)
+            is UiEvent.BoardTextEdited -> jsonEncoder.json.encodeToJsonElement(UiEvent.BoardTextEdited.serializer(), value)
+            is UiEvent.BoardTextPlaced -> jsonEncoder.json.encodeToJsonElement(UiEvent.BoardTextPlaced.serializer(), value)
+            is UiEvent.BoardShapeCommitted -> jsonEncoder.json.encodeToJsonElement(UiEvent.BoardShapeCommitted.serializer(), value)
+            is UiEvent.BoardLayerDeleted -> jsonEncoder.json.encodeToJsonElement(UiEvent.BoardLayerDeleted.serializer(), value)
+            is UiEvent.BoardCanvasClicked -> jsonEncoder.json.encodeToJsonElement(UiEvent.BoardCanvasClicked.serializer(), value)
             is UiEvent.Custom -> jsonEncoder.json.encodeToJsonElement(UiEvent.Custom.serializer(), value)
         }
         if (element is JsonObject) {
@@ -135,9 +246,22 @@ object UiEventSerializer : KSerializer<UiEvent> {
             "toggle_changed" -> UiEvent.ToggleChanged.serializer()
             "text_changed" -> UiEvent.TextChanged.serializer()
             "value_changed" -> UiEvent.ValueChanged.serializer()
+            "board_layer_selected" -> UiEvent.BoardLayerSelected.serializer()
+            "board_layer_moved" -> UiEvent.BoardLayerMoved.serializer()
+            "board_layer_resized" -> UiEvent.BoardLayerResized.serializer()
+            "board_text_edited" -> UiEvent.BoardTextEdited.serializer()
+            "board_text_placed" -> UiEvent.BoardTextPlaced.serializer()
+            "board_shape_committed" -> UiEvent.BoardShapeCommitted.serializer()
+            "board_layer_deleted" -> UiEvent.BoardLayerDeleted.serializer()
+            "board_canvas_clicked" -> UiEvent.BoardCanvasClicked.serializer()
             "custom" -> UiEvent.Custom.serializer()
             else -> UiEvent.Custom.serializer()
         }
-        return input.json.decodeFromJsonElement(deserializer, element)
+        val targetElement = if (element is JsonObject) {
+            JsonObject(element.filterKeys { it != "type" })
+        } else {
+            element
+        }
+        return input.json.decodeFromJsonElement(deserializer, targetElement)
     }
 }
