@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.serialization.json.JsonElement
 import org.wip.plugintoolkit.api.Capability
 import org.wip.plugintoolkit.api.CapabilityContext
 import org.wip.plugintoolkit.api.PluginEntry
@@ -92,7 +93,7 @@ class InteractiveToolsViewModel(
     /**
      * Selects a tool and opens a live SDUI session.
      */
-    fun selectTool(tool: InteractiveToolItem) {
+    fun selectTool(tool: InteractiveToolItem, initialParameters: Map<String, JsonElement> = emptyMap()) {
         val current = _selectedTool.value
         if (current?.plugin?.getManifest()?.getOrNull()?.plugin?.id == tool.plugin.getManifest().getOrNull()?.plugin?.id &&
             current?.capability?.name == tool.capability.name &&
@@ -101,13 +102,13 @@ class InteractiveToolsViewModel(
             return
         }
         _selectedTool.value = tool
-        startSession(tool)
+        startSession(tool, initialParameters)
     }
 
     /**
      * Starts an interactive session for the given tool item.
      */
-    fun startSession(tool: InteractiveToolItem) {
+    fun startSession(tool: InteractiveToolItem, initialParameters: Map<String, JsonElement> = emptyMap()) {
         closeSession()
         val processor = tool.plugin.getInteractiveProcessor()?.getOrNull()
         if (processor == null) {
@@ -130,7 +131,8 @@ class InteractiveToolsViewModel(
             pluginId = manifest.plugin.id,
             capabilityName = tool.capability.name,
             context = context,
-            processor = processor
+            processor = processor,
+            initialParameters = initialParameters
         )
         _activeSessionHandle.value = handle
     }

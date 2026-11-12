@@ -84,5 +84,5 @@ actual val logicModule: Module = module {
     single { ReactiveCapabilityLockTracker(get()) }
     single<SystemNodeExecutorRegistry> { DefaultSystemNodeExecutorRegistry(get()) }
     single { UpdateService(get(), get()) }
-    single { PluginUiSessionManager(get(named("AppScope"))) }
+    single { PluginUiSessionManager(get(named("AppScope")), getOrNull(), getOrNull()) }
 }

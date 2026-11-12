@@ -1,8 +1,59 @@
 package org.wip.plugintoolkit.api.sdui
 
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.channelFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
+import org.wip.plugintoolkit.api.ExecutionResult
 import org.wip.plugintoolkit.api.PluginContext
 import org.wip.plugintoolkit.api.PluginResponse
+import org.wip.plugintoolkit.api.ProgressData
+
+/**
+ * Execution status for a capability or action triggered from within a UI session.
+ */
+@Serializable
+enum class CapabilityJobStatus {
+    QUEUED,
+    RUNNING,
+    PAUSE_REQUESTED,
+    PAUSED,
+    COMPLETED,
+    FAILED,
+    CANCELLED
+}
+
+/**
+ * Immutable snapshot of a capability job executed or observed by a UI session.
+ */
+@Serializable
+data class CapabilityJobSnapshot(
+    val jobId: String,
+    val capabilityName: String,
+    val status: CapabilityJobStatus = CapabilityJobStatus.QUEUED,
+    val primaryProgress: ProgressData? = null,
+    val secondaryProgress: ProgressData? = null,
+    val subProgress: Map<String, ProgressData> = emptyMap(),
+    val recentLogs: List<String> = emptyList(),
+    val result: ExecutionResult? = null,
+    val errorMessage: String? = null,
+    val startedAtEpochMs: Long? = null,
+    val completedAtEpochMs: Long? = null
+) {
+    val isTerminal: Boolean
+        get() = status == CapabilityJobStatus.COMPLETED ||
+                status == CapabilityJobStatus.FAILED ||
+                status == CapabilityJobStatus.CANCELLED
+
+    val isRunning: Boolean
+        get() = status == CapabilityJobStatus.RUNNING
+}
 
 /**
  * Interface implemented by plugins that provide reactive, server-driven user interfaces.
@@ -11,17 +62,50 @@ interface InteractiveUiProcessor {
     /**
      * Open a long-lived interactive UI session.
      *
-     * @param context Execution context providing plugin services and session completion methods.
-     * @param events Inbound stream of user interaction events (clicks, text changes, committed vector paths).
+     * @param context Execution context providing plugin services, capability execution, and reactive state flows.
+     * @param events Inbound stream of user interaction events (clicks, text changes, spatial board actions).
      * @return Outbound reactive stream of UI node trees rendered in the host sandbox.
      */
     fun openUiSession(context: UiSessionContext, events: Flow<UiEvent>): Flow<UiNodeTree>
 }
 
 /**
- * Context provided to an interactive UI session, extending PluginContext with lifecycle termination controls.
+ * Context provided to an interactive UI session, extending PluginContext with lifecycle termination controls,
+ * background capability execution, live job monitoring, and reactive state flows.
  */
 interface UiSessionContext : PluginContext {
+    /**
+     * Unique session identifier assigned by the host.
+     */
+    val sessionId: String get() = ""
+
+    /**
+     * Capability name that opened this interactive UI session.
+     */
+    val capabilityName: String get() = ""
+
+    /**
+     * Initial input parameters passed to this interactive capability.
+     */
+    val initialParameters: Map<String, JsonElement> get() = emptyMap()
+
+    /**
+     * Reactive stream of this plugin's persisted settings.
+     * Emits whenever settings are updated in the host or via [updateSetting].
+     */
+    val settingsFlow: StateFlow<Map<String, JsonElement>> get() = MutableStateFlow(settings)
+
+    /**
+     * Reactive stream of capability locks for this plugin.
+     * Map key is lock identifier, value is true if currently locked.
+     */
+    val locksFlow: StateFlow<Map<String, Boolean>> get() = MutableStateFlow(emptyMap())
+
+    /**
+     * Reactive stream of active and recently completed capability jobs launched by this session or plugin.
+     */
+    val capabilityJobs: StateFlow<List<CapabilityJobSnapshot>> get() = MutableStateFlow(emptyList())
+
     /**
      * Terminate the interactive session successfully, returning a [PluginResponse] to the caller.
      * Completes the host job and resumes downstream connected flow nodes if running in a Flow.
@@ -32,6 +116,115 @@ interface UiSessionContext : PluginContext {
      * Terminate the interactive session with a cancellation or failure reason.
      */
     fun cancelSession(reason: String)
+
+    /**
+     * Launch a capability asynchronously.
+     * If [runInBackgroundQueue] is true, the capability is queued to the host's background [JobManager].
+     * If false, it executes inline on the session scope.
+     *
+     * @return The unique job ID assigned to this execution.
+     */
+    suspend fun launchCapability(
+        capabilityName: String,
+        parameters: Map<String, JsonElement> = emptyMap(),
+        runInBackgroundQueue: Boolean = true
+    ): String = ""
+
+    /**
+     * Execute a capability inline and await its final [ExecutionResult].
+     * Live progress and logs are streamed to [capabilityJobs] during execution.
+     */
+    suspend fun executeCapability(
+        capabilityName: String,
+        parameters: Map<String, JsonElement> = emptyMap()
+    ): ExecutionResult = ExecutionResult.Error("Not implemented")
+
+    /**
+     * Launch an action defined by the plugin.
+     */
+    suspend fun launchAction(
+        actionName: String,
+        parameters: Map<String, JsonElement> = emptyMap()
+    ): Result<Unit> = Result.failure(UnsupportedOperationException("Not implemented"))
+
+    /**
+     * Observe live progress, logs, and status updates for a specific job launched via [launchCapability].
+     */
+    fun observeCapabilityJob(jobId: String): Flow<CapabilityJobSnapshot> = emptyFlow()
+
+    /**
+     * Request pausing a running capability job.
+     */
+    suspend fun pauseCapabilityJob(jobId: String) {}
+
+    /**
+     * Resume a paused capability job.
+     */
+    suspend fun resumeCapabilityJob(jobId: String) {}
+
+    /**
+     * Cancel a queued or running capability job.
+     */
+    suspend fun cancelCapabilityJob(jobId: String) {}
+}
+
+/**
+ * Interactive session scope providing convenience functions to update state,
+ * launch capabilities, and query settings/locks within a reactive UI session.
+ */
+class InteractiveSessionScope<S>(
+    val context: UiSessionContext,
+    private val stateFlow: MutableStateFlow<S>
+) {
+    val state: S get() = stateFlow.value
+
+    fun updateState(transform: (S) -> S) {
+        stateFlow.update(transform)
+    }
+
+    fun setState(newState: S) {
+        stateFlow.value = newState
+    }
+}
+
+/**
+ * High-level helper for implementing [InteractiveUiProcessor.openUiSession].
+ *
+ * Automatically manages local reactive state [S], processes incoming [events],
+ * and emits a stream of [UiNodeTree] whenever the local state, plugin settings,
+ * or capability job statuses change.
+ *
+ * @param initialState Initial UI state.
+ * @param context The session context provided by the host.
+ * @param events Stream of user interaction events.
+ * @param onEvent Handler mapping user events to state updates or capability launches.
+ * @param render Pure function rendering the UI node tree for the current state.
+ */
+fun <S> interactiveUiSession(
+    initialState: S,
+    context: UiSessionContext,
+    events: Flow<UiEvent>,
+    onEvent: suspend InteractiveSessionScope<S>.(UiEvent) -> Unit,
+    render: S.(UiSessionContext) -> UiNodeTree
+): Flow<UiNodeTree> = channelFlow {
+    val stateFlow = MutableStateFlow(initialState)
+    val sessionScope = InteractiveSessionScope(context, stateFlow)
+
+    launch {
+        events.collect { event ->
+            sessionScope.onEvent(event)
+        }
+    }
+
+    combine(
+        stateFlow,
+        context.capabilityJobs,
+        context.settingsFlow
+    ) { currentState, _, _ ->
+        currentState.render(context)
+    }.collect { tree ->
+        send(tree)
+    }
 }
 
 // ── Declarative SDUI Builder DSL ───────────────────────────────────────────

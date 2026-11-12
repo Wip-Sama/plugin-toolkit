@@ -1,5 +1,6 @@
 package org.wip.plugintoolkit.features.plugin.viewmodel
 
+import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
@@ -71,6 +72,7 @@ class PluginManagerViewModelTest {
         every { pluginManager.loadingPlugins } returns MutableStateFlow(emptySet())
         every { pluginManager.pluginLoadingSteps } returns MutableStateFlow(emptyMap())
         every { pluginManager.isRegistryReady } returns MutableStateFlow(true)
+        every { pluginManager.getManifest(any()) } returns null
         every { repoManager.plugins } returns repoPluginsFlow
         every { repoManager.repositories } returns repositoriesFlow
         every { settingsRepository.settings } returns settingsFlow
@@ -197,6 +199,7 @@ class PluginManagerViewModelTest {
             repoUrl = "https://repo-community.com"
         )
         every { pluginManager.getUpdate("org.wip.vision") } returns updatePlugin
+        coEvery { pluginManager.updateRemote("org.wip.vision") } returns Result.success(Unit)
 
         val viewModel = createViewModel()
         viewModel.switchSourceRepoAndUpdate("org.wip.vision", "https://repo-community.com")

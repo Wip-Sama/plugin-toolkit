@@ -2,7 +2,9 @@ package org.wip.plugintoolkit.features.plugin.sdui
 
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -243,5 +245,111 @@ class PluginUiSessionManagerTest {
         assertFalse(handle2.isActive)
         assertNull(manager.getSession(handle1.sessionId))
         assertNull(manager.getSession(handle2.sessionId))
+    }
+
+    @Test
+    fun testSessionSettingsFlowAndMutationDelegation() = runTest {
+        val manager = PluginUiSessionManager(this, UnconfinedTestDispatcher(testScheduler))
+        val baseContext = DummyPluginContext()
+        var capturedContext: UiSessionContext? = null
+
+        val processor = object : InteractiveUiProcessor {
+            override fun openUiSession(
+                context: UiSessionContext,
+                events: Flow<UiEvent>
+            ): Flow<UiNodeTree> = flow {
+                capturedContext = context
+                emit(uiTree { text("Ready") })
+            }
+        }
+
+        val handle = manager.startSession("test.p1", "cap1", baseContext, processor)
+        advanceUntilIdle()
+
+        val sessionCtx = assertNotNull(capturedContext)
+        assertEquals(emptyMap(), sessionCtx.settingsFlow.value)
+
+        // Update single setting
+        sessionCtx.updateSetting("apiEndpoint", JsonPrimitive("https://api.manhwa.test"))
+        advanceUntilIdle()
+        assertEquals(JsonPrimitive("https://api.manhwa.test"), sessionCtx.settingsFlow.value["apiEndpoint"])
+        assertEquals(JsonPrimitive("https://api.manhwa.test"), sessionCtx.settings["apiEndpoint"])
+
+        // Update multiple settings
+        sessionCtx.updateSettings(mapOf("retryLimit" to JsonPrimitive(3), "debug" to JsonPrimitive(true)))
+        advanceUntilIdle()
+        assertEquals(JsonPrimitive(3), sessionCtx.settingsFlow.value["retryLimit"])
+        assertEquals(JsonPrimitive(true), sessionCtx.settingsFlow.value["debug"])
+        assertEquals(JsonPrimitive("https://api.manhwa.test"), sessionCtx.settingsFlow.value["apiEndpoint"])
+
+        handle.close()
+    }
+
+    @Test
+    fun testSessionInitialParametersForwarding() = runTest {
+        val manager = PluginUiSessionManager(this, UnconfinedTestDispatcher(testScheduler))
+        val baseContext = DummyPluginContext()
+        var receivedParams: Map<String, JsonElement>? = null
+
+        val processor = object : InteractiveUiProcessor {
+            override fun openUiSession(
+                context: UiSessionContext,
+                events: Flow<UiEvent>
+            ): Flow<UiNodeTree> = flow {
+                receivedParams = context.initialParameters
+                emit(uiTree { text("Params: ${context.initialParameters.size}") })
+            }
+        }
+
+        val params = mapOf("startPage" to JsonPrimitive(42), "filterMode" to JsonPrimitive("highRes"))
+        val handle = manager.startSession("test.p1", "cap1", baseContext, processor, initialParameters = params)
+        advanceUntilIdle()
+
+        assertEquals(params, handle.initialParameters)
+        assertEquals(params, receivedParams)
+        assertEquals(JsonPrimitive(42), receivedParams?.get("startPage"))
+
+        handle.close()
+    }
+
+    @Test
+    fun testSessionCapabilityExecutionAndObservation() = runTest {
+        val manager = PluginUiSessionManager(this, UnconfinedTestDispatcher(testScheduler))
+        val baseContext = DummyPluginContext()
+        var capturedContext: UiSessionContext? = null
+
+        val processor = object : InteractiveUiProcessor {
+            override fun openUiSession(
+                context: UiSessionContext,
+                events: Flow<UiEvent>
+            ): Flow<UiNodeTree> = flow {
+                capturedContext = context
+                emit(uiTree { text("Running") })
+            }
+        }
+
+        val handle = manager.startSession("test.p1", "cap1", baseContext, processor)
+        advanceUntilIdle()
+
+        val sessionCtx = assertNotNull(capturedContext)
+        assertEquals(0, sessionCtx.capabilityJobs.value.size)
+
+        // Launch an inline capability (no processor registered in loader -> gracefully returns error snapshot)
+        val jobId = sessionCtx.launchCapability("nonExistentCap", mapOf("k" to JsonPrimitive("v")), runInBackgroundQueue = false)
+        assertTrue(jobId.isNotEmpty())
+        advanceUntilIdle()
+
+        val jobs = sessionCtx.capabilityJobs.value
+        assertEquals(1, jobs.size)
+        val snapshot = jobs[0]
+        assertEquals(jobId, snapshot.jobId)
+        assertEquals("nonExistentCap", snapshot.capabilityName)
+        assertTrue(snapshot.isTerminal)
+
+        // Verify observeCapabilityJob
+        val observedJob = sessionCtx.observeCapabilityJob(jobId).first()
+        assertEquals(jobId, observedJob.jobId)
+
+        handle.close()
     }
 }

@@ -539,32 +539,36 @@ class PluginManagerViewModel(
 
     fun updatePlugin(pkg: String) {
         viewModelScope.launch {
-            val manifest = pluginManager.getManifest(pkg)
-            val proceedWithUpdate = suspend {
-                if (pluginManager.getUpdate(pkg) != null) {
-                    pluginManager.updateRemote(pkg)
-                } else {
-                    val newPath = PlatformUtils.pickFile()
-                    if (newPath != null) {
-                        pluginManager.updateLocal(pkg, newPath)
+            updatePluginInternal(pkg)
+        }
+    }
+
+    private suspend fun updatePluginInternal(pkg: String) {
+        val manifest = pluginManager.getManifest(pkg)
+        val proceedWithUpdate = suspend {
+            if (pluginManager.getUpdate(pkg) != null) {
+                pluginManager.updateRemote(pkg)
+            } else {
+                val newPath = PlatformUtils.pickFile()
+                if (newPath != null) {
+                    pluginManager.updateLocal(pkg, newPath)
+                }
+            }
+            flowViewModel.triggerMigrationsForUpdatedPlugin(pkg)
+        }
+
+        if (manifest != null && manifest.hasSetupHandler && !manifest.hasUpdateHandler) {
+            dialogService.showConfirmation(
+                title = Res.string.plugin_update_warning.localized.resolveNonComposable(),
+                message = "This plugin requires setup but does not support migrations. Updating will wipe all current configuration and data for this plugin. Continue?",
+                onConfirm = {
+                    viewModelScope.launch {
+                        proceedWithUpdate()
                     }
                 }
-                flowViewModel.triggerMigrationsForUpdatedPlugin(pkg)
-            }
-
-            if (manifest != null && manifest.hasSetupHandler && !manifest.hasUpdateHandler) {
-                dialogService.showConfirmation(
-                    title = Res.string.plugin_update_warning.localized.resolveNonComposable(),
-                    message = "This plugin requires setup but does not support migrations. Updating will wipe all current configuration and data for this plugin. Continue?",
-                    onConfirm = {
-                        viewModelScope.launch {
-                            proceedWithUpdate()
-                        }
-                    }
-                )
-            } else {
-                proceedWithUpdate()
-            }
+            )
+        } else {
+            proceedWithUpdate()
         }
     }
 
@@ -705,7 +709,7 @@ class PluginManagerViewModel(
             } catch (t: Throwable) {
                 notificationService.toast("Switched repository source to $repoName")
             }
-            updatePlugin(pkg)
+            updatePluginInternal(pkg)
         }
     }
 }

@@ -68,5 +68,5 @@ fun createStandaloneLogicModule(): Module = module {
     single { ScratchDiskManager() }
     single { JobManager(get(named("LoomScope")), get()) }
     single<SystemNodeExecutorRegistry> { DefaultSystemNodeExecutorRegistry(get()) }
-    single { PluginUiSessionManager(get(named("AppScope"))) }
+    single { PluginUiSessionManager(get(named("AppScope")), getOrNull(), getOrNull()) }
 }
