@@ -1065,4 +1065,7 @@
     <string name="sdui_loading_interface">Caricamento interfaccia...</string>
     <string name="sdui_session_active">Sessione Attiva</string>
     <string name="sdui_unsupported_node">Componente non supportato: %1$s</string>
+    <string name="sdui_confirm">Conferma</string>
+    <string name="sdui_cancel">Annulla</string>
+    <string name="sdui_empty_title">Nessun elemento</string>
 </resources>

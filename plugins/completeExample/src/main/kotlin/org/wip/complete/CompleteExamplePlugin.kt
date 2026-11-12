@@ -902,6 +902,11 @@ class CompleteExamplePlugin(val settings: CompleteExampleSettings) : Interactive
                         send(renderTree())
                     }
                 }
+                is UiEvent.TabSelected,
+                is UiEvent.ChipSelected,
+                is UiEvent.DialogAction -> {
+                    // Handled in stage 5 dual-stress test demos
+                }
             }
         }
     }

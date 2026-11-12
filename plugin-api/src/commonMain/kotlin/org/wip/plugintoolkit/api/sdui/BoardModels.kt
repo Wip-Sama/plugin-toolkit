@@ -61,7 +61,10 @@ enum class SemanticColor {
     ON_SURFACE,
     OUTLINE,
     ACCENT,
-    HIGHLIGHT
+    HIGHLIGHT,
+    INFO,
+    SUCCESS,
+    WARNING
 }
 
 /**

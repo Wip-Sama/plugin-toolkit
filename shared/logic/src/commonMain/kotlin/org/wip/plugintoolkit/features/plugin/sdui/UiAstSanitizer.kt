@@ -5,13 +5,19 @@ import org.wip.plugintoolkit.api.sdui.BoardNode
 import org.wip.plugintoolkit.api.sdui.BoxNode
 import org.wip.plugintoolkit.api.sdui.CardNode
 import org.wip.plugintoolkit.api.sdui.ColumnNode
+import org.wip.plugintoolkit.api.sdui.DialogNode
 import org.wip.plugintoolkit.api.sdui.ErrorBoundaryNode
 import org.wip.plugintoolkit.api.sdui.FloatingPanelNode
+import org.wip.plugintoolkit.api.sdui.ListItemNode
+import org.wip.plugintoolkit.api.sdui.ProgressBarNode
 import org.wip.plugintoolkit.api.sdui.RowNode
 import org.wip.plugintoolkit.api.sdui.ScaffoldNode
 import org.wip.plugintoolkit.api.sdui.ScrollableColumnNode
+import org.wip.plugintoolkit.api.sdui.ScrollableRowNode
 import org.wip.plugintoolkit.api.sdui.SidebarNode
 import org.wip.plugintoolkit.api.sdui.SliderNode
+import org.wip.plugintoolkit.api.sdui.SplitPaneNode
+import org.wip.plugintoolkit.api.sdui.TabsNode
 import org.wip.plugintoolkit.api.sdui.UiNode
 import org.wip.plugintoolkit.api.sdui.UiNodeTree
 
@@ -162,13 +168,41 @@ object UiAstSanitizer {
                 }
             }
 
+            if (node is ProgressBarNode) {
+                val p = node.progress
+                val sp = node.secondaryProgress
+                val invalidP = p != null && (p.isNaN() || p.isInfinite() || p < 0f || p > 1f)
+                val invalidSp = sp != null && (sp.isNaN() || sp.isInfinite() || sp < 0f || sp > 1f)
+                if (invalidP || invalidSp) {
+                    val safeP = if (p == null || p.isNaN() || p.isInfinite()) null else p.coerceIn(0f, 1f)
+                    val safeSp = if (sp == null || sp.isNaN() || sp.isInfinite()) null else sp.coerceIn(0f, 1f)
+                    return node.copy(progress = safeP, secondaryProgress = safeSp)
+                }
+            }
+
             // Recursively sanitize children for container nodes
             return when (node) {
                 is ColumnNode -> node.copy(children = node.children.map { sanitizeNode(it, depth + 1) })
                 is RowNode -> node.copy(children = node.children.map { sanitizeNode(it, depth + 1) })
+                is ScrollableRowNode -> node.copy(children = node.children.map { sanitizeNode(it, depth + 1) })
                 is BoxNode -> node.copy(children = node.children.map { sanitizeNode(it, depth + 1) })
                 is CardNode -> node.copy(children = node.children.map { sanitizeNode(it, depth + 1) })
                 is ScrollableColumnNode -> node.copy(children = node.children.map { sanitizeNode(it, depth + 1) })
+                is TabsNode -> node.copy(content = sanitizeNode(node.content, depth + 1))
+                is ListItemNode -> node.copy(trailingContent = node.trailingContent.map { sanitizeNode(it, depth + 1) })
+                is DialogNode -> node.copy(children = node.children.map { sanitizeNode(it, depth + 1) })
+                is SplitPaneNode -> {
+                    val safeFraction = if (node.splitFraction.isNaN() || node.splitFraction.isInfinite()) {
+                        0.35f
+                    } else {
+                        node.splitFraction.coerceIn(0.05f, 0.95f)
+                    }
+                    node.copy(
+                        first = sanitizeNode(node.first, depth + 1),
+                        second = sanitizeNode(node.second, depth + 1),
+                        splitFraction = safeFraction
+                    )
+                }
                 is ScaffoldNode -> node.copy(
                     content = sanitizeNode(node.content, depth + 1),
                     leftSidebar = node.leftSidebar?.let { sanitizeNode(it, depth + 1) },

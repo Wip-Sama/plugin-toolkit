@@ -371,6 +371,241 @@ abstract class UiContainerBuilder {
         add(ImageNode(id = id, asset = asset, contentDescription = contentDescription, modifier = modifier))
     }
 
+    fun icon(
+        name: String,
+        id: String = generateNodeId("icon"),
+        tint: SemanticColor? = null,
+        size: ControlSize = ControlSize.MEDIUM,
+        modifier: UiModifier = UiModifier.None
+    ) {
+        add(IconNode(id = id, name = name, tint = tint, size = size, modifier = modifier))
+    }
+
+    fun iconButton(
+        iconName: String,
+        id: String = generateNodeId("icon_btn"),
+        action: String? = null,
+        tooltip: String? = null,
+        tint: SemanticColor? = null,
+        isTonal: Boolean = false,
+        modifier: UiModifier = UiModifier.None
+    ) {
+        add(
+            IconButtonNode(
+                id = id,
+                iconName = iconName,
+                action = action,
+                tooltip = tooltip,
+                tint = tint,
+                isTonal = isTonal,
+                modifier = modifier
+            )
+        )
+    }
+
+    fun progressBar(
+        id: String = generateNodeId("progress"),
+        progress: Float? = null,
+        secondaryProgress: Float? = null,
+        label: String? = null,
+        statusText: String? = null,
+        isCircular: Boolean = false,
+        color: SemanticColor = SemanticColor.PRIMARY,
+        modifier: UiModifier = UiModifier.None
+    ) {
+        add(
+            ProgressBarNode(
+                id = id,
+                progress = progress,
+                secondaryProgress = secondaryProgress,
+                label = label,
+                statusText = statusText,
+                isCircular = isCircular,
+                color = color,
+                modifier = modifier
+            )
+        )
+    }
+
+    fun tabs(
+        selectedTabKey: String,
+        tabs: List<TabItem>,
+        id: String = generateNodeId("tabs"),
+        modifier: UiModifier = UiModifier.None,
+        contentBlock: UiContainerBuilder.() -> Unit
+    ) {
+        val contentBuilder = BoxBuilder(generateNodeId("tab_content"), UiModifier.None).apply(contentBlock)
+        add(
+            TabsNode(
+                id = id,
+                tabs = tabs,
+                selectedTabKey = selectedTabKey,
+                content = contentBuilder.build(),
+                modifier = modifier
+            )
+        )
+    }
+
+    fun listItem(
+        title: String,
+        id: String = generateNodeId("item"),
+        subtitle: String? = null,
+        leadingIcon: String? = null,
+        badgeText: String? = null,
+        badgeColor: SemanticColor? = null,
+        selected: Boolean = false,
+        selectable: Boolean = false,
+        modifier: UiModifier = UiModifier.None,
+        trailingBlock: (UiContainerBuilder.() -> Unit)? = null
+    ) {
+        val trailingContent = if (trailingBlock != null) {
+            val builder = BoxBuilder(generateNodeId("trailing"), UiModifier.None).apply(trailingBlock)
+            builder.buildChildren()
+        } else {
+            emptyList()
+        }
+        add(
+            ListItemNode(
+                id = id,
+                title = title,
+                subtitle = subtitle,
+                leadingIcon = leadingIcon,
+                badgeText = badgeText,
+                badgeColor = badgeColor,
+                selected = selected,
+                selectable = selectable,
+                trailingContent = trailingContent,
+                modifier = modifier
+            )
+        )
+    }
+
+    fun checkbox(
+        checked: Boolean,
+        id: String = generateNodeId("chk"),
+        label: String? = null,
+        modifier: UiModifier = UiModifier.None
+    ) {
+        add(CheckboxNode(id = id, checked = checked, label = label, modifier = modifier))
+    }
+
+    fun chipGroup(
+        chips: List<ChipItem>,
+        id: String = generateNodeId("chips"),
+        selectedKeys: Set<String> = emptySet(),
+        multiSelect: Boolean = false,
+        modifier: UiModifier = UiModifier.None
+    ) {
+        add(ChipGroupNode(id = id, chips = chips, selectedKeys = selectedKeys, multiSelect = multiSelect, modifier = modifier))
+    }
+
+    fun alertBanner(
+        message: String,
+        id: String = generateNodeId("alert"),
+        title: String? = null,
+        severity: SemanticColor = SemanticColor.INFO,
+        iconName: String? = null,
+        actionLabel: String? = null,
+        modifier: UiModifier = UiModifier.None
+    ) {
+        add(
+            AlertBannerNode(
+                id = id,
+                title = title,
+                message = message,
+                severity = severity,
+                iconName = iconName,
+                actionLabel = actionLabel,
+                modifier = modifier
+            )
+        )
+    }
+
+    fun emptyState(
+        title: String,
+        id: String = generateNodeId("empty"),
+        description: String? = null,
+        iconName: String = "info",
+        actionLabel: String? = null,
+        modifier: UiModifier = UiModifier.None
+    ) {
+        add(
+            EmptyStateNode(
+                id = id,
+                title = title,
+                description = description,
+                iconName = iconName,
+                actionLabel = actionLabel,
+                modifier = modifier
+            )
+        )
+    }
+
+    fun dialog(
+        title: String,
+        id: String = generateNodeId("dialog"),
+        isOpen: Boolean = true,
+        confirmLabel: String = "OK",
+        dismissLabel: String? = "Cancel",
+        isDestructive: Boolean = false,
+        modifier: UiModifier = UiModifier.None,
+        block: UiContainerBuilder.() -> Unit
+    ) {
+        val builder = BoxBuilder(generateNodeId("dialog_content"), UiModifier.None).apply(block)
+        add(
+            DialogNode(
+                id = id,
+                title = title,
+                isOpen = isOpen,
+                confirmLabel = confirmLabel,
+                dismissLabel = dismissLabel,
+                isDestructive = isDestructive,
+                children = builder.buildChildren(),
+                modifier = modifier
+            )
+        )
+    }
+
+    fun splitPane(
+        id: String = generateNodeId("split"),
+        splitFraction: Float = 0.35f,
+        isHorizontal: Boolean = true,
+        modifier: UiModifier = UiModifier.None,
+        first: UiContainerBuilder.() -> Unit,
+        second: UiContainerBuilder.() -> Unit
+    ) {
+        val firstBuilder = BoxBuilder(generateNodeId("split_first"), UiModifier.None).apply(first)
+        val secondBuilder = BoxBuilder(generateNodeId("split_second"), UiModifier.None).apply(second)
+        add(
+            SplitPaneNode(
+                id = id,
+                first = firstBuilder.build(),
+                second = secondBuilder.build(),
+                splitFraction = splitFraction,
+                isHorizontal = isHorizontal,
+                modifier = modifier
+            )
+        )
+    }
+
+    fun spacer(
+        size: SpacingSize = SpacingSize.MEDIUM,
+        id: String = generateNodeId("spacer"),
+        modifier: UiModifier = UiModifier.None
+    ) {
+        add(SpacerNode(id = id, size = size, modifier = modifier))
+    }
+
+    fun scrollableRow(
+        id: String = generateNodeId("scroll_row"),
+        spacing: SpacingSize = SpacingSize.NONE,
+        modifier: UiModifier = UiModifier.None,
+        block: ScrollableRowBuilder.() -> Unit
+    ) {
+        val builder = ScrollableRowBuilder(id, spacing, modifier).apply(block)
+        add(builder.build())
+    }
+
     fun board(
         id: String = generateNodeId("board"),
         backgroundAsset: AssetReference? = null,
@@ -495,6 +730,14 @@ class RowBuilder(
     val modifier: UiModifier
 ) : UiContainerBuilder() {
     fun build(): RowNode = RowNode(id = id, spacing = spacing, modifier = modifier, children = children.toList())
+}
+
+class ScrollableRowBuilder(
+    val id: String,
+    val spacing: SpacingSize,
+    val modifier: UiModifier
+) : UiContainerBuilder() {
+    fun build(): ScrollableRowNode = ScrollableRowNode(id = id, spacing = spacing, modifier = modifier, children = children.toList())
 }
 
 class CardBuilder(

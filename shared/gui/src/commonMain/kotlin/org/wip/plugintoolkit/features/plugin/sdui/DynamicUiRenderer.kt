@@ -5,10 +5,12 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -23,29 +25,41 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
+import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -62,27 +76,41 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import org.jetbrains.compose.resources.stringResource
+import org.wip.plugintoolkit.api.sdui.AlertBannerNode
 import org.wip.plugintoolkit.api.sdui.AlignmentRole
 import org.wip.plugintoolkit.api.sdui.BadgeNode
 import org.wip.plugintoolkit.api.sdui.BoardNode
 import org.wip.plugintoolkit.api.sdui.BoxNode
 import org.wip.plugintoolkit.api.sdui.ButtonNode
 import org.wip.plugintoolkit.api.sdui.CardNode
+import org.wip.plugintoolkit.api.sdui.CheckboxNode
+import org.wip.plugintoolkit.api.sdui.ChipGroupNode
 import org.wip.plugintoolkit.api.sdui.ColumnNode
+import org.wip.plugintoolkit.api.sdui.ControlSize
+import org.wip.plugintoolkit.api.sdui.DialogNode
 import org.wip.plugintoolkit.api.sdui.DividerNode
 import org.wip.plugintoolkit.api.sdui.DropdownNode
+import org.wip.plugintoolkit.api.sdui.EmptyStateNode
 import org.wip.plugintoolkit.api.sdui.ErrorBoundaryNode
 import org.wip.plugintoolkit.api.sdui.FloatingAnchor
 import org.wip.plugintoolkit.api.sdui.FloatingPanelNode
+import org.wip.plugintoolkit.api.sdui.IconButtonNode
 import org.wip.plugintoolkit.api.sdui.IconNode
 import org.wip.plugintoolkit.api.sdui.ImageNode
+import org.wip.plugintoolkit.api.sdui.ListItemNode
+import org.wip.plugintoolkit.api.sdui.ProgressBarNode
 import org.wip.plugintoolkit.api.sdui.RowNode
 import org.wip.plugintoolkit.api.sdui.ScaffoldNode
 import org.wip.plugintoolkit.api.sdui.ScrollableColumnNode
+import org.wip.plugintoolkit.api.sdui.ScrollableRowNode
+import org.wip.plugintoolkit.api.sdui.SemanticColor
 import org.wip.plugintoolkit.api.sdui.SidebarAttachPoint
 import org.wip.plugintoolkit.api.sdui.SidebarNode
 import org.wip.plugintoolkit.api.sdui.SliderNode
+import org.wip.plugintoolkit.api.sdui.SpacerNode
 import org.wip.plugintoolkit.api.sdui.SpacingSize
+import org.wip.plugintoolkit.api.sdui.SplitPaneNode
+import org.wip.plugintoolkit.api.sdui.TabsNode
 import org.wip.plugintoolkit.api.sdui.TextInputNode
 import org.wip.plugintoolkit.api.sdui.TextNode
 import org.wip.plugintoolkit.api.sdui.ToggleNode
@@ -93,6 +121,8 @@ import org.wip.plugintoolkit.api.sdui.UiNode
 import org.wip.plugintoolkit.api.sdui.UnknownNode
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import plugintoolkit.composeapp.generated.resources.Res
+import plugintoolkit.composeapp.generated.resources.sdui_cancel
+import plugintoolkit.composeapp.generated.resources.sdui_confirm
 import plugintoolkit.composeapp.generated.resources.sdui_error_boundary_title
 import plugintoolkit.composeapp.generated.resources.sdui_toggle_panel
 import plugintoolkit.composeapp.generated.resources.sdui_toggle_sidebar
@@ -394,11 +424,66 @@ fun RenderUiNode(
         }
 
         is IconNode -> {
+            val iconSize = when (node.size) {
+                ControlSize.SMALL -> ToolkitTheme.dimensions.iconSmall
+                ControlSize.MEDIUM -> ToolkitTheme.dimensions.iconMedium
+                ControlSize.LARGE -> ToolkitTheme.dimensions.iconLarge
+            }
+            val tintColor = node.tint?.toComposeColor() ?: LocalContentColor.current
             Icon(
-                imageVector = Icons.Default.Info,
+                imageVector = SduiIconRegistry.resolve(node.name),
                 contentDescription = node.name,
-                modifier = appliedModifier.size(ToolkitTheme.dimensions.iconMedium)
+                tint = tintColor,
+                modifier = appliedModifier.size(iconSize)
             )
+        }
+
+        is IconButtonNode -> {
+            RenderIconButton(node = node, onEvent = onEvent, modifier = appliedModifier)
+        }
+
+        is ProgressBarNode -> {
+            RenderProgressBar(node = node, modifier = appliedModifier)
+        }
+
+        is TabsNode -> {
+            RenderTabs(node = node, onEvent = onEvent, modifier = appliedModifier)
+        }
+
+        is ListItemNode -> {
+            RenderListItem(node = node, onEvent = onEvent, modifier = appliedModifier)
+        }
+
+        is CheckboxNode -> {
+            RenderCheckbox(node = node, onEvent = onEvent, modifier = appliedModifier)
+        }
+
+        is ChipGroupNode -> {
+            RenderChipGroup(node = node, onEvent = onEvent, modifier = appliedModifier)
+        }
+
+        is AlertBannerNode -> {
+            RenderAlertBanner(node = node, onEvent = onEvent, modifier = appliedModifier)
+        }
+
+        is EmptyStateNode -> {
+            RenderEmptyState(node = node, onEvent = onEvent, modifier = appliedModifier)
+        }
+
+        is DialogNode -> {
+            RenderDialog(node = node, onEvent = onEvent)
+        }
+
+        is SplitPaneNode -> {
+            RenderSplitPane(node = node, onEvent = onEvent, modifier = appliedModifier)
+        }
+
+        is SpacerNode -> {
+            RenderSpacer(node = node, modifier = appliedModifier)
+        }
+
+        is ScrollableRowNode -> {
+            RenderScrollableRow(node = node, onEvent = onEvent, modifier = appliedModifier)
         }
 
         else -> {
@@ -498,6 +583,611 @@ private fun RenderDropdown(
                         onEvent(UiEvent.OptionSelected(node.id, key))
                     }
                 )
+            }
+        }
+    }
+}
+
+/**
+ * Live capability and system progress indicator renderer.
+ */
+@Composable
+private fun RenderProgressBar(
+    node: ProgressBarNode,
+    modifier: Modifier = Modifier
+) {
+    val progressColor = node.color.toComposeColor()
+    val label = node.label
+    val statusText = node.statusText
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.xs)
+    ) {
+        if (!label.isNullOrBlank() || !statusText.isNullOrBlank()) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (!label.isNullOrBlank()) {
+                    Text(
+                        text = label,
+                        style = ToolkitTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+                if (!statusText.isNullOrBlank()) {
+                    Text(
+                        text = statusText,
+                        style = ToolkitTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+        if (node.isCircular) {
+            val progressVal = node.progress
+            if (progressVal != null) {
+                CircularProgressIndicator(
+                    progress = { progressVal.coerceIn(0f, 1f) },
+                    modifier = Modifier.size(ToolkitTheme.dimensions.iconMedium),
+                    color = progressColor,
+                    trackColor = progressColor.copy(alpha = ToolkitTheme.opacity.borderLow),
+                    strokeWidth = ToolkitTheme.dimensions.progressIndicatorStroke
+                )
+            } else {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(ToolkitTheme.dimensions.iconMedium),
+                    color = progressColor,
+                    strokeWidth = ToolkitTheme.dimensions.progressIndicatorStroke
+                )
+            }
+        } else {
+            val progressVal = node.progress
+            if (progressVal != null) {
+                LinearProgressIndicator(
+                    progress = { progressVal.coerceIn(0f, 1f) },
+                    modifier = Modifier.fillMaxWidth().height(ToolkitTheme.dimensions.capabilityProgressBarHeight),
+                    color = progressColor,
+                    trackColor = progressColor.copy(alpha = ToolkitTheme.opacity.borderLow)
+                )
+            } else {
+                LinearProgressIndicator(
+                    modifier = Modifier.fillMaxWidth().height(ToolkitTheme.dimensions.capabilityProgressBarHeight),
+                    color = progressColor,
+                    trackColor = progressColor.copy(alpha = ToolkitTheme.opacity.borderLow)
+                )
+            }
+            node.secondaryProgress?.let { secProgress ->
+                LinearProgressIndicator(
+                    progress = { secProgress.coerceIn(0f, 1f) },
+                    modifier = Modifier.fillMaxWidth().height(ToolkitTheme.dimensions.progressIndicatorStroke),
+                    color = MaterialTheme.colorScheme.tertiary,
+                    trackColor = MaterialTheme.colorScheme.tertiary.copy(alpha = ToolkitTheme.opacity.subtleHighlight)
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Tab container renderer supporting icons, badges, and view switching.
+ */
+@Composable
+private fun RenderTabs(
+    node: TabsNode,
+    onEvent: (UiEvent) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val selectedIndex = node.tabs.indexOfFirst { it.key == node.selectedTabKey }.coerceAtLeast(0)
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
+    ) {
+        ScrollableTabRow(
+            selectedTabIndex = selectedIndex,
+            containerColor = MaterialTheme.colorScheme.surface,
+            contentColor = MaterialTheme.colorScheme.primary,
+            edgePadding = ToolkitTheme.spacing.none
+        ) {
+            node.tabs.forEachIndexed { index, tab ->
+                Tab(
+                    selected = index == selectedIndex,
+                    onClick = { onEvent(UiEvent.TabSelected(node.id, tab.key)) },
+                    text = {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.xs),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            tab.iconName?.let { iconName ->
+                                Icon(
+                                    imageVector = SduiIconRegistry.resolve(iconName),
+                                    contentDescription = tab.label,
+                                    modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
+                                )
+                            }
+                            Text(text = tab.label, style = ToolkitTheme.typography.labelMedium)
+                            tab.badgeText?.let { badge ->
+                                Surface(
+                                    color = MaterialTheme.colorScheme.primaryContainer,
+                                    shape = RoundedCornerShape(ToolkitTheme.dimensions.buttonGroupInnerCorner)
+                                ) {
+                                    Text(
+                                        text = badge,
+                                        style = ToolkitTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        modifier = Modifier.padding(
+                                            horizontal = ToolkitTheme.spacing.xs,
+                                            vertical = ToolkitTheme.spacing.xxs
+                                        )
+                                    )
+                                }
+                            }
+                        }
+                    }
+                )
+            }
+        }
+        SafeUiNodeRenderer(node = node.content, onEvent = onEvent, modifier = Modifier.fillMaxWidth())
+    }
+}
+
+/**
+ * Structured list row renderer with leading controls/icons, titles, subtitles, badges, and trailing actions.
+ */
+@Composable
+private fun RenderListItem(
+    node: ListItemNode,
+    onEvent: (UiEvent) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val surfaceColor = if (node.selected) {
+        MaterialTheme.colorScheme.primaryContainer.copy(alpha = ToolkitTheme.opacity.buttonBackground)
+    } else {
+        MaterialTheme.colorScheme.surfaceContainer
+    }
+    val borderColor = if (node.selected) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        MaterialTheme.colorScheme.outlineVariant
+    }
+
+    Surface(
+        modifier = modifier
+            .fillMaxWidth()
+            .then(
+                if (node.selectable) {
+                    Modifier.clickable { onEvent(UiEvent.ToggleChanged(node.id, !node.selected)) }
+                } else {
+                    Modifier
+                }
+            ),
+        color = surfaceColor,
+        shape = ToolkitTheme.shapes.small,
+        border = BorderStroke(ToolkitTheme.dimensions.borderUnselected, borderColor)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(
+                    horizontal = ToolkitTheme.spacing.medium,
+                    vertical = ToolkitTheme.spacing.small
+                ),
+            horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (node.selectable) {
+                Checkbox(
+                    checked = node.selected,
+                    onCheckedChange = { isChecked ->
+                        onEvent(UiEvent.ToggleChanged(node.id, isChecked))
+                    }
+                )
+            }
+
+            node.leadingIcon?.let { iconName ->
+                Icon(
+                    imageVector = SduiIconRegistry.resolve(iconName),
+                    contentDescription = node.title,
+                    modifier = Modifier.size(ToolkitTheme.dimensions.iconMedium),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
+
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.xxs)
+            ) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.xs),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = node.title,
+                        style = ToolkitTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    node.badgeText?.let { badge ->
+                        val bColor = node.badgeColor?.toComposeColor() ?: MaterialTheme.colorScheme.primary
+                        Surface(
+                            color = bColor.copy(alpha = ToolkitTheme.opacity.borderLow),
+                            shape = RoundedCornerShape(ToolkitTheme.dimensions.buttonGroupInnerCorner)
+                        ) {
+                            Text(
+                                text = badge,
+                                style = ToolkitTheme.typography.labelSmall,
+                                color = bColor,
+                                modifier = Modifier.padding(
+                                    horizontal = ToolkitTheme.spacing.xs,
+                                    vertical = ToolkitTheme.spacing.xxs
+                                )
+                            )
+                        }
+                    }
+                }
+                node.subtitle?.let { sub ->
+                    Text(
+                        text = sub,
+                        style = ToolkitTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            if (node.trailingContent.isNotEmpty()) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.xs),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    node.trailingContent.forEach { child ->
+                        SafeUiNodeRenderer(node = child, onEvent = onEvent)
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Checkbox control with accompanying label.
+ */
+@Composable
+private fun RenderCheckbox(
+    node: CheckboxNode,
+    onEvent: (UiEvent) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier.clickable(enabled = node.modifier.enabled) {
+            onEvent(UiEvent.ToggleChanged(node.id, !node.checked))
+        },
+        horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.sm),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Checkbox(
+            checked = node.checked,
+            enabled = node.modifier.enabled,
+            onCheckedChange = { isChecked ->
+                onEvent(UiEvent.ToggleChanged(node.id, isChecked))
+            }
+        )
+        node.label?.let { labelText ->
+            Text(text = labelText, style = ToolkitTheme.typography.bodyMedium)
+        }
+    }
+}
+
+/**
+ * Chip group filter selector renderer.
+ */
+@Composable
+private fun RenderChipGroup(
+    node: ChipGroupNode,
+    onEvent: (UiEvent) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier.horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.xs),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        node.chips.forEach { chip ->
+            val isSelected = chip.key in node.selectedKeys
+            FilterChip(
+                selected = isSelected,
+                onClick = {
+                    onEvent(UiEvent.ChipSelected(node.id, chip.key, !isSelected))
+                },
+                label = { Text(text = chip.label, style = ToolkitTheme.typography.labelMedium) },
+                leadingIcon = chip.iconName?.let { iconName ->
+                    {
+                        Icon(
+                            imageVector = SduiIconRegistry.resolve(iconName),
+                            contentDescription = chip.label,
+                            modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
+                        )
+                    }
+                }
+            )
+        }
+    }
+}
+
+/**
+ * Compact icon action button.
+ */
+@Composable
+private fun RenderIconButton(
+    node: IconButtonNode,
+    onEvent: (UiEvent) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val action = node.action ?: node.id
+    val tint = node.tint?.toComposeColor() ?: MaterialTheme.colorScheme.onSurface
+    IconButton(
+        onClick = { onEvent(UiEvent.Click(node.id, action)) },
+        enabled = node.modifier.enabled,
+        modifier = modifier,
+        colors = if (node.isTonal) {
+            IconButtonDefaults.filledTonalIconButtonColors()
+        } else {
+            IconButtonDefaults.iconButtonColors()
+        }
+    ) {
+        Icon(
+            imageVector = SduiIconRegistry.resolve(node.iconName),
+            contentDescription = node.tooltip ?: node.iconName,
+            tint = tint,
+            modifier = Modifier.size(ToolkitTheme.dimensions.iconMedium)
+        )
+    }
+}
+
+/**
+ * Semantic inline alert banner for warnings, info, and success messages.
+ */
+@Composable
+private fun RenderAlertBanner(
+    node: AlertBannerNode,
+    onEvent: (UiEvent) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val severityColor = node.severity.toComposeColor()
+    val defaultIcon = when (node.severity) {
+        SemanticColor.ERROR -> Icons.Default.Error
+        SemanticColor.WARNING -> Icons.Default.Warning
+        SemanticColor.SUCCESS -> Icons.Default.CheckCircle
+        else -> Icons.Default.Info
+    }
+    val iconVector = node.iconName?.let { SduiIconRegistry.resolve(it) } ?: defaultIcon
+
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = severityColor.copy(alpha = ToolkitTheme.opacity.cardBackground),
+        shape = ToolkitTheme.shapes.small,
+        border = BorderStroke(ToolkitTheme.dimensions.borderUnselected, severityColor.copy(alpha = ToolkitTheme.opacity.divider))
+    ) {
+        Row(
+            modifier = Modifier.padding(ToolkitTheme.spacing.medium),
+            horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.medium),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = iconVector,
+                contentDescription = node.severity.name,
+                tint = severityColor,
+                modifier = Modifier.size(ToolkitTheme.dimensions.iconMedium)
+            )
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.xxs)
+            ) {
+                val title = node.title
+                if (!title.isNullOrBlank()) {
+                    Text(
+                        text = title,
+                        style = ToolkitTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+                Text(
+                    text = node.message,
+                    style = ToolkitTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            val actionLabel = node.actionLabel
+            if (!actionLabel.isNullOrBlank()) {
+                OutlinedButton(
+                    onClick = { onEvent(UiEvent.Click(node.id, "banner_action")) },
+                    modifier = Modifier.padding(start = ToolkitTheme.spacing.xs)
+                ) {
+                    Text(text = actionLabel, style = ToolkitTheme.typography.labelSmall)
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Empty state placeholder when data or queues are empty.
+ */
+@Composable
+private fun RenderEmptyState(
+    node: EmptyStateNode,
+    onEvent: (UiEvent) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(ToolkitTheme.spacing.extraLarge),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
+    ) {
+        Icon(
+            imageVector = SduiIconRegistry.resolve(node.iconName),
+            contentDescription = node.title,
+            modifier = Modifier.size(ToolkitTheme.dimensions.emptyStateIconSize),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = ToolkitTheme.opacity.disabled)
+        )
+        Text(
+            text = node.title,
+            style = ToolkitTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        node.description?.let { desc ->
+            Text(
+                text = desc,
+                style = ToolkitTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        node.actionLabel?.let { actionLabel ->
+            Button(
+                onClick = { onEvent(UiEvent.Click(node.id, "empty_state_action")) },
+                modifier = Modifier.padding(top = ToolkitTheme.spacing.small)
+            ) {
+                Text(text = actionLabel, style = ToolkitTheme.typography.labelMedium)
+            }
+        }
+    }
+}
+
+/**
+ * Modal dialog renderer for confirmations and forms.
+ */
+@Composable
+private fun RenderDialog(
+    node: DialogNode,
+    onEvent: (UiEvent) -> Unit
+) {
+    if (!node.isOpen) return
+
+    AlertDialog(
+        onDismissRequest = { onEvent(UiEvent.DialogAction(node.id, isConfirmed = false)) },
+        title = {
+            Text(text = node.title, style = ToolkitTheme.typography.titleLarge)
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
+            ) {
+                node.children.forEach { child ->
+                    SafeUiNodeRenderer(node = child, onEvent = onEvent)
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onEvent(UiEvent.DialogAction(node.id, isConfirmed = true)) },
+                colors = if (node.isDestructive) {
+                    ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                } else {
+                    ButtonDefaults.buttonColors()
+                }
+            ) {
+                Text(text = node.confirmLabel, style = ToolkitTheme.typography.labelMedium)
+            }
+        },
+        dismissButton = node.dismissLabel?.let { label ->
+            {
+                OutlinedButton(
+                    onClick = { onEvent(UiEvent.DialogAction(node.id, isConfirmed = false)) }
+                ) {
+                    Text(text = label, style = ToolkitTheme.typography.labelMedium)
+                }
+            }
+        }
+    )
+}
+
+/**
+ * Desktop master-detail layout split pane with weighted containers.
+ */
+@Composable
+private fun RenderSplitPane(
+    node: SplitPaneNode,
+    onEvent: (UiEvent) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val fraction1 = node.splitFraction.coerceIn(0.05f, 0.95f)
+    val fraction2 = (1f - fraction1).coerceIn(0.05f, 0.95f)
+
+    if (node.isHorizontal) {
+        Row(modifier = modifier.fillMaxSize()) {
+            Box(
+                modifier = Modifier
+                    .weight(fraction1)
+                    .fillMaxHeight()
+            ) {
+                SafeUiNodeRenderer(node = node.first, onEvent = onEvent, modifier = Modifier.fillMaxSize())
+            }
+            VerticalDivider(
+                modifier = Modifier.fillMaxHeight(),
+                color = MaterialTheme.colorScheme.outlineVariant
+            )
+            Box(
+                modifier = Modifier
+                    .weight(fraction2)
+                    .fillMaxHeight()
+            ) {
+                SafeUiNodeRenderer(node = node.second, onEvent = onEvent, modifier = Modifier.fillMaxSize())
+            }
+        }
+    } else {
+        Column(modifier = modifier.fillMaxSize()) {
+            Box(
+                modifier = Modifier
+                    .weight(fraction1)
+                    .fillMaxWidth()
+            ) {
+                SafeUiNodeRenderer(node = node.first, onEvent = onEvent, modifier = Modifier.fillMaxSize())
+            }
+            HorizontalDivider(
+                modifier = Modifier.fillMaxWidth(),
+                color = MaterialTheme.colorScheme.outlineVariant
+            )
+            Box(
+                modifier = Modifier
+                    .weight(fraction2)
+                    .fillMaxWidth()
+            ) {
+                SafeUiNodeRenderer(node = node.second, onEvent = onEvent, modifier = Modifier.fillMaxSize())
+            }
+        }
+    }
+}
+
+/**
+ * Structural spacing element.
+ */
+@Composable
+private fun RenderSpacer(
+    node: SpacerNode,
+    modifier: Modifier = Modifier
+) {
+    Spacer(modifier = modifier.size(node.size.toDp()))
+}
+
+/**
+ * Horizontally scrollable row for image strips, horizontal chips, or cards.
+ */
+@Composable
+private fun RenderScrollableRow(
+    node: ScrollableRowNode,
+    onEvent: (UiEvent) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier.horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(node.spacing.toDp()),
+        verticalAlignment = node.modifier.alignment?.toVerticalAlignment() ?: Alignment.Top
+    ) {
+        node.children.forEach { child ->
+            key(child.id) {
+                SafeUiNodeRenderer(node = child, onEvent = onEvent)
             }
         }
     }

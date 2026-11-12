@@ -173,6 +173,37 @@ sealed interface UiEvent {
     ) : UiEvent
 
     /**
+     * Tab selection change in a [TabsNode].
+     */
+    @Serializable
+    @SerialName("tab_selected")
+    data class TabSelected(
+        override val nodeId: String,
+        val tabKey: String
+    ) : UiEvent
+
+    /**
+     * Filter chip selection change in a [ChipGroupNode].
+     */
+    @Serializable
+    @SerialName("chip_selected")
+    data class ChipSelected(
+        override val nodeId: String,
+        val chipKey: String,
+        val isSelected: Boolean
+    ) : UiEvent
+
+    /**
+     * Confirmation or dismissal action in a [DialogNode].
+     */
+    @Serializable
+    @SerialName("dialog_action")
+    data class DialogAction(
+        override val nodeId: String,
+        val isConfirmed: Boolean
+    ) : UiEvent
+
+    /**
      * Custom event payload for domain-specific controls.
      */
     @Serializable
@@ -208,6 +239,9 @@ object UiEventSerializer : KSerializer<UiEvent> {
             is UiEvent.BoardShapeCommitted -> "board_shape_committed"
             is UiEvent.BoardLayerDeleted -> "board_layer_deleted"
             is UiEvent.BoardCanvasClicked -> "board_canvas_clicked"
+            is UiEvent.TabSelected -> "tab_selected"
+            is UiEvent.ChipSelected -> "chip_selected"
+            is UiEvent.DialogAction -> "dialog_action"
             is UiEvent.Custom -> "custom"
         }
         val element = when (value) {
@@ -225,6 +259,9 @@ object UiEventSerializer : KSerializer<UiEvent> {
             is UiEvent.BoardShapeCommitted -> jsonEncoder.json.encodeToJsonElement(UiEvent.BoardShapeCommitted.serializer(), value)
             is UiEvent.BoardLayerDeleted -> jsonEncoder.json.encodeToJsonElement(UiEvent.BoardLayerDeleted.serializer(), value)
             is UiEvent.BoardCanvasClicked -> jsonEncoder.json.encodeToJsonElement(UiEvent.BoardCanvasClicked.serializer(), value)
+            is UiEvent.TabSelected -> jsonEncoder.json.encodeToJsonElement(UiEvent.TabSelected.serializer(), value)
+            is UiEvent.ChipSelected -> jsonEncoder.json.encodeToJsonElement(UiEvent.ChipSelected.serializer(), value)
+            is UiEvent.DialogAction -> jsonEncoder.json.encodeToJsonElement(UiEvent.DialogAction.serializer(), value)
             is UiEvent.Custom -> jsonEncoder.json.encodeToJsonElement(UiEvent.Custom.serializer(), value)
         }
         if (element is JsonObject) {
@@ -254,6 +291,9 @@ object UiEventSerializer : KSerializer<UiEvent> {
             "board_shape_committed" -> UiEvent.BoardShapeCommitted.serializer()
             "board_layer_deleted" -> UiEvent.BoardLayerDeleted.serializer()
             "board_canvas_clicked" -> UiEvent.BoardCanvasClicked.serializer()
+            "tab_selected" -> UiEvent.TabSelected.serializer()
+            "chip_selected" -> UiEvent.ChipSelected.serializer()
+            "dialog_action" -> UiEvent.DialogAction.serializer()
             "custom" -> UiEvent.Custom.serializer()
             else -> UiEvent.Custom.serializer()
         }

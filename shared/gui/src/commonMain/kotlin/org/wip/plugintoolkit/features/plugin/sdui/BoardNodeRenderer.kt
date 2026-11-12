@@ -220,6 +220,9 @@ fun BoardNodeRenderer(
     val onSurfaceColor = MaterialTheme.colorScheme.onSurface
     val outlineColor = MaterialTheme.colorScheme.outline
     val highlightColor = ToolkitTheme.colors.warning
+    val infoColor = ToolkitTheme.colors.info
+    val successColor = ToolkitTheme.colors.success
+    val warningColor = ToolkitTheme.colors.warning
 
     val resolveColor: (SemanticColor) -> Color = { color ->
         when (color) {
@@ -232,6 +235,9 @@ fun BoardNodeRenderer(
             SemanticColor.OUTLINE -> outlineColor
             SemanticColor.ACCENT -> tertiaryColor
             SemanticColor.HIGHLIGHT -> highlightColor
+            SemanticColor.INFO -> infoColor
+            SemanticColor.SUCCESS -> successColor
+            SemanticColor.WARNING -> warningColor
         }
     }
 
@@ -2114,4 +2120,7 @@ fun SemanticColor.toComposeColor(): Color = when (this) {
     SemanticColor.OUTLINE -> MaterialTheme.colorScheme.outline
     SemanticColor.ACCENT -> MaterialTheme.colorScheme.primary
     SemanticColor.HIGHLIGHT -> ToolkitTheme.colors.warningContainer
+    SemanticColor.INFO -> ToolkitTheme.colors.info
+    SemanticColor.SUCCESS -> ToolkitTheme.colors.success
+    SemanticColor.WARNING -> ToolkitTheme.colors.warning
 }

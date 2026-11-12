@@ -219,6 +219,156 @@ data class ImageNode(
 data class IconNode(
     override val id: String,
     val name: String,
+    val tint: SemanticColor? = null,
+    val size: ControlSize = ControlSize.MEDIUM,
+    override val modifier: UiModifier = UiModifier.None
+) : UiNode
+
+@Serializable
+@SerialName("icon_button")
+data class IconButtonNode(
+    override val id: String,
+    val iconName: String,
+    val action: String? = null,
+    val tooltip: String? = null,
+    val tint: SemanticColor? = null,
+    val isTonal: Boolean = false,
+    override val modifier: UiModifier = UiModifier.None
+) : UiNode
+
+@Serializable
+@SerialName("progress_bar")
+data class ProgressBarNode(
+    override val id: String,
+    val progress: Float? = null,
+    val secondaryProgress: Float? = null,
+    val label: String? = null,
+    val statusText: String? = null,
+    val isCircular: Boolean = false,
+    val color: SemanticColor = SemanticColor.PRIMARY,
+    override val modifier: UiModifier = UiModifier.None
+) : UiNode
+
+@Serializable
+data class TabItem(
+    val key: String,
+    val label: String,
+    val iconName: String? = null,
+    val badgeText: String? = null
+)
+
+@Serializable
+@SerialName("tabs")
+data class TabsNode(
+    override val id: String,
+    val tabs: List<TabItem> = emptyList(),
+    val selectedTabKey: String,
+    val content: UiNode,
+    override val modifier: UiModifier = UiModifier.None
+) : UiNode
+
+@Serializable
+@SerialName("list_item")
+data class ListItemNode(
+    override val id: String,
+    val title: String,
+    val subtitle: String? = null,
+    val leadingIcon: String? = null,
+    val badgeText: String? = null,
+    val badgeColor: SemanticColor? = null,
+    val selected: Boolean = false,
+    val selectable: Boolean = false,
+    val trailingContent: List<UiNode> = emptyList(),
+    override val modifier: UiModifier = UiModifier.None
+) : UiNode
+
+@Serializable
+@SerialName("checkbox")
+data class CheckboxNode(
+    override val id: String,
+    val checked: Boolean,
+    val label: String? = null,
+    override val modifier: UiModifier = UiModifier.None
+) : UiNode
+
+@Serializable
+data class ChipItem(
+    val key: String,
+    val label: String,
+    val iconName: String? = null
+)
+
+@Serializable
+@SerialName("chip_group")
+data class ChipGroupNode(
+    override val id: String,
+    val chips: List<ChipItem> = emptyList(),
+    val selectedKeys: Set<String> = emptySet(),
+    val multiSelect: Boolean = false,
+    override val modifier: UiModifier = UiModifier.None
+) : UiNode
+
+@Serializable
+@SerialName("alert_banner")
+data class AlertBannerNode(
+    override val id: String,
+    val title: String? = null,
+    val message: String,
+    val severity: SemanticColor = SemanticColor.INFO,
+    val iconName: String? = null,
+    val actionLabel: String? = null,
+    override val modifier: UiModifier = UiModifier.None
+) : UiNode
+
+@Serializable
+@SerialName("empty_state")
+data class EmptyStateNode(
+    override val id: String,
+    val title: String,
+    val description: String? = null,
+    val iconName: String = "info",
+    val actionLabel: String? = null,
+    override val modifier: UiModifier = UiModifier.None
+) : UiNode
+
+@Serializable
+@SerialName("dialog")
+data class DialogNode(
+    override val id: String,
+    val title: String,
+    val isOpen: Boolean = true,
+    val confirmLabel: String = "OK",
+    val dismissLabel: String? = "Cancel",
+    val isDestructive: Boolean = false,
+    val children: List<UiNode> = emptyList(),
+    override val modifier: UiModifier = UiModifier.None
+) : UiNode
+
+@Serializable
+@SerialName("split_pane")
+data class SplitPaneNode(
+    override val id: String,
+    val first: UiNode,
+    val second: UiNode,
+    val splitFraction: Float = 0.35f,
+    val isHorizontal: Boolean = true,
+    override val modifier: UiModifier = UiModifier.None
+) : UiNode
+
+@Serializable
+@SerialName("spacer")
+data class SpacerNode(
+    override val id: String,
+    val size: SpacingSize = SpacingSize.MEDIUM,
+    override val modifier: UiModifier = UiModifier.None
+) : UiNode
+
+@Serializable
+@SerialName("scrollable_row")
+data class ScrollableRowNode(
+    override val id: String,
+    val children: List<UiNode> = emptyList(),
+    val spacing: SpacingSize = SpacingSize.NONE,
     override val modifier: UiModifier = UiModifier.None
 ) : UiNode
 
@@ -333,6 +483,18 @@ object UiNodeSerializer : KSerializer<UiNode> {
             is DropdownNode -> "dropdown"
             is ImageNode -> "image"
             is IconNode -> "icon"
+            is IconButtonNode -> "icon_button"
+            is ProgressBarNode -> "progress_bar"
+            is TabsNode -> "tabs"
+            is ListItemNode -> "list_item"
+            is CheckboxNode -> "checkbox"
+            is ChipGroupNode -> "chip_group"
+            is AlertBannerNode -> "alert_banner"
+            is EmptyStateNode -> "empty_state"
+            is DialogNode -> "dialog"
+            is SplitPaneNode -> "split_pane"
+            is SpacerNode -> "spacer"
+            is ScrollableRowNode -> "scrollable_row"
             is BadgeNode -> "badge"
             is DividerNode -> "divider"
             is BoardNode -> "board"
@@ -356,6 +518,18 @@ object UiNodeSerializer : KSerializer<UiNode> {
             is DropdownNode -> jsonEncoder.json.encodeToJsonElement(DropdownNode.serializer(), value)
             is ImageNode -> jsonEncoder.json.encodeToJsonElement(ImageNode.serializer(), value)
             is IconNode -> jsonEncoder.json.encodeToJsonElement(IconNode.serializer(), value)
+            is IconButtonNode -> jsonEncoder.json.encodeToJsonElement(IconButtonNode.serializer(), value)
+            is ProgressBarNode -> jsonEncoder.json.encodeToJsonElement(ProgressBarNode.serializer(), value)
+            is TabsNode -> jsonEncoder.json.encodeToJsonElement(TabsNode.serializer(), value)
+            is ListItemNode -> jsonEncoder.json.encodeToJsonElement(ListItemNode.serializer(), value)
+            is CheckboxNode -> jsonEncoder.json.encodeToJsonElement(CheckboxNode.serializer(), value)
+            is ChipGroupNode -> jsonEncoder.json.encodeToJsonElement(ChipGroupNode.serializer(), value)
+            is AlertBannerNode -> jsonEncoder.json.encodeToJsonElement(AlertBannerNode.serializer(), value)
+            is EmptyStateNode -> jsonEncoder.json.encodeToJsonElement(EmptyStateNode.serializer(), value)
+            is DialogNode -> jsonEncoder.json.encodeToJsonElement(DialogNode.serializer(), value)
+            is SplitPaneNode -> jsonEncoder.json.encodeToJsonElement(SplitPaneNode.serializer(), value)
+            is SpacerNode -> jsonEncoder.json.encodeToJsonElement(SpacerNode.serializer(), value)
+            is ScrollableRowNode -> jsonEncoder.json.encodeToJsonElement(ScrollableRowNode.serializer(), value)
             is BadgeNode -> jsonEncoder.json.encodeToJsonElement(BadgeNode.serializer(), value)
             is DividerNode -> jsonEncoder.json.encodeToJsonElement(DividerNode.serializer(), value)
             is BoardNode -> jsonEncoder.json.encodeToJsonElement(BoardNode.serializer(), value)
@@ -391,6 +565,18 @@ object UiNodeSerializer : KSerializer<UiNode> {
             "dropdown" -> DropdownNode.serializer()
             "image" -> ImageNode.serializer()
             "icon" -> IconNode.serializer()
+            "icon_button" -> IconButtonNode.serializer()
+            "progress_bar" -> ProgressBarNode.serializer()
+            "tabs" -> TabsNode.serializer()
+            "list_item" -> ListItemNode.serializer()
+            "checkbox" -> CheckboxNode.serializer()
+            "chip_group" -> ChipGroupNode.serializer()
+            "alert_banner" -> AlertBannerNode.serializer()
+            "empty_state" -> EmptyStateNode.serializer()
+            "dialog" -> DialogNode.serializer()
+            "split_pane" -> SplitPaneNode.serializer()
+            "spacer" -> SpacerNode.serializer()
+            "scrollable_row" -> ScrollableRowNode.serializer()
             "badge" -> BadgeNode.serializer()
             "divider" -> DividerNode.serializer()
             "board" -> BoardNode.serializer()

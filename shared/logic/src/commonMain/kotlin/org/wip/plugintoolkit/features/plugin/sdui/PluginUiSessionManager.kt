@@ -110,6 +110,9 @@ class PluginUiSessionHandle(
             is UiEvent.BoardShapeCommitted,
             is UiEvent.BoardLayerDeleted,
             is UiEvent.BoardCanvasClicked,
+            is UiEvent.TabSelected,
+            is UiEvent.ChipSelected,
+            is UiEvent.DialogAction,
             is UiEvent.Custom -> {
                 transactionalChannel.trySend(event)
             }

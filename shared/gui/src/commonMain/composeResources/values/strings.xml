@@ -1069,4 +1069,7 @@
     <string name="sdui_loading_interface">Loading interface...</string>
     <string name="sdui_session_active">Active Session</string>
     <string name="sdui_unsupported_node">Unsupported component: %1$s</string>
+    <string name="sdui_confirm">Confirm</string>
+    <string name="sdui_cancel">Cancel</string>
+    <string name="sdui_empty_title">No items</string>
 </resources>
