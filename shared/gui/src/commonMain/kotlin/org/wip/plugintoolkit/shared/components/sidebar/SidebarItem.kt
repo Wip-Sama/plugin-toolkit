@@ -26,6 +26,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -83,6 +86,9 @@ fun <T> SidebarItem(
         bottomEnd = bottomEnd
     )
 
+    val resolvedTitle = element.title.resolve()
+    var isTitleTruncated by remember(resolvedTitle) { mutableStateOf(false) }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -90,7 +96,7 @@ fun <T> SidebarItem(
             .clip(animatedShape)
             .background(backgroundColor)
             .clickable { onClick() }
-            .then(if (!isExpanded) Modifier.tooltip(element.title.resolve()) else Modifier)
+            .then(if (!isExpanded || isTitleTruncated) Modifier.tooltip(resolvedTitle) else Modifier)
             .padding(horizontal = ToolkitTheme.spacing.small, vertical = ToolkitTheme.spacing.small),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Start
@@ -123,13 +129,14 @@ fun <T> SidebarItem(
                 Spacer(modifier = Modifier.width(ToolkitTheme.spacing.medium))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = element.title.resolve(),
+                        text = resolvedTitle,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = contentColor,
                         maxLines = 1,
                         softWrap = false,
-                        overflow = TextOverflow.Ellipsis
+                        overflow = TextOverflow.Ellipsis,
+                        onTextLayout = { result -> isTitleTruncated = result.hasVisualOverflow }
                     )
                     val resolvedDesc = element.description?.resolve()
                     if (!resolvedDesc.isNullOrBlank()) {

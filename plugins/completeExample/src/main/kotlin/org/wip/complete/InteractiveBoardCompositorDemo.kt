@@ -747,7 +747,7 @@ private fun renderBoardCompositorTree(
             anchor = FloatingAnchor.TOP_END,
             title = "Board Controls",
             isCollapsible = true,
-            isCollapsed = false
+            isCollapsed = true
         ) {
             textInput(
                 id = "titleInput",

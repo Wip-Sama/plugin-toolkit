@@ -194,4 +194,24 @@ class ThemeTest {
         assertNotNull(shapes.pill)
         assertEquals(androidx.compose.foundation.shape.RoundedCornerShape(percent = 50), shapes.pill)
     }
+
+    @Test
+    fun testSduiDesktopExpressiveDimensionTokens() {
+        val dimensions = Dimensions()
+        assertEquals(32.dp, dimensions.desktopTouchTargetSize)
+        assertEquals(30.dp, dimensions.denseIconButtonSize)
+        assertEquals(18.dp, dimensions.denseIconSize)
+        assertEquals(12.dp, dimensions.sduiCompactSpacing)
+        assertEquals(240.dp, dimensions.sduiSidebarMinWidth)
+        assertEquals(300.dp, dimensions.sduiSidebarDefaultWidth)
+        assertEquals(400.dp, dimensions.sduiSidebarMaxWidth)
+        assertEquals(260.dp, dimensions.sduiFloatingPanelMinWidth)
+        assertEquals(340.dp, dimensions.sduiFloatingPanelMaxWidth)
+        assertEquals(440.dp, dimensions.sduiFloatingPanelMaxHeight)
+        assertEquals(680.dp, dimensions.sduiFormMaxWidth)
+        assertEquals(120.dp, dimensions.sduiTextColumnMinWidth)
+        assertEquals(180.dp, dimensions.sduiBadgeMaxWidth)
+        assertEquals(12.dp, dimensions.sduiScrollbarEndPadding)
+        assertEquals(8.dp, dimensions.sduiScrollbarThickness)
+    }
 }

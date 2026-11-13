@@ -1,5 +1,6 @@
 package org.wip.plugintoolkit.features.plugin.sdui
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -45,11 +46,14 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -75,11 +79,16 @@ import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import kotlinx.serialization.json.JsonPrimitive
 import org.jetbrains.compose.resources.stringResource
 import org.wip.plugintoolkit.api.sdui.BoardGridStyle
@@ -245,6 +254,7 @@ fun BoardNodeRenderer(
     val shouldApplyBorder = node.showToolbar || hasFixedAspect
     val selectedChipAlpha = ToolkitTheme.opacity.borderLow
     val highlighterAlpha = ToolkitTheme.opacity.divider
+    val boardShape = ToolkitTheme.shapes.large
 
     Column(
         modifier = modifier
@@ -252,11 +262,11 @@ fun BoardNodeRenderer(
             .then(
                 if (shouldApplyBorder) {
                     Modifier
-                        .clip(RoundedCornerShape(ToolkitTheme.dimensions.textFieldCornerRadius))
+                        .clip(boardShape)
                         .border(
                             width = ToolkitTheme.dimensions.borderUnselected,
-                            color = outlineVariant,
-                            shape = RoundedCornerShape(ToolkitTheme.dimensions.textFieldCornerRadius)
+                            color = outlineVariant.copy(alpha = ToolkitTheme.opacity.divider),
+                            shape = boardShape
                         )
                 } else {
                     Modifier.clipToBounds()
@@ -1038,12 +1048,49 @@ fun BoardNodeRenderer(
                     },
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
-                        .padding(ToolkitTheme.spacing.sm)
+                        .padding(ToolkitTheme.spacing.md)
                 )
             }
         }
     }
 }
+
+/**
+ * Shared desktop-density icon action button with mandatory Material 3 hover/focus tooltip.
+ */
+@Composable
+private fun BoardCompactIconButton(
+    icon: ImageVector,
+    label: String,
+    onClick: () -> Unit,
+    tint: Color = LocalContentColor.current,
+    buttonSize: Dp = ToolkitTheme.dimensions.denseIconButtonSize,
+    iconSize: Dp = ToolkitTheme.dimensions.denseIconSize
+) {
+    SduiTooltipBox(tooltip = label) {
+        IconButton(
+            onClick = onClick,
+            modifier = Modifier
+                .size(buttonSize)
+                .pointerHoverIcon(PointerIcon.Hand)
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = label,
+                modifier = Modifier.size(iconSize),
+                tint = tint
+            )
+        }
+    }
+}
+
+private data class BoardToolChipSpec(
+    val selected: Boolean,
+    val label: String,
+    val icon: ImageVector,
+    val accentColor: Color? = null,
+    val onSelect: () -> Unit
+)
 
 @Composable
 private fun BoardToolbar(
@@ -1058,178 +1105,136 @@ private fun BoardToolbar(
     onRedo: () -> Unit,
     onClear: () -> Unit
 ) {
+    val toolSpecs = listOf(
+        BoardToolChipSpec(
+            selected = selectedTool is BoardTool.Select,
+            label = stringResource(Res.string.sdui_board_select),
+            icon = Icons.Default.NearMe,
+            accentColor = primaryColor,
+            onSelect = { onSelectTool(BoardTool.Select(), "select") }
+        ),
+        BoardToolChipSpec(
+            selected = selectedTool is BoardTool.Pan,
+            label = stringResource(Res.string.sdui_board_pan),
+            icon = Icons.Default.OpenWith,
+            onSelect = { onSelectTool(BoardTool.Pan, "pan") }
+        ),
+        BoardToolChipSpec(
+            selected = selectedTool is BoardTool.PlaceText,
+            label = stringResource(Res.string.sdui_board_text),
+            icon = Icons.Default.Title,
+            onSelect = { onSelectTool(BoardTool.PlaceText(), "text") }
+        ),
+        BoardToolChipSpec(
+            selected = selectedTool is BoardTool.Shape || selectedTool is BoardTool.Rectangle,
+            label = stringResource(Res.string.sdui_board_shape),
+            icon = Icons.Default.CropSquare,
+            onSelect = { onSelectTool(BoardTool.Shape(), "shape") }
+        ),
+        BoardToolChipSpec(
+            selected = selectedTool is BoardTool.Brush,
+            label = stringResource(Res.string.sdui_board_pen),
+            icon = Icons.Default.Edit,
+            accentColor = primaryColor,
+            onSelect = { onSelectTool(BoardTool.Brush(), "brush") }
+        ),
+        BoardToolChipSpec(
+            selected = selectedTool is BoardTool.Highlighter,
+            label = stringResource(Res.string.sdui_board_highlighter),
+            icon = Icons.Default.FormatPaint,
+            onSelect = { onSelectTool(BoardTool.Highlighter(), "highlighter") }
+        ),
+        BoardToolChipSpec(
+            selected = selectedTool is BoardTool.Eraser,
+            label = stringResource(Res.string.sdui_board_eraser),
+            icon = Icons.Default.AutoFixHigh,
+            accentColor = errorColor,
+            onSelect = { onSelectTool(BoardTool.Eraser(), "eraser") }
+        )
+    )
+
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = MaterialTheme.colorScheme.surfaceContainer,
         tonalElevation = ToolkitTheme.dimensions.cardElevation
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = ToolkitTheme.spacing.sm, vertical = ToolkitTheme.spacing.xxs),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
+        CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides Dp.Unspecified) {
             Row(
                 modifier = Modifier
-                    .weight(1f, fill = false)
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.xs),
-                verticalAlignment = Alignment.CenterVertically
+                    .fillMaxWidth()
+                    .padding(horizontal = ToolkitTheme.spacing.md, vertical = ToolkitTheme.spacing.xs),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.sm)
             ) {
-                FilterChip(
-                    selected = selectedTool is BoardTool.Select,
-                    onClick = { onSelectTool(BoardTool.Select(), "select") },
-                    label = { Text(stringResource(Res.string.sdui_board_select), style = ToolkitTheme.typography.labelSmall) },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.Default.NearMe,
-                            contentDescription = stringResource(Res.string.sdui_board_select),
-                            modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
-                        )
-                    },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = primaryColor.copy(alpha = selectedChipAlpha),
-                        selectedLabelColor = primaryColor
-                    )
-                )
-
-                FilterChip(
-                    selected = selectedTool is BoardTool.Pan,
-                    onClick = { onSelectTool(BoardTool.Pan, "pan") },
-                    label = { Text(stringResource(Res.string.sdui_board_pan), style = ToolkitTheme.typography.labelSmall) },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.Default.OpenWith,
-                            contentDescription = stringResource(Res.string.sdui_board_pan),
-                            modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
-                        )
-                    }
-                )
-
-                FilterChip(
-                    selected = selectedTool is BoardTool.PlaceText,
-                    onClick = { onSelectTool(BoardTool.PlaceText(), "text") },
-                    label = { Text(stringResource(Res.string.sdui_board_text), style = ToolkitTheme.typography.labelSmall) },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.Default.Title,
-                            contentDescription = stringResource(Res.string.sdui_board_text),
-                            modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
-                        )
-                    }
-                )
-
-                FilterChip(
-                    selected = selectedTool is BoardTool.Shape || selectedTool is BoardTool.Rectangle,
-                    onClick = { onSelectTool(BoardTool.Shape(), "shape") },
-                    label = { Text(stringResource(Res.string.sdui_board_shape), style = ToolkitTheme.typography.labelSmall) },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.Default.CropSquare,
-                            contentDescription = stringResource(Res.string.sdui_board_shape),
-                            modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
-                        )
-                    }
-                )
-
-                FilterChip(
-                    selected = selectedTool is BoardTool.Brush,
-                    onClick = { onSelectTool(BoardTool.Brush(), "brush") },
-                    label = { Text(stringResource(Res.string.sdui_board_pen), style = ToolkitTheme.typography.labelSmall) },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.Default.Edit,
-                            contentDescription = stringResource(Res.string.sdui_board_pen),
-                            modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
-                        )
-                    },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = primaryColor.copy(alpha = selectedChipAlpha),
-                        selectedLabelColor = primaryColor
-                    )
-                )
-
-                FilterChip(
-                    selected = selectedTool is BoardTool.Highlighter,
-                    onClick = { onSelectTool(BoardTool.Highlighter(), "highlighter") },
-                    label = { Text(stringResource(Res.string.sdui_board_highlighter), style = ToolkitTheme.typography.labelSmall) },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.Default.FormatPaint,
-                            contentDescription = stringResource(Res.string.sdui_board_highlighter),
-                            modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
-                        )
-                    }
-                )
-
-                FilterChip(
-                    selected = selectedTool is BoardTool.Eraser,
-                    onClick = { onSelectTool(BoardTool.Eraser(), "eraser") },
-                    label = { Text(stringResource(Res.string.sdui_board_eraser), style = ToolkitTheme.typography.labelSmall) },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.Default.AutoFixHigh,
-                            contentDescription = stringResource(Res.string.sdui_board_eraser),
-                            modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
-                        )
-                    },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = errorColor.copy(alpha = selectedChipAlpha),
-                        selectedLabelColor = errorColor
-                    )
-                )
-            }
-
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.xxs),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                if (hasSelection) {
-                    IconButton(
-                        onClick = onDeleteSelected,
-                        modifier = Modifier.size(ToolkitTheme.dimensions.standardButtonHeight)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Delete,
-                            contentDescription = stringResource(Res.string.sdui_board_delete),
-                            modifier = Modifier.size(ToolkitTheme.dimensions.iconMediumSmall),
-                            tint = errorColor
+                Row(
+                    modifier = Modifier
+                        .weight(1f)
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.sm),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    toolSpecs.forEach { spec ->
+                        val chipColors = if (spec.accentColor != null) {
+                            FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = spec.accentColor.copy(alpha = selectedChipAlpha),
+                                selectedLabelColor = spec.accentColor,
+                                selectedLeadingIconColor = spec.accentColor
+                            )
+                        } else {
+                            FilterChipDefaults.filterChipColors()
+                        }
+                        FilterChip(
+                            selected = spec.selected,
+                            onClick = spec.onSelect,
+                            shape = ToolkitTheme.shapes.small,
+                            modifier = Modifier.pointerHoverIcon(PointerIcon.Hand),
+                            label = {
+                                Text(
+                                    text = spec.label,
+                                    style = ToolkitTheme.typography.labelMedium,
+                                    maxLines = 1,
+                                    softWrap = false
+                                )
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = spec.icon,
+                                    contentDescription = spec.label,
+                                    modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
+                                )
+                            },
+                            colors = chipColors
                         )
                     }
                 }
 
-                IconButton(
-                    onClick = onUndo,
-                    modifier = Modifier.size(ToolkitTheme.dimensions.standardButtonHeight)
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.xs),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.Undo,
-                        contentDescription = stringResource(Res.string.sdui_board_undo),
-                        modifier = Modifier.size(ToolkitTheme.dimensions.iconMediumSmall)
+                    if (hasSelection) {
+                        BoardCompactIconButton(
+                            icon = Icons.Default.Delete,
+                            label = stringResource(Res.string.sdui_board_delete),
+                            tint = errorColor,
+                            onClick = onDeleteSelected
+                        )
+                    }
+                    BoardCompactIconButton(
+                        icon = Icons.AutoMirrored.Filled.Undo,
+                        label = stringResource(Res.string.sdui_board_undo),
+                        onClick = onUndo
                     )
-                }
-
-                IconButton(
-                    onClick = onRedo,
-                    modifier = Modifier.size(ToolkitTheme.dimensions.standardButtonHeight)
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.Redo,
-                        contentDescription = stringResource(Res.string.sdui_board_redo),
-                        modifier = Modifier.size(ToolkitTheme.dimensions.iconMediumSmall)
+                    BoardCompactIconButton(
+                        icon = Icons.AutoMirrored.Filled.Redo,
+                        label = stringResource(Res.string.sdui_board_redo),
+                        onClick = onRedo
                     )
-                }
-
-                IconButton(
-                    onClick = onClear,
-                    modifier = Modifier.size(ToolkitTheme.dimensions.standardButtonHeight)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Clear,
-                        contentDescription = stringResource(Res.string.sdui_board_clear),
-                        modifier = Modifier.size(ToolkitTheme.dimensions.iconMediumSmall),
-                        tint = errorColor
+                    BoardCompactIconButton(
+                        icon = Icons.Default.Clear,
+                        label = stringResource(Res.string.sdui_board_clear),
+                        tint = errorColor,
+                        onClick = onClear
                     )
                 }
             }
@@ -1248,47 +1253,47 @@ private fun BoardZoomControlsPill(
     Surface(
         modifier = modifier,
         shape = ToolkitTheme.shapes.pill,
-        color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = ToolkitTheme.opacity.almostOpaque),
-        tonalElevation = ToolkitTheme.dimensions.menuElevation
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        tonalElevation = ToolkitTheme.dimensions.menuElevation,
+        border = BorderStroke(
+            ToolkitTheme.dimensions.borderUnselected,
+            MaterialTheme.colorScheme.outlineVariant.copy(alpha = ToolkitTheme.opacity.divider)
+        )
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = ToolkitTheme.spacing.xs, vertical = ToolkitTheme.spacing.xxs),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.xxs)
-        ) {
-            IconButton(
-                onClick = onZoomOut,
-                modifier = Modifier.size(ToolkitTheme.dimensions.textFieldHeightCompact)
+        CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides Dp.Unspecified) {
+            Row(
+                modifier = Modifier.padding(
+                    horizontal = ToolkitTheme.spacing.sm,
+                    vertical = ToolkitTheme.spacing.xxs
+                ),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.xs)
             ) {
-                Icon(
-                    imageVector = Icons.Default.Remove,
-                    contentDescription = stringResource(Res.string.sdui_board_zoom_out),
-                    modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
+                BoardCompactIconButton(
+                    icon = Icons.Default.Remove,
+                    label = stringResource(Res.string.sdui_board_zoom_out),
+                    onClick = onZoomOut,
+                    buttonSize = ToolkitTheme.dimensions.textFieldHeightCompact,
+                    iconSize = ToolkitTheme.dimensions.iconSmall
                 )
-            }
-            Text(
-                text = "${(scale * PERCENT_MULTIPLIER).roundToInt()}%",
-                style = ToolkitTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            IconButton(
-                onClick = onZoomIn,
-                modifier = Modifier.size(ToolkitTheme.dimensions.textFieldHeightCompact)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = stringResource(Res.string.sdui_board_zoom_in),
-                    modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
+                Text(
+                    text = "${(scale * PERCENT_MULTIPLIER).roundToInt()}%",
+                    style = ToolkitTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
-            }
-            IconButton(
-                onClick = onReset,
-                modifier = Modifier.size(ToolkitTheme.dimensions.textFieldHeightCompact)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.CenterFocusStrong,
-                    contentDescription = stringResource(Res.string.sdui_board_zoom_reset),
-                    modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
+                BoardCompactIconButton(
+                    icon = Icons.Default.Add,
+                    label = stringResource(Res.string.sdui_board_zoom_in),
+                    onClick = onZoomIn,
+                    buttonSize = ToolkitTheme.dimensions.textFieldHeightCompact,
+                    iconSize = ToolkitTheme.dimensions.iconSmall
+                )
+                BoardCompactIconButton(
+                    icon = Icons.Default.CenterFocusStrong,
+                    label = stringResource(Res.string.sdui_board_zoom_reset),
+                    onClick = onReset,
+                    buttonSize = ToolkitTheme.dimensions.textFieldHeightCompact,
+                    iconSize = ToolkitTheme.dimensions.iconSmall
                 )
             }
         }
@@ -1586,20 +1591,21 @@ private fun SpatialComponentLayerCard(
     val wDp = boardWidthDp * size.width
     val hDp = boardHeightDp * size.height
 
+    val componentShape = ToolkitTheme.shapes.large
     Surface(
         modifier = Modifier
             .offset(x = xDp, y = yDp)
             .width(wDp)
             .height(hDp)
-            .clip(ToolkitTheme.shapes.medium)
+            .clip(componentShape)
             .border(
                 width = if (isSelected) ToolkitTheme.dimensions.progressIndicatorStroke else ToolkitTheme.dimensions.borderUnselected,
-                color = if (isSelected) primaryColor else outlineVariant,
-                shape = ToolkitTheme.shapes.medium
+                color = if (isSelected) primaryColor else outlineVariant.copy(alpha = ToolkitTheme.opacity.divider),
+                shape = componentShape
             ),
         color = MaterialTheme.colorScheme.surfaceContainer,
         tonalElevation = ToolkitTheme.dimensions.cardElevation,
-        shape = ToolkitTheme.shapes.medium
+        shape = componentShape
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             Column(modifier = Modifier.fillMaxSize()) {
@@ -1623,25 +1629,27 @@ private fun SpatialComponentLayerCard(
                             )
                             .then(
                                 if (canInteractWithBoard && layer.draggable) {
-                                    Modifier.pointerInput(layer.id) {
-                                        detectDragGestures(
-                                            onDragStart = {
-                                                onSelect()
-                                                onDragStart()
-                                            },
-                                            onDrag = { change, dragAmount ->
-                                                change.consume()
-                                                onDrag(dragAmount)
-                                            },
-                                            onDragEnd = { onDragEnd() },
-                                            onDragCancel = { onDragEnd() }
-                                        )
-                                    }
+                                    Modifier
+                                        .pointerHoverIcon(PointerIcon.Hand)
+                                        .pointerInput(layer.id) {
+                                            detectDragGestures(
+                                                onDragStart = {
+                                                    onSelect()
+                                                    onDragStart()
+                                                },
+                                                onDrag = { change, dragAmount ->
+                                                    change.consume()
+                                                    onDrag(dragAmount)
+                                                },
+                                                onDragEnd = { onDragEnd() },
+                                                onDragCancel = { onDragEnd() }
+                                            )
+                                        }
                                 } else {
                                     Modifier
                                 }
                             )
-                            .padding(horizontal = ToolkitTheme.spacing.xs, vertical = ToolkitTheme.spacing.xxs),
+                            .padding(horizontal = ToolkitTheme.spacing.sm, vertical = ToolkitTheme.spacing.xxs),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
@@ -1654,7 +1662,9 @@ private fun SpatialComponentLayerCard(
                         Text(
                             text = layer.id,
                             style = ToolkitTheme.typography.labelSmall,
-                            color = if (isSelected) primaryColor else MaterialTheme.colorScheme.onSurfaceVariant
+                            color = if (isSelected) primaryColor else MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 }
@@ -1664,13 +1674,15 @@ private fun SpatialComponentLayerCard(
                         .fillMaxWidth()
                         .weight(1f)
                         .clipToBounds()
-                        .padding(ToolkitTheme.spacing.xs)
+                        .padding(ToolkitTheme.spacing.sm)
                 ) {
-                    SafeUiNodeRenderer(
-                        node = layer.content,
-                        onEvent = onEvent,
-                        modifier = Modifier.fillMaxSize()
-                    )
+                    CompositionLocalProvider(LocalInCompactSduiSurface provides true) {
+                        SafeUiNodeRenderer(
+                            node = layer.content,
+                            onEvent = onEvent,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
                 }
             }
 

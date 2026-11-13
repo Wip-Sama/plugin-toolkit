@@ -595,6 +595,10 @@ class CompleteExampleTest {
         assertEquals(1, scaffold.floatingPanels.size)
         assertEquals("controlsPanel", scaffold.floatingPanels.first().id)
         assertEquals(FloatingAnchor.TOP_END, scaffold.floatingPanels.first().anchor)
+        assertTrue(
+            scaffold.floatingPanels.first().isCollapsed,
+            "Board controls floating panel must start collapsed on startup so it does not cover the workspace"
+        )
         assertNotNull(scaffold.rightSidebar, "Compositor must expose layer inspector rightSidebar")
         assertNotNull(scaffold.topBar, "Compositor must expose topBar actions")
 
