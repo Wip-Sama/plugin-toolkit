@@ -1,27 +1,61 @@
 package org.wip.complete
 
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import org.wip.plugintoolkit.api.CapabilityContext
 import org.wip.plugintoolkit.api.ExecutionFileSystem
 import org.wip.plugintoolkit.api.ExecutionResult
 import org.wip.plugintoolkit.api.HostFileSystem
+import org.wip.plugintoolkit.api.PluginAction
 import org.wip.plugintoolkit.api.PluginContext
+import org.wip.plugintoolkit.api.PluginEntry
 import org.wip.plugintoolkit.api.PluginFileSystem
 import org.wip.plugintoolkit.api.PluginLogger
+import org.wip.plugintoolkit.api.PluginRequest
+import org.wip.plugintoolkit.api.PluginResponse
 import org.wip.plugintoolkit.api.PluginSignal
 import org.wip.plugintoolkit.api.PluginSignalManager
 import org.wip.plugintoolkit.api.PluginStorage
+import org.wip.plugintoolkit.api.ProgressData
 import org.wip.plugintoolkit.api.ProgressReporter
+import org.wip.plugintoolkit.api.RelativePath
+import org.wip.plugintoolkit.api.sdui.BoardLayer
+import org.wip.plugintoolkit.api.sdui.BoardNode
+import org.wip.plugintoolkit.api.sdui.BoardTool
+import org.wip.plugintoolkit.api.sdui.CapabilityJobSnapshot
+import org.wip.plugintoolkit.api.sdui.CapabilityJobStatus
+import org.wip.plugintoolkit.api.sdui.ColumnNode
+import org.wip.plugintoolkit.api.sdui.DialogNode
+import org.wip.plugintoolkit.api.sdui.FloatingAnchor
+import org.wip.plugintoolkit.api.sdui.NormalizedPoint
+import org.wip.plugintoolkit.api.sdui.ScaffoldNode
+import org.wip.plugintoolkit.api.sdui.SemanticColor
+import org.wip.plugintoolkit.api.sdui.SplitPaneNode
+import org.wip.plugintoolkit.api.sdui.TabsNode
+import org.wip.plugintoolkit.api.sdui.UiEvent
+import org.wip.plugintoolkit.api.sdui.UiNode
+import org.wip.plugintoolkit.api.sdui.UiNodeTree
+import org.wip.plugintoolkit.api.sdui.UiSessionContext
+import org.wip.plugintoolkit.api.sdui.VectorPathData
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -36,9 +70,28 @@ class CompleteExampleTest {
         override fun error(message: String, throwable: Throwable?) { logs.add("ERROR: $message") }
     }
 
-    private class FakeProgressReporter : ProgressReporter {
+    private class FakeProgressReporter(
+        private val onPrimary: (ProgressData) -> Unit = {},
+        private val onSecondary: (ProgressData?) -> Unit = {}
+    ) : ProgressReporter {
         var lastProgress: Float = 0f
-        override fun report(progress: Float) { lastProgress = progress }
+        override fun report(progress: Float) {
+            lastProgress = progress
+            onPrimary(ProgressData.percentage(progress))
+        }
+        override fun report(data: ProgressData) {
+            data.fraction?.let { lastProgress = it }
+            onPrimary(data)
+        }
+        override fun reportSecondary(progress: Float) {
+            onSecondary(ProgressData.percentage(progress))
+        }
+        override fun reportSecondary(data: ProgressData) {
+            onSecondary(data)
+        }
+        override fun clearSecondary() {
+            onSecondary(null)
+        }
     }
 
     private class FakePluginSignalManager : PluginSignalManager {
@@ -55,18 +108,41 @@ class CompleteExampleTest {
         override suspend fun remove(key: String) { data.remove(key) }
     }
 
+    private class FakePluginFileSystem : PluginFileSystem {
+        val files = mutableMapOf<String, ByteArray>()
+        override suspend fun readFile(relativePath: RelativePath): ByteArray? = files[relativePath.value]
+        override suspend fun readTextFile(relativePath: RelativePath): String? = files[relativePath.value]?.decodeToString()
+        override suspend fun writeFile(relativePath: RelativePath, data: ByteArray): Result<Unit> {
+            files[relativePath.value] = data
+            return Result.success(Unit)
+        }
+        override suspend fun writeTextFile(relativePath: RelativePath, text: String): Result<Unit> {
+            files[relativePath.value] = text.encodeToByteArray()
+            return Result.success(Unit)
+        }
+        override suspend fun exists(relativePath: RelativePath): Boolean = relativePath.value in files
+        override suspend fun listFiles(relativePath: RelativePath): List<String> = files.keys.filter { it.startsWith(relativePath.value) }
+        override suspend fun deleteFile(relativePath: RelativePath): Result<Unit> {
+            files.remove(relativePath.value)
+            return Result.success(Unit)
+        }
+        override fun getBasePath(): String = "/virtual-plugin"
+        override suspend fun extractResource(resourcePath: String, targetRelativePath: RelativePath): Result<Unit> = Result.success(Unit)
+    }
+
     private class TestPluginContext(
         override val logger: PluginLogger = FakePluginLogger(),
         override val progress: ProgressReporter = FakeProgressReporter(),
         override val signals: PluginSignalManager = FakePluginSignalManager(),
         override val storage: PluginStorage = FakePluginStorage(),
-        initialSettings: Map<String, JsonElement> = emptyMap()
+        override val fileSystem: PluginFileSystem = FakePluginFileSystem(),
+        initialSettings: Map<String, JsonElement> = emptyMap(),
+        private val onSettingsMutated: (Map<String, JsonElement>) -> Unit = {}
     ) : PluginContext {
         val updatedSettings = mutableMapOf<String, JsonElement>().apply { putAll(initialSettings) }
         override val settings: Map<String, JsonElement> get() = updatedSettings
 
-        override val fileSystem: PluginFileSystem get() = throw UnsupportedOperationException()
-        override val cacheFileSystem: PluginFileSystem get() = throw UnsupportedOperationException()
+        override val cacheFileSystem: PluginFileSystem get() = fileSystem
         override val executionFileSystem: ExecutionFileSystem get() = throw UnsupportedOperationException()
         override val hostFileSystem: HostFileSystem get() = throw UnsupportedOperationException()
 
@@ -74,7 +150,145 @@ class CompleteExampleTest {
 
         override suspend fun updateSetting(key: String, value: JsonElement) {
             updatedSettings[key] = value
+            onSettingsMutated(updatedSettings.toMap())
         }
+    }
+
+    private class TestWiredSessionContext(
+        override val capabilityName: String,
+        private val entry: PluginEntry,
+        private val scope: CoroutineScope,
+        private val baseContext: TestPluginContext,
+        private val settingsState: MutableStateFlow<Map<String, JsonElement>>,
+        private val locksState: MutableStateFlow<Map<String, Boolean>> = MutableStateFlow(emptyMap())
+    ) : UiSessionContext, PluginContext by baseContext {
+        private val jobsState = MutableStateFlow<List<CapabilityJobSnapshot>>(emptyList())
+        private var jobCounter = 0
+
+        override val sessionId: String = "test_session_$capabilityName"
+        override val settingsFlow: StateFlow<Map<String, JsonElement>> = settingsState.asStateFlow()
+        override val locksFlow: StateFlow<Map<String, Boolean>> = locksState.asStateFlow()
+        override val capabilityJobs: StateFlow<List<CapabilityJobSnapshot>> = jobsState.asStateFlow()
+
+        override fun completeSession(response: PluginResponse) {}
+        override fun cancelSession(reason: String) {}
+
+        override suspend fun updateSetting(key: String, value: JsonElement) {
+            baseContext.updateSetting(key, value)
+            settingsState.value = baseContext.settings.toMap()
+        }
+
+        override suspend fun launchCapability(
+            capabilityName: String,
+            parameters: Map<String, JsonElement>,
+            runInBackgroundQueue: Boolean
+        ): String {
+            val id = "job_${++jobCounter}"
+            jobsState.update { it + CapabilityJobSnapshot(id, capabilityName, CapabilityJobStatus.RUNNING) }
+            scope.launch {
+                runJob(id, capabilityName, parameters)
+            }
+            return id
+        }
+
+        override suspend fun executeCapability(
+            capabilityName: String,
+            parameters: Map<String, JsonElement>
+        ): ExecutionResult {
+            val id = "job_${++jobCounter}"
+            jobsState.update { it + CapabilityJobSnapshot(id, capabilityName, CapabilityJobStatus.RUNNING) }
+            return runJob(id, capabilityName, parameters)
+        }
+
+        override suspend fun launchAction(
+            actionName: String,
+            parameters: Map<String, JsonElement>
+        ): Result<Unit> {
+            val proc = entry.getProcessor().getOrThrow()
+            val actionMeta = entry.getManifest().getOrThrow().actions.find {
+                it.functionName.equals(actionName, ignoreCase = true)
+            } ?: PluginAction(name = actionName, description = actionName, functionName = actionName)
+            val result = proc.runAction(actionMeta, parameters, this)
+            settingsState.value = baseContext.settings.toMap()
+            locksState.value = proc.refreshLocks(this)
+            return result
+        }
+
+        private suspend fun runJob(
+            jobId: String,
+            capabilityName: String,
+            parameters: Map<String, JsonElement>
+        ): ExecutionResult {
+            val proc = entry.getProcessor().getOrThrow()
+            val jobContext = object : PluginContext by this {
+                override val progress: ProgressReporter = FakeProgressReporter(
+                    onPrimary = { data ->
+                        jobsState.update { list ->
+                            list.map { if (it.jobId == jobId) it.copy(primaryProgress = data) else it }
+                        }
+                    },
+                    onSecondary = { data ->
+                        jobsState.update { list ->
+                            list.map { if (it.jobId == jobId) it.copy(secondaryProgress = data) else it }
+                        }
+                    }
+                )
+            }
+            val result = proc.process(PluginRequest(method = capabilityName, parameters = parameters), jobContext)
+            val status = when (result) {
+                is ExecutionResult.Success -> CapabilityJobStatus.COMPLETED
+                is ExecutionResult.Paused -> CapabilityJobStatus.PAUSED
+                is ExecutionResult.Error -> CapabilityJobStatus.FAILED
+            }
+            jobsState.update { list ->
+                list.map {
+                    if (it.jobId == jobId) {
+                        it.copy(
+                            status = status,
+                            result = result,
+                            errorMessage = (result as? ExecutionResult.Error)?.message
+                        )
+                    } else it
+                }
+            }
+            return result
+        }
+    }
+
+    private fun collectNodes(node: UiNode): List<UiNode> {
+        val result = mutableListOf(node)
+        when (node) {
+            is ColumnNode -> node.children.forEach { result.addAll(collectNodes(it)) }
+            is org.wip.plugintoolkit.api.sdui.RowNode -> node.children.forEach { result.addAll(collectNodes(it)) }
+            is org.wip.plugintoolkit.api.sdui.BoxNode -> node.children.forEach { result.addAll(collectNodes(it)) }
+            is org.wip.plugintoolkit.api.sdui.CardNode -> node.children.forEach { result.addAll(collectNodes(it)) }
+            is org.wip.plugintoolkit.api.sdui.ScrollableColumnNode -> node.children.forEach { result.addAll(collectNodes(it)) }
+            is org.wip.plugintoolkit.api.sdui.ScrollableRowNode -> node.children.forEach { result.addAll(collectNodes(it)) }
+            is org.wip.plugintoolkit.api.sdui.SidebarNode -> node.children.forEach { result.addAll(collectNodes(it)) }
+            is org.wip.plugintoolkit.api.sdui.FloatingPanelNode -> node.children.forEach { result.addAll(collectNodes(it)) }
+            is DialogNode -> node.children.forEach { result.addAll(collectNodes(it)) }
+            is org.wip.plugintoolkit.api.sdui.ListItemNode -> node.trailingContent.forEach { result.addAll(collectNodes(it)) }
+            is SplitPaneNode -> {
+                result.addAll(collectNodes(node.first))
+                result.addAll(collectNodes(node.second))
+            }
+            is TabsNode -> result.addAll(collectNodes(node.content))
+            is ScaffoldNode -> {
+                node.topBar?.let { result.addAll(collectNodes(it)) }
+                node.bottomBar?.let { result.addAll(collectNodes(it)) }
+                node.leftSidebar?.let { result.addAll(collectNodes(it)) }
+                node.rightSidebar?.let { result.addAll(collectNodes(it)) }
+                result.addAll(collectNodes(node.content))
+                node.floatingPanels.forEach { result.addAll(collectNodes(it)) }
+            }
+            is BoardNode -> {
+                node.layers.filterIsInstance<BoardLayer.ComponentLayer>().forEach { layer ->
+                    result.addAll(collectNodes(layer.content))
+                }
+            }
+            else -> Unit
+        }
+        return result
     }
 
     @Test
@@ -334,94 +548,258 @@ class CompleteExampleTest {
 
     @Test
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
-    fun testInteractiveUiProcessorSessionLifecycle() = runTest {
+    fun testInteractiveBoardCompositorSessionLifecycleAndExport() = runTest {
         val settings = CompleteExampleSettings()
         val plugin = CompleteExamplePlugin(settings)
         val entry = CompleteExamplePluginPluginEntry(plugin)
 
         val interactiveProcessor = entry.getInteractiveProcessor()?.getOrNull()
-        assertTrue(interactiveProcessor != null, "InteractiveUiProcessor must be non-null in generated entry")
+        assertNotNull(interactiveProcessor, "InteractiveUiProcessor must be non-null in generated entry")
 
-        val eventsFlow = kotlinx.coroutines.flow.MutableSharedFlow<org.wip.plugintoolkit.api.sdui.UiEvent>()
-        val emittedTrees = mutableListOf<org.wip.plugintoolkit.api.sdui.UiNodeTree>()
+        val eventsFlow = MutableSharedFlow<UiEvent>()
+        val emittedTrees = mutableListOf<UiNodeTree>()
+        val fakeFs = FakePluginFileSystem()
+        val testContext = TestPluginContext(fileSystem = fakeFs)
+        val settingsState = MutableStateFlow<Map<String, JsonElement>>(emptyMap())
 
-        val testContext = TestPluginContext()
-        val sessionContext = object : org.wip.plugintoolkit.api.sdui.UiSessionContext, org.wip.plugintoolkit.api.PluginContext by testContext {
-            override fun completeSession(response: org.wip.plugintoolkit.api.PluginResponse) {}
-            override fun cancelSession(reason: String) {}
-        }
+        val collectScope = kotlinx.coroutines.CoroutineScope(coroutineContext)
+        val sessionContext = TestWiredSessionContext(
+            capabilityName = "interactiveBoardCompositor",
+            entry = entry,
+            scope = collectScope,
+            baseContext = testContext,
+            settingsState = settingsState
+        )
 
         val job = launch {
-            interactiveProcessor.openUiSession(sessionContext, eventsFlow).collect {
-                emittedTrees.add(it)
+            interactiveProcessor.openUiSession(sessionContext, eventsFlow).collect { tree ->
+                emittedTrees.add(tree)
             }
         }
-        advanceUntilIdle()
+        try {
+            advanceUntilIdle()
 
-        // Verify initial tree emitted
-        assertEquals(1, emittedTrees.size)
-        val initialTree = emittedTrees.first()
-        assertTrue(initialTree.root is org.wip.plugintoolkit.api.sdui.ScaffoldNode)
-        val scaffold = initialTree.root as org.wip.plugintoolkit.api.sdui.ScaffoldNode
-        assertTrue(scaffold.content is org.wip.plugintoolkit.api.sdui.BoardNode)
+        assertTrue(emittedTrees.isNotEmpty(), "Expected initial compositor tree")
+        val initialTree = emittedTrees.last()
+        val serializedTree = Json.encodeToString(UiNodeTree.serializer(), initialTree)
+        val roundTripped = Json.decodeFromString(UiNodeTree.serializer(), serializedTree)
+        assertTrue(roundTripped.root is ScaffoldNode)
+
+        val scaffold = initialTree.root as ScaffoldNode
+        val board = scaffold.content as BoardNode
+        assertNotNull(board.backgroundAsset, "Storyboard page backgroundAsset must be generated")
+        assertTrue(board.layers.any { it is BoardLayer.ImageLayer && it.id == "stamp_img_1" })
+        assertTrue(board.layers.any { it is BoardLayer.TextLayer && it.id == "text_1" })
+        assertTrue(board.layers.any { it is BoardLayer.ShapeLayer && it.id == "callout_1" })
+        assertTrue(board.layers.any { it is BoardLayer.ComponentLayer && it.id == "inspector_widget" })
         assertEquals(1, scaffold.floatingPanels.size)
         assertEquals("controlsPanel", scaffold.floatingPanels.first().id)
-        assertEquals(org.wip.plugintoolkit.api.sdui.FloatingAnchor.TOP_END, scaffold.floatingPanels.first().anchor)
+        assertEquals(FloatingAnchor.TOP_END, scaffold.floatingPanels.first().anchor)
+        assertNotNull(scaffold.rightSidebar, "Compositor must expose layer inspector rightSidebar")
+        assertNotNull(scaffold.topBar, "Compositor must expose topBar actions")
 
-        // Dispatch text change
-        eventsFlow.emit(org.wip.plugintoolkit.api.sdui.UiEvent.TextChanged("titleInput", "New Custom Canvas Title"))
+        // Assert globally unique node IDs inside the compositor tree
+        val allIds = collectNodes(initialTree.root).map { it.id }
+        assertEquals(allIds.size, allIds.toSet().size, "All node IDs in compositor tree must be unique")
+
+        // Inline text edit on TextLayer + layer move + title change
+        eventsFlow.emit(UiEvent.BoardTextEdited("drawingBoard", "text_1", "Updated Dialogue Caption"))
+        eventsFlow.emit(UiEvent.BoardLayerMoved("drawingBoard", "text_1", NormalizedPoint(0.25f, 0.45f)))
+        eventsFlow.emit(UiEvent.TextChanged("titleInput", "Chapter 42 — Reviewed"))
         advanceUntilIdle()
-        assertEquals(2, emittedTrees.size)
 
-        // Dispatch button tap
-        eventsFlow.emit(org.wip.plugintoolkit.api.sdui.UiEvent.Click("counterBtn"))
-        advanceUntilIdle()
-        assertEquals(3, emittedTrees.size)
+        val editedBoard = (emittedTrees.last().root as ScaffoldNode).content as BoardNode
+        val editedTextLayer = editedBoard.layers.filterIsInstance<BoardLayer.TextLayer>().first { it.id == "text_1" }
+        assertEquals("Updated Dialogue Caption", editedTextLayer.text)
+        assertEquals(NormalizedPoint(0.25f, 0.45f), editedTextLayer.position)
 
-        // Dispatch path committed
-        val testPath = org.wip.plugintoolkit.api.sdui.VectorPathData(
+        // Dispatch path committed, tool change, color change
+        val testPath = VectorPathData(
             strokeId = "test_stroke",
-            points = listOf(
-                org.wip.plugintoolkit.api.sdui.NormalizedPoint(0.1f, 0.1f),
-                org.wip.plugintoolkit.api.sdui.NormalizedPoint(0.5f, 0.5f)
-            ),
-            color = org.wip.plugintoolkit.api.sdui.SemanticColor.PRIMARY,
+            points = listOf(NormalizedPoint(0.1f, 0.1f), NormalizedPoint(0.5f, 0.5f)),
+            color = SemanticColor.PRIMARY,
             strokeWidth = 4f
         )
-        eventsFlow.emit(org.wip.plugintoolkit.api.sdui.UiEvent.PathCommitted("drawingBoard", testPath))
+        eventsFlow.emit(UiEvent.PathCommitted("drawingBoard", testPath))
+        eventsFlow.emit(UiEvent.OptionSelected("toolDropdown", "HIGHLIGHTER"))
+        eventsFlow.emit(UiEvent.OptionSelected("colorDropdown", "HIGHLIGHT"))
         advanceUntilIdle()
-        assertEquals(4, emittedTrees.size)
 
-        // Dispatch tool change
-        eventsFlow.emit(org.wip.plugintoolkit.api.sdui.UiEvent.OptionSelected("toolDropdown", "HIGHLIGHTER"))
+        val colorBoard = (emittedTrees.last().root as ScaffoldNode).content as BoardNode
+        assertTrue(colorBoard.layers.any { it is BoardLayer.PathLayer })
+        assertTrue(colorBoard.activeTool is BoardTool.Highlighter)
+        assertEquals(SemanticColor.HIGHLIGHT, (colorBoard.activeTool as BoardTool.Highlighter).color)
+
+        // Trigger renderCompositedPage export capability from the UI
+        eventsFlow.emit(UiEvent.Click("saveRenderBtn", "export_page"))
         advanceUntilIdle()
-        assertEquals(5, emittedTrees.size)
-        val highlighterTree = emittedTrees.last()
-        val highlighterBoard = (highlighterTree.root as org.wip.plugintoolkit.api.sdui.ScaffoldNode).content as org.wip.plugintoolkit.api.sdui.BoardNode
-        assertTrue(highlighterBoard.activeTool is org.wip.plugintoolkit.api.sdui.BoardTool.Highlighter)
 
-        // Dispatch color change
-        eventsFlow.emit(org.wip.plugintoolkit.api.sdui.UiEvent.OptionSelected("colorDropdown", "HIGHLIGHT"))
+        assertTrue(
+            sessionContext.capabilityJobs.value.any {
+                it.capabilityName == "renderCompositedPage" && it.status == CapabilityJobStatus.COMPLETED
+            },
+            "Expected renderCompositedPage job to complete"
+        )
+        assertTrue(fakeFs.files.containsKey(CompleteExampleSampleAssets.EXPORT_IMAGE_PATH))
+        assertTrue(fakeFs.files.containsKey(CompleteExampleSampleAssets.EXPORT_REPORT_PATH))
+        } finally {
+            job.cancel()
+        }
+    }
+
+    @Test
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    fun testInteractiveChapterPublisherSessionAndCapabilityBridge() = runTest {
+        val settings = CompleteExampleSettings(userId = "manhwa_lead")
+        val plugin = CompleteExamplePlugin(settings)
+        val entry = CompleteExamplePluginPluginEntry(plugin)
+        val interactiveProcessor = entry.getInteractiveProcessor()?.getOrNull()
+        assertNotNull(interactiveProcessor)
+
+        val eventsFlow = MutableSharedFlow<UiEvent>()
+        val emittedTrees = mutableListOf<UiNodeTree>()
+        val fakeFs = FakePluginFileSystem()
+        val settingsState = MutableStateFlow<Map<String, JsonElement>>(
+            mapOf(
+                "userId" to JsonPrimitive("manhwa_lead"),
+                "apiKey" to JsonPrimitive("")
+            )
+        )
+        val testContext = TestPluginContext(
+            fileSystem = fakeFs,
+            initialSettings = settingsState.value
+        ) { updated -> settingsState.value = updated }
+
+        val locksState = MutableStateFlow(mapOf("feature_unlocked" to false))
+        val sessionScope = kotlinx.coroutines.CoroutineScope(coroutineContext)
+        val sessionContext = TestWiredSessionContext(
+            capabilityName = "interactiveChapterPublisher",
+            entry = entry,
+            scope = sessionScope,
+            baseContext = testContext,
+            settingsState = settingsState,
+            locksState = locksState
+        )
+
+        val job = launch {
+            interactiveProcessor.openUiSession(sessionContext, eventsFlow).collect { tree ->
+                emittedTrees.add(tree)
+            }
+        }
+        try {
+            advanceUntilIdle()
+
+        assertTrue(emittedTrees.isNotEmpty(), "Expected initial publisher tree")
+        val initialTree = emittedTrees.last()
+        val roundTripped = Json.decodeFromString(
+            UiNodeTree.serializer(),
+            Json.encodeToString(UiNodeTree.serializer(), initialTree)
+        )
+        assertTrue(roundTripped.root is ScaffoldNode)
+
+        val initialAllIds = collectNodes(initialTree.root).map { it.id }
+        assertEquals(initialAllIds.size, initialAllIds.toSet().size, "Publisher tree node IDs must be unique")
+        assertTrue("pub_row_ch_041" in initialAllIds, "Expected ch_041 in loaded catalog")
+        assertTrue("pub_row_ch_043" in initialAllIds, "Expected remote-only ch_043 in reconciled catalog")
+
+        // Select ch_041 and trigger batch push capability
+        eventsFlow.emit(UiEvent.ToggleChanged("pub_chk_ch_041", true))
+        eventsFlow.emit(UiEvent.Click("pub_push_selected_btn", "push_selected"))
         advanceUntilIdle()
-        assertEquals(6, emittedTrees.size)
-        val colorTree = emittedTrees.last()
-        val colorBoard = (colorTree.root as org.wip.plugintoolkit.api.sdui.ScaffoldNode).content as org.wip.plugintoolkit.api.sdui.BoardNode
-        assertEquals(org.wip.plugintoolkit.api.sdui.SemanticColor.HIGHLIGHT, (colorBoard.activeTool as org.wip.plugintoolkit.api.sdui.BoardTool.Highlighter).color)
 
-        job.cancel()
+        assertTrue(
+            sessionContext.capabilityJobs.value.any {
+                it.capabilityName == "publishChapterBatch" && it.status == CapabilityJobStatus.COMPLETED
+            },
+            "publishChapterBatch capability job should have completed"
+        )
+        val reconciledAfterPush = CompleteExampleCatalogStore.reconcile(
+            CompleteExampleCatalogStore.loadLocalCatalog(testContext.storage),
+            CompleteExampleCatalogStore.loadRemoteCatalog(testContext.storage)
+        )
+        assertEquals(
+            ChapterSyncStatus.PUBLISHED,
+            reconciledAfterPush.first { it.id == "ch_041" }.status
+        )
+
+        // Switch to queue tab and verify job card appears
+        eventsFlow.emit(UiEvent.TabSelected("pub_tabs", "queue"))
+        advanceUntilIdle()
+        val queueNodeIds = collectNodes(emittedTrees.last().root).map { it.id }
+        assertTrue(queueNodeIds.any { it.startsWith("queue_card_") }, "Expected capability job card in queue tab")
+
+        // Switch to settings tab, mutate apiKey & toggle feature lock action
+        eventsFlow.emit(UiEvent.TabSelected("pub_tabs", "settings"))
+        advanceUntilIdle()
+        eventsFlow.emit(UiEvent.TextChanged("cfg_api_key_input", "live_secret_token"))
+        eventsFlow.emit(UiEvent.Click("cfg_toggle_lock_btn", "toggle_feature_lock"))
+        advanceUntilIdle()
+
+        assertEquals("live_secret_token", settingsState.value["apiKey"]?.jsonPrimitive?.content)
+        assertEquals(true, locksState.value["feature_unlocked"])
+        } finally {
+            job.cancel()
+        }
+    }
+
+    @Test
+    fun testPublishChapterBatchPauseAndResume() = runTest {
+        val plugin = CompleteExamplePlugin(CompleteExampleSettings())
+        val signals = FakePluginSignalManager()
+        val context = TestPluginContext(signals = signals)
+
+        val signalJob = launch {
+            delay(30)
+            signals.sendSignal(PluginSignal.PAUSE)
+        }
+
+        val chapterIds = Json.encodeToString(listOf("ch_041", "ch_042"))
+        val pausedResult = plugin.publishChapterBatch(
+            chapterIdsJson = chapterIds,
+            environment = "STAGING",
+            simulatedStepDelayMs = 80L,
+            resumeState = null,
+            context = context
+        )
+        signalJob.join()
+        assertTrue(pausedResult is ExecutionResult.Paused, "Expected Paused result but got $pausedResult")
+
+        val resumedResult = plugin.publishChapterBatch(
+            chapterIdsJson = chapterIds,
+            environment = "STAGING",
+            simulatedStepDelayMs = 5L,
+            resumeState = pausedResult.resumeState,
+            context = context
+        )
+        assertTrue(resumedResult is ExecutionResult.Success, "Expected Success on resume but got $resumedResult")
+        val localAfter = CompleteExampleCatalogStore.loadLocalCatalog(context.storage)
+        assertEquals(ChapterSyncStatus.PUBLISHED, localAfter.first { it.id == "ch_042" }.status)
     }
 
     @Test
     fun testInteractiveToolCapabilityManifestGeneration() {
         val manifest = CompleteExamplePluginManifest.manifest
-        val interactiveCap = manifest.capabilities.find { it.name == "interactiveDrawingAndControls" }
-        assertNotNull(interactiveCap, "interactiveDrawingAndControls capability must exist in manifest")
-        assertTrue(interactiveCap.isInteractive, "Capability must be flagged as interactive")
-        assertEquals(
-            org.wip.plugintoolkit.api.CapabilityContext.INTERACTIVE_ONLY,
-            interactiveCap.context,
-            "Interactive capability must default to INTERACTIVE_ONLY context"
-        )
+
+        val compositorCap = manifest.capabilities.find { it.name == "interactiveBoardCompositor" }
+        assertNotNull(compositorCap, "interactiveBoardCompositor capability must exist in manifest")
+        assertTrue(compositorCap.isInteractive, "interactiveBoardCompositor must be flagged as interactive")
+        assertEquals(CapabilityContext.INTERACTIVE_ONLY, compositorCap.context)
+
+        val publisherCap = manifest.capabilities.find { it.name == "interactiveChapterPublisher" }
+        assertNotNull(publisherCap, "interactiveChapterPublisher capability must exist in manifest")
+        assertTrue(publisherCap.isInteractive, "interactiveChapterPublisher must be flagged as interactive")
+        assertEquals(CapabilityContext.INTERACTIVE_ONLY, publisherCap.context)
+
+        val pushCap = manifest.capabilities.find { it.name == "publishChapterBatch" }
+        assertNotNull(pushCap)
+        assertTrue(pushCap.isPausable, "publishChapterBatch must declare isPausable=true")
+
+        val pullCap = manifest.capabilities.find { it.name == "pullRemoteChapters" }
+        assertNotNull(pullCap)
+        assertTrue(pullCap.isPausable, "pullRemoteChapters must declare isPausable=true")
+
+        assertNotNull(manifest.capabilities.find { it.name == "renderCompositedPage" })
+        assertNotNull(manifest.capabilities.find { it.name == "queryChapterCatalog" })
     }
 }
 

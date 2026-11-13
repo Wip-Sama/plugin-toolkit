@@ -2,9 +2,11 @@ package org.wip.complete
 
 import kotlinx.coroutines.delay
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.coroutines.flow.Flow
@@ -21,24 +23,11 @@ import org.wip.plugintoolkit.api.ProgressData
 import org.wip.plugintoolkit.api.PluginNetworkClient
 import org.wip.plugintoolkit.api.watchProcess
 import org.wip.plugintoolkit.api.ConditionOperator
-import org.wip.plugintoolkit.api.sdui.BoardGridStyle
 import org.wip.plugintoolkit.api.sdui.BoardLayer
-import org.wip.plugintoolkit.api.sdui.BoardShapeType
-import org.wip.plugintoolkit.api.sdui.BoardTool
-import org.wip.plugintoolkit.api.sdui.BoardViewportConfig
-import org.wip.plugintoolkit.api.sdui.FloatingAnchor
 import org.wip.plugintoolkit.api.sdui.InteractiveUiProcessor
-import org.wip.plugintoolkit.api.sdui.NormalizedPoint
-import org.wip.plugintoolkit.api.sdui.NormalizedSize
-import org.wip.plugintoolkit.api.sdui.SemanticColor
-import org.wip.plugintoolkit.api.sdui.SpacingSize
-import org.wip.plugintoolkit.api.sdui.TypographyRole
 import org.wip.plugintoolkit.api.sdui.UiEvent
-import org.wip.plugintoolkit.api.sdui.UiModifier
 import org.wip.plugintoolkit.api.sdui.UiNodeTree
 import org.wip.plugintoolkit.api.sdui.UiSessionContext
-import org.wip.plugintoolkit.api.sdui.uiTree
-import kotlinx.coroutines.flow.channelFlow
 import org.wip.plugintoolkit.api.annotations.Capability
 import org.wip.plugintoolkit.api.annotations.CapabilityContext
 import org.wip.plugintoolkit.api.annotations.CapabilityInput
@@ -557,357 +546,260 @@ class CompleteExamplePlugin(val settings: CompleteExampleSettings) : Interactive
     }
 
     @InteractiveTool(
-        name = "interactiveDrawingAndControls",
-        description = "Interactive SDUI canvas showcasing reactive live controls, form synchronization, and vector drawing."
+        name = "interactiveBoardCompositor",
+        description = "Interactive spatial compositor demo: renders a storyboard image layer, supports inline-editable text, callouts, stamps, vector annotations, and live export capability execution."
     )
-    fun interactiveDrawingAndControls(): String {
-        return "Interactive SDUI session active"
+    fun interactiveBoardCompositor(): String {
+        return "Interactive Spatial Board Compositor active"
+    }
+
+    @InteractiveTool(
+        name = "interactiveChapterPublisher",
+        description = "Non-board complex SDUI workspace: reconciles local & remote chapters, reads live settings/locks, and runs pauseable batch push/pull capabilities."
+    )
+    fun interactiveChapterPublisher(): String {
+        return "Interactive Chapter Publisher active"
+    }
+
+    @Capability(
+        name = "renderCompositedPage",
+        description = "Flattens board layers onto the storyboard page image and exports a composited PNG + metadata summary."
+    )
+    suspend fun renderCompositedPage(
+        @CapabilityParam(description = "Title of the board", defaultValue = "Chapter 42 — Page 01")
+        boardTitle: String = "Chapter 42 — Page 01",
+        @CapabilityParam(description = "Serialized list of BoardLayer entries", defaultValue = "[]")
+        layersJson: String = "[]",
+        context: PluginContext
+    ): ExecutionResult {
+        context.logger.info("Rendering composited page '$boardTitle'...")
+        context.progress.report(ProgressData.percentage(0.15f, "Decoding spatial layers..."))
+        val layers = runCatching {
+            CompleteExampleCatalogStore.json.decodeFromString<List<BoardLayer>>(layersJson)
+        }.getOrDefault(emptyList())
+
+        delay(40)
+        context.progress.report(ProgressData.percentage(0.55f, "Compositing ${layers.size} layer(s) onto page artboard..."))
+        context.progress.reportSecondary(ProgressData.percentage(0.5f, "Encoding PNG raster output"))
+
+        val exportPath = CompleteExampleSampleAssets.exportCompositedPage(
+            context = context,
+            boardTitle = boardTitle,
+            layers = layers
+        )
+
+        delay(40)
+        context.progress.clearSecondary()
+        context.progress.report(ProgressData.percentage(1.0f, "Exported composited page to $exportPath"))
+        return ExecutionResult.Success(
+            PluginResponse(
+                result = JsonPrimitive("Composited ${layers.size} layers into $exportPath"),
+                metadata = mapOf(
+                    "outputImagePath" to exportPath,
+                    "layerCount" to layers.size.toString()
+                )
+            )
+        )
+    }
+
+    @Capability(
+        name = "queryChapterCatalog",
+        description = "Loads local & remote chapter catalogs from storage and reconciles sync status."
+    )
+    suspend fun queryChapterCatalog(
+        @CapabilityParam(description = "Target publishing environment (STAGING or PRODUCTION)", defaultValue = "STAGING")
+        environment: String = "STAGING",
+        context: PluginContext
+    ): ExecutionResult {
+        context.logger.info("Querying chapter catalog for environment=$environment")
+        context.progress.report(ProgressData.percentage(0.3f, "Loading local and remote chapter catalogs..."))
+        val local = CompleteExampleCatalogStore.loadLocalCatalog(context.storage)
+        val remote = CompleteExampleCatalogStore.loadRemoteCatalog(context.storage)
+        val reconciled = CompleteExampleCatalogStore.reconcile(local, remote)
+        val chaptersJson = CompleteExampleCatalogStore.json.encodeToString(reconciled)
+        context.progress.report(ProgressData.percentage(1.0f, "Loaded ${reconciled.size} chapters ($environment)"))
+        return ExecutionResult.Success(
+            PluginResponse(
+                result = JsonPrimitive("Loaded ${reconciled.size} chapters for $environment"),
+                metadata = mapOf(
+                    "chaptersJson" to chaptersJson,
+                    "environment" to environment
+                )
+            )
+        )
+    }
+
+    @Capability(
+        name = "publishChapterBatch",
+        description = "Uploads selected chapters to the remote catalog with live per-chapter progress and pause/resume support.",
+        supportsPause = true,
+        maxConcurrentExecutions = 2
+    )
+    suspend fun publishChapterBatch(
+        @CapabilityParam(description = "JSON array of chapter IDs to push", defaultValue = "[]")
+        chapterIdsJson: String = "[]",
+        @CapabilityParam(description = "Target environment (STAGING or PRODUCTION)", defaultValue = "STAGING")
+        environment: String = "STAGING",
+        @CapabilityParam(description = "Simulated delay per stage in ms", defaultValue = "60")
+        simulatedStepDelayMs: Long = 60L,
+        @ResumeState resumeState: JsonElement?,
+        context: PluginContext
+    ): ExecutionResult = runChapterBatchSync(
+        isPush = true,
+        chapterIdsJson = chapterIdsJson,
+        environment = environment,
+        simulatedStepDelayMs = simulatedStepDelayMs,
+        resumeState = resumeState,
+        context = context
+    )
+
+    @Capability(
+        name = "pullRemoteChapters",
+        description = "Downloads selected remote chapters into the local workspace with live progress and pause/resume support.",
+        supportsPause = true,
+        maxConcurrentExecutions = 2
+    )
+    suspend fun pullRemoteChapters(
+        @CapabilityParam(description = "JSON array of chapter IDs to pull", defaultValue = "[]")
+        chapterIdsJson: String = "[]",
+        @CapabilityParam(description = "Source environment (STAGING or PRODUCTION)", defaultValue = "STAGING")
+        environment: String = "STAGING",
+        @CapabilityParam(description = "Simulated delay per stage in ms", defaultValue = "60")
+        simulatedStepDelayMs: Long = 60L,
+        @ResumeState resumeState: JsonElement?,
+        context: PluginContext
+    ): ExecutionResult = runChapterBatchSync(
+        isPush = false,
+        chapterIdsJson = chapterIdsJson,
+        environment = environment,
+        simulatedStepDelayMs = simulatedStepDelayMs,
+        resumeState = resumeState,
+        context = context
+    )
+
+    private suspend fun runChapterBatchSync(
+        isPush: Boolean,
+        chapterIdsJson: String,
+        environment: String,
+        simulatedStepDelayMs: Long,
+        resumeState: JsonElement?,
+        context: PluginContext
+    ): ExecutionResult {
+        val targetIds = runCatching {
+            CompleteExampleCatalogStore.json.decodeFromString<List<String>>(chapterIdsJson)
+        }.getOrDefault(emptyList())
+        if (targetIds.isEmpty()) {
+            return ExecutionResult.Error(
+                ErrorDetail(message = "No chapter IDs specified for sync.", exceptionType = "EMPTY_SELECTION")
+            )
+        }
+
+        val resumed = resumeState?.let { element ->
+            runCatching {
+                CompleteExampleCatalogStore.json.decodeFromJsonElement(ChapterBatchResumeState.serializer(), element)
+            }.getOrNull()
+        }
+        var currentIndex = resumed?.nextIndex ?: 0
+        val processedIds = (resumed?.processedIds ?: emptyList()).toMutableList()
+        var pauseRequested = false
+
+        context.onSignal { signal ->
+            if (signal == PluginSignal.PAUSE) {
+                pauseRequested = true
+            }
+        }
+
+        val local = CompleteExampleCatalogStore.loadLocalCatalog(context.storage).toMutableList()
+        val remote = CompleteExampleCatalogStore.loadRemoteCatalog(context.storage).toMutableList()
+        val featureUnlocked = context.settings["feature_unlocked"]?.jsonPrimitive?.contentOrNull == "true"
+
+        while (currentIndex < targetIds.size) {
+            if (pauseRequested) {
+                val checkpoint = ChapterBatchResumeState(currentIndex, processedIds.toList())
+                context.logger.info("Batch sync paused at index $currentIndex/${targetIds.size}")
+                return ExecutionResult.Paused(
+                    CompleteExampleCatalogStore.json.encodeToJsonElement(ChapterBatchResumeState.serializer(), checkpoint)
+                )
+            }
+
+            val chId = targetIds[currentIndex]
+            val localItem = local.find { it.id == chId }
+            val remoteItem = remote.find { it.id == chId }
+            val label = if (isPush) "Pushing $chId -> $environment" else "Pulling $chId <- $environment"
+
+            context.progress.report(
+                ProgressData.percentage(
+                    currentIndex.toFloat() / targetIds.size.toFloat(),
+                    "$label (${currentIndex + 1}/${targetIds.size})"
+                )
+            )
+            context.progress.reportSecondary(ProgressData.percentage(0.25f, "Validating manifest for $chId"))
+            delay(simulatedStepDelayMs.coerceAtLeast(1L))
+
+            if (isPush && (localItem?.requiresLock == true) && !featureUnlocked) {
+                context.logger.warn("Blocked push of locked chapter $chId while feature_unlocked=false")
+            } else if (isPush && localItem != null) {
+                val synced = localItem.copy(
+                    remoteRevision = localItem.localRevision,
+                    status = ChapterSyncStatus.PUBLISHED
+                )
+                val lIdx = local.indexOfFirst { it.id == chId }
+                if (lIdx >= 0) local[lIdx] = synced
+                val rIdx = remote.indexOfFirst { it.id == chId }
+                if (rIdx >= 0) remote[rIdx] = synced else remote.add(synced)
+                processedIds.add(chId)
+            } else if (!isPush && remoteItem != null) {
+                val synced = remoteItem.copy(
+                    localRevision = remoteItem.remoteRevision,
+                    status = ChapterSyncStatus.PUBLISHED
+                )
+                val rIdx = remote.indexOfFirst { it.id == chId }
+                if (rIdx >= 0) remote[rIdx] = synced
+                val lIdx = local.indexOfFirst { it.id == chId }
+                if (lIdx >= 0) local[lIdx] = synced else local.add(synced)
+                processedIds.add(chId)
+            }
+
+            context.progress.reportSecondary(ProgressData.percentage(1.0f, "Synced $chId"))
+            delay(simulatedStepDelayMs.coerceAtLeast(1L))
+            currentIndex++
+            context.progress.report(
+                ProgressData.percentage(
+                    currentIndex.toFloat() / targetIds.size.toFloat(),
+                    "Completed $currentIndex/${targetIds.size} chapters"
+                )
+            )
+        }
+
+        context.progress.clearSecondary()
+        CompleteExampleCatalogStore.saveLocalCatalog(context.storage, local)
+        CompleteExampleCatalogStore.saveRemoteCatalog(context.storage, remote)
+        val reconciledJson = CompleteExampleCatalogStore.json.encodeToString(
+            CompleteExampleCatalogStore.reconcile(local, remote)
+        )
+
+        return ExecutionResult.Success(
+            PluginResponse(
+                result = JsonPrimitive("${if (isPush) "Published" else "Pulled"} ${processedIds.size} chapter(s) in $environment"),
+                metadata = mapOf(
+                    "chaptersJson" to reconciledJson,
+                    "processedCount" to processedIds.size.toString()
+                )
+            )
+        )
     }
 
     override fun openUiSession(
         context: UiSessionContext,
         events: Flow<UiEvent>
-    ): Flow<UiNodeTree> = channelFlow {
-        var canvasTitle = "Interactive Spatial Board"
-        var brushWidth = 4.0
-        var snapToGrid = false
-        var brushColor = SemanticColor.PRIMARY
-        var activeToolType = "SELECT"
-        var counter = 0
-        var clearRevision = 0
-        var selectedLayerIds = setOf<String>()
-        val layers = mutableListOf<BoardLayer>(
-            BoardLayer.ShapeLayer(
-                id = "callout_1",
-                shapeType = BoardShapeType.CALLOUT_BUBBLE,
-                position = NormalizedPoint(0.08f, 0.12f),
-                size = NormalizedSize(0.28f, 0.18f),
-                strokeColor = SemanticColor.PRIMARY,
-                fillColor = SemanticColor.SURFACE,
-                text = "Double-click text to edit!",
-                zIndex = 1
-            ),
-            BoardLayer.TextLayer(
-                id = "text_1",
-                text = "Editable Overlay Caption",
-                position = NormalizedPoint(0.12f, 0.36f),
-                color = SemanticColor.ON_SURFACE,
-                backgroundColor = SemanticColor.SURFACE,
-                borderColor = SemanticColor.OUTLINE,
-                role = TypographyRole.TITLE_MEDIUM,
-                zIndex = 2
-            )
-        )
-
-        fun renderTree(): UiNodeTree = uiTree {
-            val activeBoardTool: BoardTool = when (activeToolType) {
-                "SELECT" -> BoardTool.Select()
-                "PAN" -> BoardTool.Pan
-                "TEXT" -> BoardTool.PlaceText(defaultText = "New Caption", color = brushColor)
-                "SHAPE" -> BoardTool.Shape(
-                    shapeType = BoardShapeType.CALLOUT_BUBBLE,
-                    strokeColor = brushColor,
-                    fillColor = SemanticColor.SURFACE,
-                    strokeWidth = brushWidth.toFloat()
-                )
-                "HIGHLIGHTER" -> BoardTool.Highlighter(color = brushColor, strokeWidth = (brushWidth * 2.5).toFloat())
-                "ERASER" -> BoardTool.Eraser(radius = (brushWidth * 2).toFloat())
-                else -> BoardTool.Brush(color = brushColor, strokeWidth = brushWidth.toFloat())
-            }
-
-            scaffold(id = "interactiveScaffold", modifier = UiModifier.fillMaxSize()) {
-                content {
-                    board(
-                        id = "drawingBoard",
-                        activeTool = activeBoardTool,
-                        viewportConfig = BoardViewportConfig(
-                            gridStyle = BoardGridStyle.DOTS,
-                            snapToGrid = snapToGrid,
-                            gridStep = 0.05f
-                        ),
-                        selectedLayerIds = selectedLayerIds,
-                        clearRevision = clearRevision,
-                        showToolbar = true,
-                        showZoomControls = true,
-                        modifier = UiModifier.fillMaxSize()
-                    ) {
-                        layers.forEach { layer(it) }
-                        componentLayer(
-                            id = "inspector_widget",
-                            position = NormalizedPoint(0.08f, 0.62f),
-                            size = NormalizedSize(0.32f, 0.24f),
-                            zIndex = 3
-                        ) {
-                            column(spacing = SpacingSize.EXTRA_SMALL) {
-                                text(
-                                    text = canvasTitle,
-                                    role = TypographyRole.TITLE_MEDIUM,
-                                    color = SemanticColor.PRIMARY
-                                )
-                                text(
-                                    text = "Selected: ${selectedLayerIds.joinToString().ifEmpty { "None" }}",
-                                    role = TypographyRole.BODY_SMALL
-                                )
-                                button(
-                                    id = "boardWidgetBtn",
-                                    label = "Widget Taps: $counter",
-                                    action = "increment_counter"
-                                )
-                            }
-                        }
-                    }
-                }
-
-                floatingPanel(
-                    id = "controlsPanel",
-                    anchor = FloatingAnchor.TOP_END,
-                    title = "Board Controls",
-                    isCollapsible = true,
-                    isCollapsed = false
-                ) {
-                    textInput(
-                        id = "titleInput",
-                        text = canvasTitle,
-                        label = "Board Title",
-                        placeholder = "Enter title..."
-                    )
-                    dropdown(
-                        id = "toolDropdown",
-                        label = "Active Tool",
-                        options = mapOf(
-                            "SELECT" to "Select / Move / Edit",
-                            "PAN" to "Pan Camera",
-                            "TEXT" to "Place Text",
-                            "SHAPE" to "Draw Callout Bubble",
-                            "PEN" to "Freehand Pen",
-                            "HIGHLIGHTER" to "Highlighter",
-                            "ERASER" to "Eraser"
-                        ),
-                        selectedKey = activeToolType
-                    )
-                    dropdown(
-                        id = "colorDropdown",
-                        label = "Active Color",
-                        options = mapOf(
-                            "PRIMARY" to "Primary Blue",
-                            "SECONDARY" to "Secondary Gray",
-                            "ACCENT" to "Accent Teal",
-                            "HIGHLIGHT" to "Warning Highlight",
-                            "ERROR" to "Error Red"
-                        ),
-                        selectedKey = brushColor.name
-                    )
-                    toggle(
-                        id = "snapToggle",
-                        label = "Snap to Grid",
-                        checked = snapToGrid
-                    )
-                    slider(
-                        id = "widthSlider",
-                        value = brushWidth,
-                        min = 1.0,
-                        max = 20.0,
-                        steps = 19,
-                        label = "Stroke Width: ${brushWidth.toInt()}px"
-                    )
-                    row(spacing = SpacingSize.SMALL) {
-                        button(
-                            id = "clearBtn",
-                            label = "Clear Board",
-                            action = "clear_canvas",
-                            isPrimary = false,
-                            isDestructive = true
-                        )
-                        button(
-                            id = "counterBtn",
-                            label = "Taps: $counter",
-                            action = "increment_counter"
-                        )
-                    }
-                    text(
-                        id = "footerStats",
-                        text = "Tool: $activeToolType | Color: ${brushColor.name} | Layers: ${layers.size + 1}",
-                        role = TypographyRole.LABEL,
-                        color = SemanticColor.ON_SURFACE
-                    )
-                }
-            }
-        }
-
-        send(renderTree())
-
-        events.collect { event ->
-            when (event) {
-                is UiEvent.Click -> {
-                    when (event.action ?: event.nodeId) {
-                        "clear_canvas", "clearBtn" -> {
-                            layers.clear()
-                            selectedLayerIds = emptySet()
-                            clearRevision++
-                            send(renderTree())
-                        }
-                        "increment_counter", "counterBtn", "boardWidgetBtn" -> {
-                            counter++
-                            send(renderTree())
-                        }
-                    }
-                }
-                is UiEvent.TextChanged -> {
-                    if (event.nodeId == "titleInput") {
-                        canvasTitle = event.text
-                        send(renderTree())
-                    }
-                }
-                is UiEvent.ValueChanged -> {
-                    if (event.nodeId == "widthSlider") {
-                        brushWidth = event.value
-                        send(renderTree())
-                    }
-                }
-                is UiEvent.ToggleChanged -> {
-                    if (event.nodeId == "snapToggle") {
-                        snapToGrid = event.checked
-                        send(renderTree())
-                    }
-                }
-                is UiEvent.OptionSelected -> {
-                    if (event.nodeId == "toolDropdown") {
-                        activeToolType = event.selectedKey
-                        send(renderTree())
-                    } else if (event.nodeId == "colorDropdown") {
-                        brushColor = try {
-                            SemanticColor.valueOf(event.selectedKey)
-                        } catch (e: Exception) {
-                            SemanticColor.PRIMARY
-                        }
-                        send(renderTree())
-                    }
-                }
-                is UiEvent.PathCommitted -> {
-                    if (event.nodeId == "drawingBoard") {
-                        layers.add(
-                            BoardLayer.PathLayer(
-                                id = "path_${layers.size + 1}",
-                                path = event.path,
-                                zIndex = layers.size + 1
-                            )
-                        )
-                        send(renderTree())
-                    }
-                }
-                is UiEvent.BoardLayerSelected -> {
-                    selectedLayerIds = event.selectedLayerIds.toSet()
-                    send(renderTree())
-                }
-                is UiEvent.BoardLayerMoved -> {
-                    val idx = layers.indexOfFirst { it.id == event.layerId }
-                    if (idx >= 0) {
-                        val updated = when (val existing = layers[idx]) {
-                            is BoardLayer.TextLayer -> existing.copy(position = event.position)
-                            is BoardLayer.ImageLayer -> existing.copy(position = event.position)
-                            is BoardLayer.ShapeLayer -> existing.copy(position = event.position)
-                            is BoardLayer.ComponentLayer -> existing.copy(position = event.position)
-                            is BoardLayer.PathLayer -> existing
-                        }
-                        layers[idx] = updated
-                        send(renderTree())
-                    }
-                }
-                is UiEvent.BoardLayerResized -> {
-                    val idx = layers.indexOfFirst { it.id == event.layerId }
-                    if (idx >= 0) {
-                        val updated = when (val existing = layers[idx]) {
-                            is BoardLayer.TextLayer -> existing.copy(position = event.position, size = event.size)
-                            is BoardLayer.ImageLayer -> existing.copy(position = event.position, size = event.size)
-                            is BoardLayer.ShapeLayer -> existing.copy(position = event.position, size = event.size)
-                            is BoardLayer.ComponentLayer -> existing.copy(position = event.position, size = event.size)
-                            is BoardLayer.PathLayer -> existing
-                        }
-                        layers[idx] = updated
-                        send(renderTree())
-                    }
-                }
-                is UiEvent.BoardTextEdited -> {
-                    val idx = layers.indexOfFirst { it.id == event.layerId }
-                    if (idx >= 0) {
-                        val existing = layers[idx]
-                        if (existing is BoardLayer.TextLayer) {
-                            layers[idx] = existing.copy(text = event.text)
-                            send(renderTree())
-                        }
-                    }
-                }
-                is UiEvent.BoardTextPlaced -> {
-                    val newId = "text_${layers.size + 1}"
-                    layers.add(
-                        BoardLayer.TextLayer(
-                            id = newId,
-                            text = event.text,
-                            position = event.position,
-                            color = brushColor,
-                            backgroundColor = SemanticColor.SURFACE,
-                            borderColor = brushColor,
-                            zIndex = layers.size + 1
-                        )
-                    )
-                    selectedLayerIds = setOf(newId)
-                    activeToolType = "SELECT"
-                    send(renderTree())
-                }
-                is UiEvent.BoardShapeCommitted -> {
-                    val newId = "shape_${layers.size + 1}"
-                    layers.add(
-                        BoardLayer.ShapeLayer(
-                            id = newId,
-                            shapeType = event.shapeType,
-                            position = event.position,
-                            size = event.size,
-                            strokeColor = event.strokeColor,
-                            fillColor = event.fillColor,
-                            strokeWidth = event.strokeWidth,
-                            zIndex = layers.size + 1
-                        )
-                    )
-                    selectedLayerIds = setOf(newId)
-                    activeToolType = "SELECT"
-                    send(renderTree())
-                }
-                is UiEvent.BoardLayerDeleted -> {
-                    val toDelete = event.layerIds.toSet()
-                    layers.removeAll { it.id in toDelete }
-                    selectedLayerIds = selectedLayerIds - toDelete
-                    send(renderTree())
-                }
-                is UiEvent.BoardCanvasClicked -> {
-                    selectedLayerIds = emptySet()
-                    send(renderTree())
-                }
-                is UiEvent.Custom -> {
-                    if (event.action == "SELECT_TOOL") {
-                        activeToolType = when (event.payload?.jsonPrimitive?.content) {
-                            "select" -> "SELECT"
-                            "pan" -> "PAN"
-                            "text" -> "TEXT"
-                            "shape" -> "SHAPE"
-                            "brush" -> "PEN"
-                            "highlighter" -> "HIGHLIGHTER"
-                            "eraser" -> "ERASER"
-                            else -> activeToolType
-                        }
-                        send(renderTree())
-                    } else if (event.action == "CLEAR") {
-                        layers.clear()
-                        selectedLayerIds = emptySet()
-                        clearRevision++
-                        send(renderTree())
-                    }
-                }
-                is UiEvent.TabSelected,
-                is UiEvent.ChipSelected,
-                is UiEvent.DialogAction -> {
-                    // Handled in stage 5 dual-stress test demos
-                }
-            }
-        }
+    ): Flow<UiNodeTree> = when (context.capabilityName) {
+        "interactiveChapterPublisher" -> runChapterPublisherSession(context, events)
+        else -> runBoardCompositorSession(context, events)
     }
 }
+
+@Serializable
+private data class ChapterBatchResumeState(
+    val nextIndex: Int,
+    val processedIds: List<String>
+)
