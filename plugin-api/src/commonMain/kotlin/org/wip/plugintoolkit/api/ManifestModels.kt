@@ -423,7 +423,12 @@ object ParameterMetadataSerializer : KSerializer<ParameterMetadata> {
         } else {
             JsonObject(element.filterKeys { it != "semanticType" })
         }
-        val surrogate = input.json.decodeFromJsonElement(ParameterMetadataSurrogate.serializer(), finalElement)
+        val normalizedMap = finalElement.toMutableMap()
+        normalizeLenientBooleanField(normalizedMap, "required")
+        normalizeLenientBooleanField(normalizedMap, "secret")
+        normalizeLenientBooleanField(normalizedMap, "isDestructive")
+        normalizeLenientBooleanField(normalizedMap, "isAdvanced")
+        val surrogate = input.json.decodeFromJsonElement(ParameterMetadataSurrogate.serializer(), JsonObject(normalizedMap))
         return ParameterMetadata(
             defaultValue = surrogate.defaultValue,
             description = surrogate.description,
@@ -438,6 +443,14 @@ object ParameterMetadataSerializer : KSerializer<ParameterMetadata> {
             isAdvanced = surrogate.isAdvanced,
             condition = surrogate.condition
         )
+    }
+
+    private fun normalizeLenientBooleanField(map: MutableMap<String, JsonElement>, key: String) {
+        val raw = (map[key] as? JsonPrimitive)?.contentOrNull?.trim()?.lowercase() ?: return
+        when (raw) {
+            "true", "tr", "tru", "t", "1", "yes" -> map[key] = JsonPrimitive(true)
+            "false", "fa", "fal", "fals", "f", "0", "no" -> map[key] = JsonPrimitive(false)
+        }
     }
 }
 
@@ -509,6 +522,14 @@ object OutputMetadataSerializer : KSerializer<OutputMetadata> {
             isAdvanced = surrogate.isAdvanced,
             condition = surrogate.condition
         )
+    }
+
+    private fun normalizeLenientBooleanField(map: MutableMap<String, JsonElement>, key: String) {
+        val raw = (map[key] as? JsonPrimitive)?.contentOrNull?.trim()?.lowercase() ?: return
+        when (raw) {
+            "true", "tr", "tru", "t", "1", "yes" -> map[key] = JsonPrimitive(true)
+            "false", "fa", "fal", "fals", "f", "0", "no" -> map[key] = JsonPrimitive(false)
+        }
     }
 }
 

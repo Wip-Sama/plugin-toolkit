@@ -3,6 +3,8 @@ package org.wip.plugintoolkit.api
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 class ManifestModelsTest {
     @Test
@@ -45,5 +47,29 @@ class ManifestModelsTest {
         val serialized = json.encodeToString(CapabilitySerializer, capability)
         val deserialized = json.decodeFromString(CapabilitySerializer, serialized)
         assertEquals(3, deserialized.maxConcurrentExecutions)
+    }
+
+    @Test
+    fun testParameterMetadataToleratesMalformedBooleanLiterals() {
+        val lenientJson = Json { ignoreUnknownKeys = true; isLenient = true }
+        val payload = """
+            {
+              "name": "legacy_cap",
+              "description": "Legacy cap with truncated boolean literal",
+              "returnType": { "type": "primitive", "primitiveType": "STRING" },
+              "parameters": {
+                "mode": {
+                  "description": "Mode flag",
+                  "type": { "type": "primitive", "primitiveType": "STRING" },
+                  "required": "fa",
+                  "isAdvanced": tr
+                }
+              }
+            }
+        """.trimIndent()
+        val parsed = lenientJson.decodeFromString(CapabilitySerializer, payload)
+        val param = parsed.parameters!!["mode"]!!
+        assertTrue(param.isAdvanced)
+        assertFalse(param.required)
     }
 }

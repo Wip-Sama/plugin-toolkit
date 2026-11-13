@@ -8,7 +8,11 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.decodeFromJsonElement
 import org.wip.plugintoolkit.api.PluginContext
 import org.wip.plugintoolkit.api.PluginFileSystem
 import org.wip.plugintoolkit.api.PluginLogger
@@ -563,12 +567,30 @@ class PluginLifecycleManager(
 
         return content?.let {
             try {
-                json.decodeFromString<List<PluginMigration>>(it)
+                parsePluginMigrationsJson(it, json)
             } catch (e: Exception) {
                 Logger.w { "Failed to parse migrations for $pkg: ${e.message}" }
                 emptyList()
             }
         } ?: emptyList()
+    }
+
+    internal companion object {
+        internal fun parsePluginMigrationsJson(content: String, json: Json): List<PluginMigration> {
+            val element = json.parseToJsonElement(content)
+            return when (element) {
+                is JsonArray -> json.decodeFromJsonElement<List<PluginMigration>>(element)
+                is JsonObject -> {
+                    val nested = element["migrations"]
+                    if (nested is JsonArray) {
+                        json.decodeFromJsonElement<List<PluginMigration>>(nested)
+                    } else {
+                        listOf(json.decodeFromJsonElement<PluginMigration>(element))
+                    }
+                }
+                else -> emptyList()
+            }
+        }
     }
 
     suspend fun refreshLocks(

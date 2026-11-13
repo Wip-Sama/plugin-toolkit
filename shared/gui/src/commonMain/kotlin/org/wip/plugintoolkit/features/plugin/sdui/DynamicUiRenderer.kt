@@ -8,7 +8,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -61,6 +63,8 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -129,6 +133,11 @@ import plugintoolkit.composeapp.generated.resources.sdui_toggle_sidebar
 import plugintoolkit.composeapp.generated.resources.sdui_unsupported_node
 
 /**
+ * Tracks whether the current composition subtree is already inside a vertical scroll container.
+ */
+private val LocalInVerticalScroll = compositionLocalOf { false }
+
+/**
  * Root boundary renderer that delegates to [RenderUiNode].
  */
 @Composable
@@ -160,20 +169,7 @@ fun RenderUiNode(
                 verticalArrangement = Arrangement.spacedBy(node.spacing.toDp()),
                 horizontalAlignment = node.modifier.alignment?.toHorizontalAlignment() ?: Alignment.Start
             ) {
-                node.children.forEach { child ->
-                    key(child.id) {
-                        var childModifier: Modifier = Modifier
-                        child.modifier.weight?.let { weight ->
-                            if (weight > 0f) {
-                                childModifier = childModifier.weight(weight)
-                            }
-                        }
-                        child.modifier.alignment?.let { align ->
-                            childModifier = childModifier.align(align.toHorizontalAlignment())
-                        }
-                        SafeUiNodeRenderer(node = child, onEvent = onEvent, modifier = childModifier)
-                    }
-                }
+                RenderColumnChildren(children = node.children, onEvent = onEvent, allowWeight = !LocalInVerticalScroll.current)
             }
         }
 
@@ -238,33 +234,25 @@ fun RenderUiNode(
                             color = MaterialTheme.colorScheme.onSurface
                         )
                     }
-                    node.children.forEach { child ->
-                        key(child.id) {
-                            var childModifier: Modifier = Modifier
-                            child.modifier.alignment?.let { align ->
-                                childModifier = childModifier.align(align.toHorizontalAlignment())
-                            }
-                            SafeUiNodeRenderer(node = child, onEvent = onEvent, modifier = childModifier)
-                        }
-                    }
+                    RenderColumnChildren(children = node.children, onEvent = onEvent, allowWeight = false)
                 }
             }
         }
 
         is ScrollableColumnNode -> {
-            Column(
-                modifier = appliedModifier.verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(node.spacing.toDp()),
-                horizontalAlignment = node.modifier.alignment?.toHorizontalAlignment() ?: Alignment.Start
-            ) {
-                node.children.forEach { child ->
-                    key(child.id) {
-                        var childModifier: Modifier = Modifier
-                        child.modifier.alignment?.let { align ->
-                            childModifier = childModifier.align(align.toHorizontalAlignment())
-                        }
-                        SafeUiNodeRenderer(node = child, onEvent = onEvent, modifier = childModifier)
-                    }
+            val inScroll = LocalInVerticalScroll.current
+            val scrollModifier = if (inScroll) {
+                appliedModifier
+            } else {
+                appliedModifier.verticalScroll(rememberScrollState())
+            }
+            CompositionLocalProvider(LocalInVerticalScroll provides true) {
+                Column(
+                    modifier = scrollModifier,
+                    verticalArrangement = Arrangement.spacedBy(node.spacing.toDp()),
+                    horizontalAlignment = node.modifier.alignment?.toHorizontalAlignment() ?: Alignment.Start
+                ) {
+                    RenderColumnChildren(children = node.children, onEvent = onEvent, allowWeight = false)
                 }
             }
         }
@@ -680,55 +668,63 @@ private fun RenderTabs(
     modifier: Modifier = Modifier
 ) {
     val selectedIndex = node.tabs.indexOfFirst { it.key == node.selectedTabKey }.coerceAtLeast(0)
-    Column(
-        modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
-    ) {
-        ScrollableTabRow(
-            selectedTabIndex = selectedIndex,
-            containerColor = MaterialTheme.colorScheme.surface,
-            contentColor = MaterialTheme.colorScheme.primary,
-            edgePadding = ToolkitTheme.spacing.none
+    BoxWithConstraints(modifier = modifier) {
+        val hasBoundedHeight = constraints.hasBoundedHeight
+        Column(
+            modifier = if (hasBoundedHeight) Modifier.fillMaxSize() else Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
         ) {
-            node.tabs.forEachIndexed { index, tab ->
-                Tab(
-                    selected = index == selectedIndex,
-                    onClick = { onEvent(UiEvent.TabSelected(node.id, tab.key)) },
-                    text = {
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.xs),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            tab.iconName?.let { iconName ->
-                                Icon(
-                                    imageVector = SduiIconRegistry.resolve(iconName),
-                                    contentDescription = tab.label,
-                                    modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
-                                )
-                            }
-                            Text(text = tab.label, style = ToolkitTheme.typography.labelMedium)
-                            tab.badgeText?.let { badge ->
-                                Surface(
-                                    color = MaterialTheme.colorScheme.primaryContainer,
-                                    shape = RoundedCornerShape(ToolkitTheme.dimensions.buttonGroupInnerCorner)
-                                ) {
-                                    Text(
-                                        text = badge,
-                                        style = ToolkitTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                        modifier = Modifier.padding(
-                                            horizontal = ToolkitTheme.spacing.xs,
-                                            vertical = ToolkitTheme.spacing.xxs
-                                        )
+            ScrollableTabRow(
+                selectedTabIndex = selectedIndex,
+                containerColor = MaterialTheme.colorScheme.surface,
+                contentColor = MaterialTheme.colorScheme.primary,
+                edgePadding = ToolkitTheme.spacing.none
+            ) {
+                node.tabs.forEachIndexed { index, tab ->
+                    Tab(
+                        selected = index == selectedIndex,
+                        onClick = { onEvent(UiEvent.TabSelected(node.id, tab.key)) },
+                        text = {
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.xs),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                tab.iconName?.let { iconName ->
+                                    Icon(
+                                        imageVector = SduiIconRegistry.resolve(iconName),
+                                        contentDescription = tab.label,
+                                        modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
                                     )
+                                }
+                                Text(text = tab.label, style = ToolkitTheme.typography.labelMedium)
+                                tab.badgeText?.let { badge ->
+                                    Surface(
+                                        color = MaterialTheme.colorScheme.primaryContainer,
+                                        shape = RoundedCornerShape(ToolkitTheme.dimensions.buttonGroupInnerCorner)
+                                    ) {
+                                        Text(
+                                            text = badge,
+                                            style = ToolkitTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                            modifier = Modifier.padding(
+                                                horizontal = ToolkitTheme.spacing.xs,
+                                                vertical = ToolkitTheme.spacing.xxs
+                                            )
+                                        )
+                                    }
                                 }
                             }
                         }
-                    }
-                )
+                    )
+                }
             }
+            val contentModifier = if (hasBoundedHeight) {
+                Modifier.weight(1f).fillMaxWidth()
+            } else {
+                Modifier.fillMaxWidth()
+            }
+            SafeUiNodeRenderer(node = node.content, onEvent = onEvent, modifier = contentModifier)
         }
-        SafeUiNodeRenderer(node = node.content, onEvent = onEvent, modifier = Modifier.fillMaxWidth())
     }
 }
 
@@ -1070,12 +1066,12 @@ private fun RenderDialog(
             Text(text = node.title, style = ToolkitTheme.typography.titleLarge)
         },
         text = {
-            Column(
-                modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
-            ) {
-                node.children.forEach { child ->
-                    SafeUiNodeRenderer(node = child, onEvent = onEvent)
+            CompositionLocalProvider(LocalInVerticalScroll provides true) {
+                Column(
+                    modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
+                ) {
+                    RenderColumnChildren(children = node.children, onEvent = onEvent, allowWeight = false)
                 }
             }
         },
@@ -1428,6 +1424,8 @@ private fun RenderSidebar(
 ) {
     var isCollapsed by remember(node.id, node.isCollapsed) { mutableStateOf(node.isCollapsed) }
     val isHorizontal = node.attachPoint == SidebarAttachPoint.LEFT || node.attachPoint == SidebarAttachPoint.RIGHT
+    val delegatesScrolling = remember(node.children) { node.children.any { it.containsScrollableOrWeightedContent() } }
+    val applySidebarScroll = isHorizontal && !delegatesScrolling && !LocalInVerticalScroll.current
 
     Surface(
         modifier = if (isHorizontal) {
@@ -1439,7 +1437,8 @@ private fun RenderSidebar(
         border = BorderStroke(ToolkitTheme.dimensions.borderThin, MaterialTheme.colorScheme.outlineVariant.copy(alpha = ToolkitTheme.opacity.divider))
     ) {
         Column(
-            modifier = Modifier.padding(ToolkitTheme.spacing.sm),
+            modifier = (if (isHorizontal) Modifier.fillMaxSize() else Modifier.fillMaxWidth())
+                .padding(ToolkitTheme.spacing.sm),
             verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
         ) {
             Row(
@@ -1472,19 +1471,62 @@ private fun RenderSidebar(
                 }
             }
 
-            AnimatedVisibility(visible = !isCollapsed) {
-                Column(
-                    modifier = Modifier.verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
-                ) {
-                    node.children.forEach { child ->
-                        key(child.id) {
-                            SafeUiNodeRenderer(node = child, onEvent = onEvent)
-                        }
+            AnimatedVisibility(
+                visible = !isCollapsed,
+                modifier = if (isHorizontal) Modifier.weight(1f).fillMaxWidth() else Modifier.fillMaxWidth()
+            ) {
+                val bodyModifier = (if (isHorizontal) Modifier.fillMaxSize() else Modifier.fillMaxWidth())
+                    .then(if (applySidebarScroll) Modifier.verticalScroll(rememberScrollState()) else Modifier)
+                CompositionLocalProvider(LocalInVerticalScroll provides (LocalInVerticalScroll.current || applySidebarScroll)) {
+                    Column(
+                        modifier = bodyModifier,
+                        verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
+                    ) {
+                        RenderColumnChildren(
+                            children = node.children,
+                            onEvent = onEvent,
+                            allowWeight = !applySidebarScroll
+                        )
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun ColumnScope.RenderColumnChildren(
+    children: List<UiNode>,
+    onEvent: (UiEvent) -> Unit,
+    allowWeight: Boolean
+) {
+    children.forEach { child ->
+        key(child.id) {
+            var childModifier: Modifier = Modifier
+            if (allowWeight) {
+                child.modifier.weight?.let { weight ->
+                    if (weight > 0f) {
+                        childModifier = childModifier.weight(weight)
+                    }
+                }
+            }
+            child.modifier.alignment?.let { align ->
+                childModifier = childModifier.align(align.toHorizontalAlignment())
+            }
+            SafeUiNodeRenderer(node = child, onEvent = onEvent, modifier = childModifier)
+        }
+    }
+}
+
+private fun UiNode.containsScrollableOrWeightedContent(): Boolean {
+    if ((modifier.weight ?: 0f) > 0f) return true
+    return when (this) {
+        is ScrollableColumnNode, is SplitPaneNode, is BoardNode -> true
+        is ColumnNode -> children.any { it.containsScrollableOrWeightedContent() }
+        is BoxNode -> children.any { it.containsScrollableOrWeightedContent() }
+        is RowNode -> children.any { it.containsScrollableOrWeightedContent() }
+        is TabsNode -> content.containsScrollableOrWeightedContent()
+        else -> false
     }
 }
 
