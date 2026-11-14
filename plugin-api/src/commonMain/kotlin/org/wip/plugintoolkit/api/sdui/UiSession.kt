@@ -90,8 +90,9 @@ interface UiSessionContext : PluginContext {
     val initialParameters: Map<String, JsonElement> get() = emptyMap()
 
     /**
-     * Reactive stream of this plugin's persisted settings.
-     * Emits whenever settings are updated in the host or via [updateSetting].
+     * Reactive stream of this plugin's persisted settings merged over manifest defaults.
+     * Emits whenever settings are updated in the host settings view or via [updateSetting],
+     * [updateSettings], or [clearSetting].
      */
     val settingsFlow: StateFlow<Map<String, JsonElement>> get() = MutableStateFlow(settings)
 

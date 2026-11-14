@@ -411,6 +411,35 @@ class PluginLifecycleManager(
         }
     }
 
+    fun resolveEffectiveSettings(
+        pkg: String,
+        store: PluginSettingsStore? = null
+    ): Map<String, JsonElement> {
+        val storedSettings = store ?: loadPluginSettings(pkg)
+        val actualManifest = getManifest(pkg)
+        val mergedSettings = mutableMapOf<String, JsonElement>()
+        actualManifest?.settings?.forEach { (key, meta) ->
+            meta.defaultValue?.let { mergedSettings[key] = it }
+        }
+        mergedSettings.putAll(storedSettings.settings)
+        return mergedSettings
+    }
+
+    suspend fun updatePluginSettingsPatch(
+        pkg: String,
+        newSettings: Map<String, JsonElement> = emptyMap(),
+        keysToClear: Set<String> = emptySet()
+    ) {
+        val currentStore = loadPluginSettings(pkg)
+        val patchedSettings = currentStore.settings.toMutableMap().apply {
+            keysToClear.forEach { remove(it) }
+            putAll(newSettings)
+        }
+        val updatedStore = currentStore.copy(settings = patchedSettings)
+        savePluginSettings(pkg, updatedStore)
+        refreshLocks(pkg, updatedStore)
+    }
+
     fun createPluginContext(
         pkg: String,
         jobId: String? = null,
@@ -427,15 +456,14 @@ class PluginLifecycleManager(
 
         val storedSettings = overriddenSettings ?: loadPluginSettings(pkg)
         val actualManifest = manifest ?: getManifest(pkg)
-        val mergedSettings = mutableMapOf<String, JsonElement>()
-
-        // 1. Manifest defaults
+        val defaultSettings = mutableMapOf<String, JsonElement>()
         actualManifest?.settings?.forEach { (key, meta) ->
-            meta.defaultValue?.let { mergedSettings[key] = it }
+            meta.defaultValue?.let { defaultSettings[key] = it }
         }
-
-        // 2. User overrides
-        mergedSettings.putAll(storedSettings.settings)
+        val mergedSettings = mutableMapOf<String, JsonElement>().apply {
+            putAll(defaultSettings)
+            putAll(storedSettings.settings)
+        }
 
         val tracker = ResourceUsageTracker()
         val trackedFs = TrackingPluginFileSystem(DefaultPluginFileSystem(installPath, jarFullPath), tracker)
@@ -528,10 +556,12 @@ class PluginLifecycleManager(
                 }
             },
             onUpdateSettings = { newSettings ->
-                val currentStore = loadPluginSettings(pkg)
-                val updatedStore = currentStore.copy(settings = currentStore.settings + newSettings)
-                savePluginSettings(pkg, updatedStore)
+                updatePluginSettingsPatch(pkg, newSettings = newSettings)
             },
+            onClearSetting = { key ->
+                updatePluginSettingsPatch(pkg, keysToClear = setOf(key))
+            },
+            defaultSettings = defaultSettings,
             onShowToast = { message ->
                 notificationService.toast(message)
             },
@@ -679,6 +709,8 @@ class DefaultPluginContext(
     override val networkClient: org.wip.plugintoolkit.api.PluginNetworkClient = org.wip.plugintoolkit.api.NoOpPluginNetworkClient,
     private val onRequiredActionChange: (String?) -> Unit = {},
     private val onUpdateSettings: (suspend (Map<String, JsonElement>) -> Unit)? = null,
+    private val onClearSetting: (suspend (String) -> Unit)? = null,
+    private val defaultSettings: Map<String, JsonElement> = emptyMap(),
     private val onShowToast: ((String) -> Unit)? = null,
     private val onShowNotification: ((String, String, PluginNotificationType) -> Unit)? = null
 ) : PluginContext {
@@ -710,6 +742,16 @@ class DefaultPluginContext(
     override suspend fun updateSettings(newSettings: Map<String, JsonElement>) {
         _settings.putAll(newSettings)
         onUpdateSettings?.invoke(newSettings)
+    }
+
+    override suspend fun clearSetting(key: String) {
+        val defaultVal = defaultSettings[key]
+        if (defaultVal != null) {
+            _settings[key] = defaultVal
+        } else {
+            _settings.remove(key)
+        }
+        onClearSetting?.invoke(key)
     }
 
     override fun recordNetworkUsage(bytesRead: Long, bytesWritten: Long, throughputBytesPerSec: Long?) {

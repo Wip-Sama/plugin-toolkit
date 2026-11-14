@@ -779,6 +779,13 @@ suspend fun fetchData(context: PluginContext) {
 }
 ```
 
+#### Updating & Syncing Settings from `@InteractiveTool` or Capabilities
+
+Plugins can also programmatically update or reset `@PluginSetting` values through `PluginContext`:
+
+- `context.updateSetting(key, value)` / `context.updateSettings(map)` writes directly through the host `PluginLifecycleManager` settings controller, encrypting `@PluginSetting(secret = true)` keys in `settings.json`, refreshing `@PluginLocks`, and broadcasting changes to both Host Plugin Settings UI and `UiSessionContext.settingsFlow`.
+- `context.clearSetting(key)` removes the override so the setting reverts to its manifest `defaultValue`.
+
 ## Plugin Requirements
 
 Plugins can specify system and application requirements in their manifest. These are validated by the host application before installation and loading.

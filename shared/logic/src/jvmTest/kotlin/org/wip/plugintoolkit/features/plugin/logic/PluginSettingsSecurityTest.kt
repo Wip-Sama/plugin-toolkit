@@ -196,4 +196,71 @@ class PluginSettingsSecurityTest {
 
         assertEquals("42", savedNumber, "Non-string settings are currently not encrypted even if marked secret")
     }
+
+    @Test
+    fun testUpdateAndClearSettingsPatchMergesDefaultsAndEncryptsSecrets() = runTest {
+        val fileSystem = FakeFileSystem()
+        val persistence = FakeSettingsPersistence()
+        val settingsRepo = SettingsRepository(persistence, backgroundScope)
+        val mockAppConfig = io.mockk.mockk<org.wip.plugintoolkit.core.SystemConfig>(relaxed = true)
+        val registry = PluginRegistry(settingsRepo, backgroundScope, loomDispatcher, mockAppConfig)
+        val jobManager = JobManager(backgroundScope, settingsRepo)
+        val lifecycleManager = PluginLifecycleManager(registry, jobManager, settingsRepo, fileSystem)
+
+        val pkg = "test.plugin.patch.sync"
+        val tempDir = System.getProperty("java.io.tmpdir").replace("\\", "/")
+        val installPath = "$tempDir/test.plugin.patch.sync"
+
+        val manifest = PluginManifest(
+            manifestVersion = "1.0",
+            plugin = PluginInfo(id = pkg, name = "Patch Sync Plugin", version = "1.0.0", description = "Test"),
+            requirements = Requirements(minMemoryMb = 128, minExecutionTimeMs = 100),
+            settings = mapOf(
+                "apiKey" to SettingMetadata(
+                    description = "Secret token",
+                    type = DataType.Primitive(PrimitiveType.STRING),
+                    secret = true
+                ),
+                "previewHours" to SettingMetadata(
+                    description = "Cubari preview window",
+                    type = DataType.Primitive(PrimitiveType.STRING),
+                    defaultValue = JsonPrimitive("24")
+                )
+            )
+        )
+        fileSystem.manifestJson = json.encodeToString(manifest)
+
+        registry.addOrUpdatePlugin(
+            InstalledPlugin(
+                pkg = pkg,
+                name = "Patch Sync Plugin",
+                version = "1.0.0",
+                installPath = installPath
+            )
+        )
+
+        val ctx = lifecycleManager.createPluginContext(pkg, manifest = manifest)
+        assertEquals(JsonPrimitive("24"), ctx.settings["previewHours"])
+
+        ctx.updateSetting("previewHours", JsonPrimitive("48"))
+        ctx.updateSetting("apiKey", JsonPrimitive("ghp_live_token"))
+
+        val liveStore = lifecycleManager.pluginSettingsState.value[pkg]
+        assertNotNull(liveStore)
+        assertEquals(JsonPrimitive("48"), liveStore.settings["previewHours"])
+        assertEquals(JsonPrimitive("ghp_live_token"), liveStore.settings["apiKey"])
+
+        val diskStore = json.decodeFromString<PluginSettingsStore>(fileSystem.readFile("$installPath/settings.json")!!)
+        val diskSecret = (diskStore.settings["apiKey"] as JsonPrimitive).content
+        assertTrue(diskSecret.startsWith("ENC[dpapi:") || diskSecret.startsWith("ENC[aes:"))
+
+        ctx.clearSetting("previewHours")
+        val afterClearStore = lifecycleManager.pluginSettingsState.value[pkg]
+        assertNotNull(afterClearStore)
+        assertTrue(!afterClearStore.settings.containsKey("previewHours"))
+
+        val effectiveAfterClear = lifecycleManager.resolveEffectiveSettings(pkg, afterClearStore)
+        assertEquals(JsonPrimitive("24"), effectiveAfterClear["previewHours"])
+        assertEquals(JsonPrimitive("ghp_live_token"), effectiveAfterClear["apiKey"])
+    }
 }

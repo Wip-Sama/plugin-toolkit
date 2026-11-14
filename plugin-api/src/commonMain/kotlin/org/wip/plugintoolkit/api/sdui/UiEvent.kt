@@ -220,6 +220,33 @@ sealed interface UiEvent {
     ) : UiEvent
 
     /**
+     * Keyboard shortcut triggered from a node configured with [UiModifier.shortcuts].
+     */
+    @Serializable
+    @SerialName("shortcut_triggered")
+    data class ShortcutTriggered(
+        override val nodeId: String,
+        val action: String,
+        val key: String,
+        val ctrl: Boolean = false,
+        val shift: Boolean = false,
+        val alt: Boolean = false,
+        val meta: Boolean = false
+    ) : UiEvent
+
+    /**
+     * External OS files or directories dropped onto a node configured with [UiModifier.dropTarget].
+     * All returned [paths] are automatically granted read access in [UiSessionContext.hostFileSystem].
+     */
+    @Serializable
+    @SerialName("files_dropped")
+    data class FilesDropped(
+        override val nodeId: String,
+        val action: String = "files_dropped",
+        val paths: List<String>
+    ) : UiEvent
+
+    /**
      * Custom event payload for domain-specific controls.
      */
     @Serializable
@@ -259,6 +286,8 @@ object UiEventSerializer : KSerializer<UiEvent> {
             is UiEvent.ChipSelected -> "chip_selected"
             is UiEvent.DialogAction -> "dialog_action"
             is UiEvent.ItemsReordered -> "items_reordered"
+            is UiEvent.ShortcutTriggered -> "shortcut_triggered"
+            is UiEvent.FilesDropped -> "files_dropped"
             is UiEvent.Custom -> "custom"
         }
         val element = when (value) {
@@ -280,6 +309,8 @@ object UiEventSerializer : KSerializer<UiEvent> {
             is UiEvent.ChipSelected -> jsonEncoder.json.encodeToJsonElement(UiEvent.ChipSelected.serializer(), value)
             is UiEvent.DialogAction -> jsonEncoder.json.encodeToJsonElement(UiEvent.DialogAction.serializer(), value)
             is UiEvent.ItemsReordered -> jsonEncoder.json.encodeToJsonElement(UiEvent.ItemsReordered.serializer(), value)
+            is UiEvent.ShortcutTriggered -> jsonEncoder.json.encodeToJsonElement(UiEvent.ShortcutTriggered.serializer(), value)
+            is UiEvent.FilesDropped -> jsonEncoder.json.encodeToJsonElement(UiEvent.FilesDropped.serializer(), value)
             is UiEvent.Custom -> jsonEncoder.json.encodeToJsonElement(UiEvent.Custom.serializer(), value)
         }
         if (element is JsonObject) {
@@ -313,6 +344,8 @@ object UiEventSerializer : KSerializer<UiEvent> {
             "chip_selected" -> UiEvent.ChipSelected.serializer()
             "dialog_action" -> UiEvent.DialogAction.serializer()
             "items_reordered" -> UiEvent.ItemsReordered.serializer()
+            "shortcut_triggered" -> UiEvent.ShortcutTriggered.serializer()
+            "files_dropped" -> UiEvent.FilesDropped.serializer()
             "custom" -> UiEvent.Custom.serializer()
             else -> UiEvent.Custom.serializer()
         }

@@ -782,8 +782,9 @@ interface PluginContext {
     fun onSignal(handler: suspend (PluginSignal) -> Unit) = signals.onSignal(handler)
 
     /**
-     * Update or set a specific setting value for this plugin.
-     * Persists the change to disk and updates in-memory settings.
+     * Update or set a specific setting value for this plugin via the host settings controller.
+     * Encrypts secret fields, persists changes to disk, synchronizes live settings UI/flows,
+     * and re-evaluates plugin locks.
      *
      * @param key The setting key.
      * @param value The setting value as a [JsonElement].
@@ -791,12 +792,21 @@ interface PluginContext {
     suspend fun updateSetting(key: String, value: JsonElement) {}
 
     /**
-     * Update multiple settings for this plugin simultaneously.
-     * Persists the changes to disk and updates in-memory settings.
+     * Update multiple settings for this plugin simultaneously via the host settings controller.
+     * Encrypts secret fields, persists changes to disk, synchronizes live settings UI/flows,
+     * and re-evaluates plugin locks.
      *
      * @param newSettings A map of setting keys to their new [JsonElement] values.
      */
     suspend fun updateSettings(newSettings: Map<String, JsonElement>) {}
+
+    /**
+     * Remove a saved override for [key] so the manifest `@PluginSetting` default (if any) applies.
+     * Persists the removal, synchronizes live settings UI/flows, and re-evaluates plugin locks.
+     *
+     * @param key The setting key to clear.
+     */
+    suspend fun clearSetting(key: String) {}
 
     suspend fun updateSetting(key: String, value: String) {
         updateSetting(key, kotlinx.serialization.json.JsonPrimitive(value))

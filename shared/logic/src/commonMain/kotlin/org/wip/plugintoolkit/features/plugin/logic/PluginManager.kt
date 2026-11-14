@@ -136,6 +136,15 @@ class PluginManager(
 
     fun loadPluginSettings(pkg: String) = lifecycleManager.loadPluginSettings(pkg)
 
+    fun resolveEffectiveSettings(pkg: String, store: PluginSettingsStore? = null) =
+        lifecycleManager.resolveEffectiveSettings(pkg, store)
+
+    suspend fun updatePluginSettings(pkg: String, newSettings: Map<String, kotlinx.serialization.json.JsonElement>) =
+        lifecycleManager.updatePluginSettingsPatch(pkg, newSettings = newSettings)
+
+    suspend fun clearPluginSetting(pkg: String, key: String) =
+        lifecycleManager.updatePluginSettingsPatch(pkg, keysToClear = setOf(key))
+
     fun savePluginSettings(pkg: String, store: PluginSettingsStore) {
         lifecycleManager.savePluginSettings(pkg, store)
         scope.launch {

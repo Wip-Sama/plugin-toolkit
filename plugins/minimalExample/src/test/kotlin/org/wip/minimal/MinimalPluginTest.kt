@@ -1,5 +1,7 @@
 package org.wip.minimal
 
+import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.JsonPrimitive
 import org.wip.plugintoolkit.api.OS
 import org.wip.plugintoolkit.api.PluginContext
 import org.wip.plugintoolkit.api.PluginNotificationType
@@ -43,9 +45,15 @@ class MinimalPluginTest {
         assertNull(entry.getInteractiveProcessor())
 
         // Verify updated PluginContext default implementations remain binary-compatible for minimal plugins
-        val noOpSecrets = object : PluginContext by StubNoOpContext() {}.secrets
+        val noOpContext = object : PluginContext by StubNoOpContext() {}
+        val noOpSecrets = noOpContext.secrets
         assertNotNull(noOpSecrets)
-        StubNoOpContext().showNotification("Title", "Message", PluginNotificationType.INFO)
+        noOpContext.showNotification("Title", "Message", PluginNotificationType.INFO)
+        runTest {
+            noOpContext.updateSetting("apiKey", JsonPrimitive("demo"))
+            noOpContext.updateSettings(mapOf("apiKey" to JsonPrimitive("demo2")))
+            noOpContext.clearSetting("apiKey")
+        }
     }
 
     private class StubNoOpContext : PluginContext {

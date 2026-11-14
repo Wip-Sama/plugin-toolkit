@@ -539,7 +539,9 @@ private suspend fun handleBoardCompositorEvent(
         is UiEvent.TabSelected,
         is UiEvent.ChipSelected,
         is UiEvent.DialogAction,
-        is UiEvent.ItemsReordered -> Unit
+        is UiEvent.ItemsReordered,
+        is UiEvent.ShortcutTriggered,
+        is UiEvent.FilesDropped -> Unit
     }
 }
 

@@ -18,8 +18,10 @@ import org.wip.plugintoolkit.api.sdui.SidebarAttachPoint
 import org.wip.plugintoolkit.api.sdui.SidebarNode
 import org.wip.plugintoolkit.api.sdui.SliderNode
 import org.wip.plugintoolkit.api.sdui.TextNode
+import org.wip.plugintoolkit.api.sdui.UiDropTarget
 import org.wip.plugintoolkit.api.sdui.UiModifier
 import org.wip.plugintoolkit.api.sdui.UiNodeTree
+import org.wip.plugintoolkit.api.sdui.UiShortcut
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -311,6 +313,57 @@ class UiAstSanitizerTest {
         val compLayer = assertIs<BoardLayer.ComponentLayer>(board.layers[1])
         val nestedError = assertIs<ErrorBoundaryNode>(compLayer.content)
         assertTrue(nestedError.errorMessage.contains("Malformed slider range"))
+    }
+
+    @Test
+    fun testShortcutAndDropTargetValidation() {
+        val validTree = UiNodeTree(
+            root = ColumnNode(
+                id = "valid_shortcuts_col",
+                modifier = UiModifier.fillMaxSize()
+                    .shortcut(key = UiShortcut.KEY_DELETE, action = "delete_page", label = "Delete")
+                    .onFileDrop(action = "drop_pages", allowedExtensions = listOf("png"), maxFiles = 10),
+                children = listOf(TextNode(id = "ok_label", text = "OK"))
+            )
+        )
+        assertEquals(validTree, validTree.sanitize())
+
+        val invalidTree = UiNodeTree(
+            root = ColumnNode(
+                id = "invalid_root",
+                children = listOf(
+                    TextNode(
+                        id = "bad_shortcut_key",
+                        text = "bad",
+                        modifier = UiModifier.shortcut(key = "  ", action = "act")
+                    ),
+                    TextNode(
+                        id = "bad_drop_action",
+                        text = "bad",
+                        modifier = UiModifier.onFileDrop(action = "")
+                    ),
+                    TextNode(
+                        id = "bad_drop_accept",
+                        text = "bad",
+                        modifier = UiModifier.dropTarget(
+                            UiDropTarget(action = "drop", acceptFiles = false, acceptDirectories = false)
+                        )
+                    ),
+                    TextNode(
+                        id = "bad_drop_max",
+                        text = "bad",
+                        modifier = UiModifier.onFileDrop(action = "drop", maxFiles = 0)
+                    )
+                )
+            )
+        )
+
+        val sanitized = invalidTree.sanitize()
+        val root = assertIs<ColumnNode>(sanitized.root)
+        assertTrue(assertIs<ErrorBoundaryNode>(root.children[0]).errorMessage.contains("Invalid UiShortcut"))
+        assertTrue(assertIs<ErrorBoundaryNode>(root.children[1]).errorMessage.contains("action must not be blank"))
+        assertTrue(assertIs<ErrorBoundaryNode>(root.children[2]).errorMessage.contains("must accept files or directories"))
+        assertTrue(assertIs<ErrorBoundaryNode>(root.children[3]).errorMessage.contains("maxFiles"))
     }
 }
 

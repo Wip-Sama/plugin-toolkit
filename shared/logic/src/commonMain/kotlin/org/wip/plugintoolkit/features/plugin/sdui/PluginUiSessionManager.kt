@@ -141,8 +141,20 @@ class PluginUiSessionHandle(
             is UiEvent.ChipSelected,
             is UiEvent.DialogAction,
             is UiEvent.ItemsReordered,
+            is UiEvent.ShortcutTriggered,
             is UiEvent.Custom -> {
                 transactionalChannel.trySend(event)
+            }
+            is UiEvent.FilesDropped -> {
+                val dynamicFs = hostFileSystem as? DynamicHostFileSystem
+                val validPaths = event.paths
+                    .map { it.trim() }
+                    .filter { it.isNotEmpty() }
+                    .distinct()
+                if (validPaths.isNotEmpty()) {
+                    validPaths.forEach { dynamicFs?.grantAccess(it) }
+                    transactionalChannel.trySend(event.copy(paths = validPaths))
+                }
             }
             is UiEvent.TextChanged,
             is UiEvent.ValueChanged -> {
@@ -283,7 +295,7 @@ class PluginUiSessionManager(
             sessionScope.launch {
                 pluginManager.pluginSettingsState.collect { stores ->
                     stores[pluginId]?.let { store ->
-                        _settingsFlow.value = store.settings
+                        _settingsFlow.value = pluginManager.resolveEffectiveSettings(pluginId, store)
                     }
                 }
             }
@@ -554,6 +566,12 @@ class PluginUiSessionManager(
             override suspend fun updateSettings(newSettings: Map<String, JsonElement>) {
                 _settingsFlow.update { it + newSettings }
                 context.updateSettings(newSettings)
+            }
+
+            override suspend fun clearSetting(key: String) {
+                context.clearSetting(key)
+                _settingsFlow.value = pluginManager?.resolveEffectiveSettings(pluginId)
+                    ?: (_settingsFlow.value - key)
             }
 
             override fun recordNetworkUsage(bytesRead: Long, bytesWritten: Long, throughputBytesPerSec: Long?) {

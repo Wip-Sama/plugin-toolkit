@@ -1072,6 +1072,7 @@
     <string name="sdui_hide_secret">Nascondi testo segreto</string>
     <string name="sdui_drag_reorder">Trascina per riordinare</string>
     <string name="sdui_resize_pane">Ridimensiona pannello</string>
+    <string name="sdui_drop_files_hint">Rilascia i file qui</string>
     <string name="dialog_select_file">Seleziona File</string>
     <string name="dialog_select_files">Seleziona File</string>
     <string name="dialog_save_file">Salva File</string>

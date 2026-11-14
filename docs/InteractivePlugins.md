@@ -41,7 +41,7 @@ Plugins depend on `plugin-api` and implement `InteractiveUiProcessor` on the `@P
 
 - **Annotations:** `org.wip.plugintoolkit.api.annotations.*` (`@PluginInfo`, `@InteractiveTool`, `@Capability`, `@CapabilityParam`, `@PluginAction`, `@PluginSetting`, `@PluginLocks`, etc.)
 - **Core Context, HTTP & Secrets:** `org.wip.plugintoolkit.api.*` (`PluginContext`, `PluginResponse`, `PluginSecretStorage`, `PluginNotificationType`, `HttpMethod`, `HttpRequest`, `HttpResponse`, `MultipartPart`, `ExecutionResult`)
-- **Declarative SDUI & Events:** `org.wip.plugintoolkit.api.sdui.*` (`InteractiveUiProcessor`, `UiSessionContext`, `InteractiveSessionScope`, `UiNodeTree`, `UiNode`, `UiEvent`, `UiModifier`, `uiTree`, `interactiveUiSession`, `BoardTool`, `BoardLayer`, `AssetReference`, `ImageScale`, `SpacingSize`, `TypographyRole`, `SemanticColor`, `ControlSize`, `AlignmentRole`, etc.)
+- **Declarative SDUI & Events:** `org.wip.plugintoolkit.api.sdui.*` (`InteractiveUiProcessor`, `UiSessionContext`, `InteractiveSessionScope`, `UiNodeTree`, `UiNode`, `UiEvent`, `UiModifier`, `UiShortcut`, `UiDropTarget`, `uiTree`, `interactiveUiSession`, `BoardTool`, `BoardLayer`, `AssetReference`, `ImageScale`, `SpacingSize`, `TypographyRole`, `SemanticColor`, `ControlSize`, `AlignmentRole`, `FloatingAnchor`, `SidebarAttachPoint`, etc.)
 
 > [!IMPORTANT]
 > There is **no** `org.wip.plugintoolkit.api.sdui.dsl` package. All DSL builders (`uiTree`, `UiContainerBuilder`, `interactiveUiSession`, etc.) live directly in `org.wip.plugintoolkit.api.sdui`. Always prefer explicit top-level imports.
@@ -260,13 +260,20 @@ UiModifier
     .widthIn(min = 120, max = 480)
     .heightIn(min = 48, max = 320)
     .aspectRatio(0.707f)               // e.g. portrait manga page ratio
-    .align(AlignmentRole.CENTER_VERTICAL)
+    .align(AlignmentRole.CENTER_END)
     .controlSize(ControlSize.SMALL)    // SMALL, MEDIUM, LARGE
     .background(SemanticColor.SURFACE)
     .border(SemanticColor.OUTLINE)
     .clipRounded(true)
     .enabled(true)
     .visible(true)
+    .shortcut(key = UiShortcut.KEY_DELETE, action = "delete_page", label = "Del")
+    .shortcut(key = "S", action = "save_draft", ctrl = true, allowWhileTyping = true, label = "Ctrl+S")
+    .onFileDrop(
+        action = "drop_page_files",
+        allowedExtensions = listOf("png", "jpg", "jpeg", "webp"),
+        hint = "Drop page images here"
+    )
 ```
 
 ### Enum Reference
@@ -276,9 +283,9 @@ UiModifier
 - **`SemanticColor`**: `PRIMARY`, `SECONDARY`, `TERTIARY`, `ERROR`, `SURFACE`, `ON_SURFACE`, `OUTLINE`, `ACCENT`, `HIGHLIGHT`, `INFO`, `SUCCESS`, `WARNING`
 - **`ControlSize`**: `SMALL`, `MEDIUM`, `LARGE`
 - **`ImageScale`**: `FIT`, `CROP`, `FILL_BOUNDS`, `INSIDE`
-- **`FloatingAnchor`**: `TOP_START`, `TOP_END`, `BOTTOM_START`, `BOTTOM_END`
-- **`SidebarAttachPoint`**: `LEFT`, `RIGHT`, `TOP`, `BOTTOM`
-- **`AlignmentRole`**: `START`, `CENTER_HORIZONTAL`, `END`, `TOP`, `CENTER_VERTICAL`, `BOTTOM`, `CENTER`
+- **`FloatingAnchor`**: `TOP_START`, `TOP_CENTER`, `TOP_END`, `BOTTOM_START`, `BOTTOM_CENTER`, `BOTTOM_END`, `CENTER_START`, `CENTER_END`, `CENTER`
+- **`SidebarAttachPoint`**: `LEFT`, `TOP`, `RIGHT`, `BOTTOM`
+- **`AlignmentRole`**: `START`, `CENTER`, `END`, `TOP`, `BOTTOM`, `TOP_START`, `TOP_CENTER`, `TOP_END`, `BOTTOM_START`, `BOTTOM_CENTER`, `BOTTOM_END`, `CENTER_START`, `CENTER_END`
 
 ---
 
@@ -373,7 +380,51 @@ is UiEvent.ItemsReordered -> if (event.nodeId == "page_order_grid") {
 ```
 
 > [!NOTE]
-> `UiEvent.ItemsReordered` is dispatched on the **lossless** host event lane alongside `Click`, `TextChanged`, `DialogAction`, `TabSelected`, and other discrete events—rapid consecutive reorders are never conflated or dropped.
+> `UiEvent.ItemsReordered` is dispatched on the **lossless** host event lane alongside `Click`, `TextChanged`, `DialogAction`, `TabSelected`, `ShortcutTriggered`, `FilesDropped`, and other discrete events—rapid consecutive reorders are never conflated or dropped.
+
+### External OS File & Folder Drag-and-Drop (`UiModifier.onFileDrop` / `UiModifier.dropTarget`)
+
+Desktop users can drag image files or repository folders straight from their OS file manager onto any SDUI container or tile annotated with `.onFileDrop(...)` or `.dropTarget(UiDropTarget(...))`:
+
+```kotlin
+scrollableColumn(
+    id = "pages_pane",
+    spacing = SpacingSize.SMALL,
+    modifier = UiModifier.fillMaxSize()
+        .onFileDrop(
+            action = "drop_page_files",
+            allowedExtensions = listOf("png", "jpg", "jpeg", "webp"),
+            maxFiles = 200,
+            hint = "Drop PNG, JPG, or WEBP page files here"
+        )
+) {
+    // ...
+}
+```
+
+- When valid files or directories are dropped, the host automatically grants `hostFileSystem` read access for every returned path and emits `UiEvent.FilesDropped(nodeId, action, paths)`.
+- Any local images inside `paths` can immediately be rendered in `ImageNode(AssetReference.Uri(path))` without calling `pickFiles(...)`.
+- To accept only folders (for example a local Cubari Git clone dropzone), pass `.dropTarget(UiDropTarget(action = "drop_repo_folder", acceptFiles = false, acceptDirectories = true, maxFiles = 1, hint = "Drop repository folder"))`.
+
+### Keyboard Shortcuts & Hotkeys (`UiModifier.shortcut`)
+
+Attach desktop hotkeys directly to workspace roots, split panes, or specific panels using `.shortcut(...)` / `.shortcuts(...)`:
+
+```kotlin
+scaffold(
+    id = "workspace_root",
+    modifier = UiModifier.fillMaxSize()
+        .shortcut(key = "S", action = "save_draft", ctrl = true, allowWhileTyping = true, label = "Ctrl+S")
+        .shortcut(key = UiShortcut.KEY_ESCAPE, action = "dismiss_or_back", label = "Esc")
+        .shortcut(key = UiShortcut.KEY_DELETE, action = "delete_selected_pages", label = "Del")
+        .shortcut(key = UiShortcut.KEY_ARROW_LEFT, action = "move_page_prev", label = "Left")
+        .shortcut(key = UiShortcut.KEY_ARROW_RIGHT, action = "move_page_next", label = "Right")
+) { /* ... */ }
+```
+
+- When pressed, the host emits `UiEvent.ShortcutTriggered(nodeId, action, key, ctrl, shift, alt, meta)` targeting the deepest declared matching node.
+- **Typing Protection:** While a `TextInputNode` holds focus, unmodified keys (`Delete`, `Backspace`, arrows, single letters) and standard text-editing combos (`Ctrl+A/C/V/X/Z/Y`) continue editing text instead of firing canvas hotkeys. Set `allowWhileTyping = true` (or use non-text command chords like `Ctrl+S`) for shortcuts that should fire even while typing.
+- Standard key constants on `UiShortcut`: `KEY_DELETE`, `KEY_BACKSPACE`, `KEY_ESCAPE`, `KEY_ENTER`, `KEY_SPACE`, `KEY_TAB`, `KEY_ARROW_LEFT`, `KEY_ARROW_RIGHT`, `KEY_ARROW_UP`, `KEY_ARROW_DOWN`, `KEY_HOME`, `KEY_END`, `KEY_PAGE_UP`, `KEY_PAGE_DOWN`.
 
 ---
 
@@ -441,11 +492,14 @@ Supported `HttpMethod` values: `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD`.
 - `context.showToast(message)` (or `context.toast(message)`) displays a transient confirmation toast.
 - `context.showNotification(title, message, type)` records a persistent entry in the host notification center and surfaces critical alerts using `PluginNotificationType.INFO`, `SUCCESS`, `WARNING`, or `ERROR`.
 
-### Live Settings, Locks & Background Capability Jobs
+### Live Settings Synchronization (`settingsFlow`, `updateSetting`, `clearSetting`, `locksFlow`)
 
-Inside `UiSessionContext`, your session has reactive access to:
+Inside `UiSessionContext`, your session reads AND writes `@PluginSetting` configuration bidirectionally through the host settings controller (`PluginLifecycleManager`):
+
 - `context.initialParameters: Map<String, JsonElement>` — parameters passed from a caller or `openInteractiveTool(...)`.
-- `context.settingsFlow: StateFlow<Map<String, JsonElement>>` — live host setting updates.
+- `context.settingsFlow: StateFlow<Map<String, JsonElement>>` — live effective settings map (manifest `@PluginSetting` `defaultValue`s merged with user overrides).
+- `context.updateSetting(key, value)` / `context.updateSettings(map)` — writes directly through the host settings pipeline: encrypts `@PluginSetting(secret = true)` keys at rest in `settings.json`, updates `settingsFlow` AND Host Native Plugin Settings simultaneously, and automatically re-evaluates `@PluginLocks` (`refreshLocks`).
+- `context.clearSetting(key)` — clears a user override so the setting reverts to its manifest `@PluginSetting(defaultValue = ...)` and refreshes locks.
 - `context.locksFlow: StateFlow<Map<String, Boolean>>` — live capability lock states (`@PluginLocks`).
 - `context.capabilityJobs: StateFlow<List<CapabilityJobSnapshot>>` — live progress (`0f..1f`), logs, status (`PENDING`, `RUNNING`, `PAUSED`, `COMPLETED`, `FAILED`, `CANCELLED`), and results of capabilities launched from this session.
 - `context.launchCapability(capabilityName, parameters = emptyMap(), runInBackgroundQueue = true): String` — returns `jobId`.
@@ -453,12 +507,22 @@ Inside `UiSessionContext`, your session has reactive access to:
 - `context.launchAction(actionName, parameters = emptyMap()): Result<Unit>` — invokes `@PluginAction` methods (e.g., to refresh locks).
 - `context.observeCapabilityJob(jobId)`, `pauseCapabilityJob(jobId)`, `resumeCapabilityJob(jobId)`, `cancelCapabilityJob(jobId)`.
 
+```kotlin
+// Inside an InteractiveUiProcessor event handler:
+is UiEvent.TextChanged -> if (event.nodeId == "preview_hours_input") {
+    context.updateSetting("previewWindowHours", JsonPrimitive(event.text))
+}
+is UiEvent.Click -> if (event.action == "reset_preview_window") {
+    context.clearSetting("previewWindowHours")
+}
+```
+
 ---
 
 ## 10. Events (`UiEvent`) & Delivery Guarantees
 
 The host splits incoming events into two queues so high-frequency pointer/slider events never drop button clicks or typed characters:
-- **Lossless queue:** `Click`, `OptionSelected`, `ToggleChanged`, `TextChanged`, `ItemsReordered`, `BoardLayerSelected`, `BoardLayerMoved`, `BoardLayerResized`, `BoardTextEdited`, `BoardTextPlaced`, `BoardShapeCommitted`, `BoardLayerDeleted`, `BoardCanvasClicked`, `TabSelected`, `ChipSelected`, `DialogAction`, `PathCommitted`, `Custom`.
+- **Lossless queue:** `Click`, `OptionSelected`, `ToggleChanged`, `TextChanged`, `ItemsReordered`, `ShortcutTriggered`, `FilesDropped`, `BoardLayerSelected`, `BoardLayerMoved`, `BoardLayerResized`, `BoardTextEdited`, `BoardTextPlaced`, `BoardShapeCommitted`, `BoardLayerDeleted`, `BoardCanvasClicked`, `TabSelected`, `ChipSelected`, `DialogAction`, `PathCommitted`, `Custom`.
 - **Conflated high-frequency queue:** `ValueChanged` (live slider / split-pane drag updates).
 
 | Event Class | Fields | Source Control(s) |
@@ -469,6 +533,8 @@ The host splits incoming events into two queues so high-frequency pointer/slider
 | `UiEvent.OptionSelected` | `nodeId`, `selectedKey: String` | `DropdownNode` |
 | `UiEvent.ValueChanged` | `nodeId`, `value: Double` | `SliderNode`, resizable `SplitPaneNode` (`splitFraction`) |
 | `UiEvent.ItemsReordered` | `nodeId`, `itemIds: List<String>`, `fromIndex: Int`, `toIndex: Int` | `GridNode`, `ColumnNode`, `ScrollableColumnNode` with `reorderable = true` |
+| `UiEvent.ShortcutTriggered` | `nodeId`, `action: String`, `key: String`, `ctrl`, `shift`, `alt`, `meta` | Any `UiNode` declaring `UiModifier.shortcut(...)` / `UiModifier.shortcuts(...)` |
+| `UiEvent.FilesDropped` | `nodeId`, `action: String`, `paths: List<String>` | Any `UiNode` declaring `UiModifier.onFileDrop(...)` / `UiModifier.dropTarget(...)` |
 | `UiEvent.TabSelected` | `nodeId`, `tabKey: String` | `TabsNode` |
 | `UiEvent.ChipSelected` | `nodeId`, `chipKey: String`, `isSelected: Boolean` | `ChipGroupNode` |
 | `UiEvent.DialogAction` | `nodeId`, `isConfirmed: Boolean` | `DialogNode` |
@@ -552,8 +618,8 @@ Every emitted `UiNodeTree` passes through the host `UiAstSanitizer` before rende
 Interactive sessions run on standard Kotlin `Flow`s and can be unit-tested in pure JVM tests with `kotlinx-coroutines-test` by implementing a lightweight fake `UiSessionContext`:
 
 - Assert the initial rendered `UiNodeTree` structure and node IDs.
-- Send synthetic `UiEvent`s (`Click`, `TextChanged`, `ItemsReordered`, `OptionSelected`, `DialogAction`) through a `MutableSharedFlow<UiEvent>`.
-- Verify state transitions, `completeSession` / `cancelSession`, `openInteractiveTool` navigation calls, `secrets` storage, and `networkClient.request` payloads.
+- Send synthetic `UiEvent`s (`Click`, `TextChanged`, `ItemsReordered`, `ShortcutTriggered`, `FilesDropped`, `OptionSelected`, `DialogAction`) through a `MutableSharedFlow<UiEvent>`.
+- Verify state transitions, `completeSession` / `cancelSession`, `updateSetting` / `clearSetting`, `openInteractiveTool` navigation calls, `secrets` storage, and `networkClient.request` payloads.
 
 Reference implementations:
 - Full multi-pane chapter workspace + local repo & grid reordering + secrets + HTTP webhook: [`InteractiveChapterPublisherDemo.kt`](../plugins/completeExample/src/main/kotlin/org/wip/complete/InteractiveChapterPublisherDemo.kt)

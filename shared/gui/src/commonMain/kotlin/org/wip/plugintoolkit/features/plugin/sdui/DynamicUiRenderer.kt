@@ -86,6 +86,7 @@ import androidx.compose.material3.TooltipDefaults
 import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -96,11 +97,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
@@ -207,13 +211,48 @@ fun SafeUiNodeRenderer(
     modifier: Modifier = Modifier
 ) {
     if (LocalInSduiRoot.current) {
-        RenderUiNode(node = node, onEvent = onEvent, modifier = modifier)
+        val nextDepth = LocalSduiNodeDepth.current + 1
+        CompositionLocalProvider(LocalSduiNodeDepth provides nextDepth) {
+            RenderUiNode(node = node, onEvent = onEvent, modifier = modifier)
+        }
     } else {
+        val textInputFocusTracker = remember { SduiTextInputFocusTracker() }
+        val shortcutRegistry = remember { SduiShortcutRegistry() }
+        val rootFocusRequester = remember { FocusRequester() }
+        val focusManager = LocalFocusManager.current
+
+        LaunchedEffect(Unit) {
+            runCatching { rootFocusRequester.requestFocus() }
+        }
+
+        val wrappedOnEvent: (UiEvent) -> Unit = remember(onEvent, textInputFocusTracker, rootFocusRequester, focusManager) {
+            { event ->
+                if (event !is UiEvent.TextChanged && textInputFocusTracker.isTyping) {
+                    focusManager.clearFocus()
+                    runCatching { rootFocusRequester.requestFocus() }
+                }
+                onEvent(event)
+            }
+        }
+
         CompositionLocalProvider(
             LocalInSduiRoot provides true,
-            LocalMinimumInteractiveComponentSize provides ToolkitTheme.dimensions.desktopTouchTargetSize
+            LocalMinimumInteractiveComponentSize provides ToolkitTheme.dimensions.desktopTouchTargetSize,
+            LocalSduiTextInputFocusTracker provides textInputFocusTracker,
+            LocalSduiShortcutRegistry provides shortcutRegistry,
+            LocalSduiNodeDepth provides 0
         ) {
-            RenderUiNode(node = node, onEvent = onEvent, modifier = modifier)
+            RenderUiNode(
+                node = node,
+                onEvent = wrappedOnEvent,
+                modifier = modifier
+                    .focusRequester(rootFocusRequester)
+                    .sduiRootShortcutHost(
+                        registry = shortcutRegistry,
+                        tracker = textInputFocusTracker,
+                        onEvent = wrappedOnEvent
+                    )
+            )
         }
     }
 }
@@ -312,7 +351,21 @@ fun RenderUiNode(
 
     // Sidebars manage their own collapse-aware animated width from node.modifier.widthDp.
     val modifierSpec = if (node is SidebarNode) node.modifier.copy(widthDp = null) else node.modifier
-    val appliedModifier = modifier.applyUiModifier(modifierSpec)
+    val appliedModifier = modifier
+        .applyUiModifier(modifierSpec)
+        .sduiShortcuts(
+            nodeId = node.id,
+            shortcuts = modifierSpec.shortcuts,
+            enabled = modifierSpec.enabled,
+            onEvent = onEvent
+        )
+        .sduiDropTarget(
+            nodeId = node.id,
+            dropTarget = modifierSpec.dropTarget,
+            enabled = modifierSpec.enabled,
+            clipRounded = modifierSpec.clipRounded,
+            onEvent = onEvent
+        )
 
     when (node) {
         is ColumnNode -> {
@@ -684,21 +737,6 @@ fun RenderUiNode(
         is ScrollableRowNode -> {
             RenderScrollableRow(node = node, onEvent = onEvent, modifier = appliedModifier)
         }
-
-        else -> {
-            Surface(
-                modifier = appliedModifier,
-                color = MaterialTheme.colorScheme.surfaceVariant,
-                shape = ToolkitTheme.shapes.small
-            ) {
-                Text(
-                    text = stringResource(Res.string.sdui_unsupported_node, node::class.simpleName ?: "unknown"),
-                    style = ToolkitTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(ToolkitTheme.spacing.xs)
-                )
-            }
-        }
     }
 }
 
@@ -776,7 +814,9 @@ private fun RenderTextInput(
         },
         shape = ToolkitTheme.shapes.medium,
         colors = sduiOutlinedTextFieldColors(),
-        modifier = modifier.withFormWidthConstraint(node.modifier)
+        modifier = modifier
+            .trackSduiTextInputFocus(node.id)
+            .withFormWidthConstraint(node.modifier)
     )
 }
 

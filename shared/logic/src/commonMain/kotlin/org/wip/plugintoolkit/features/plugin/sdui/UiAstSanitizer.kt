@@ -158,6 +158,41 @@ object UiAstSanitizer {
                 )
             }
 
+            for (shortcut in node.modifier.shortcuts) {
+                if (shortcut.key.isBlank() || shortcut.action.isBlank()) {
+                    return ErrorBoundaryNode(
+                        id = node.id,
+                        errorMessage = "Invalid UiShortcut on '${node.id}': key and action must not be blank",
+                        failedNodeType = node::class.simpleName
+                    )
+                }
+            }
+
+            node.modifier.dropTarget?.let { dropTarget ->
+                if (dropTarget.action.isBlank()) {
+                    return ErrorBoundaryNode(
+                        id = node.id,
+                        errorMessage = "Invalid UiDropTarget on '${node.id}': action must not be blank",
+                        failedNodeType = node::class.simpleName
+                    )
+                }
+                if (!dropTarget.acceptFiles && !dropTarget.acceptDirectories) {
+                    return ErrorBoundaryNode(
+                        id = node.id,
+                        errorMessage = "Invalid UiDropTarget on '${node.id}': must accept files or directories",
+                        failedNodeType = node::class.simpleName
+                    )
+                }
+                val maxFiles = dropTarget.maxFiles
+                if (maxFiles != null && maxFiles <= 0) {
+                    return ErrorBoundaryNode(
+                        id = node.id,
+                        errorMessage = "Invalid UiDropTarget on '${node.id}': maxFiles=$maxFiles must be > 0",
+                        failedNodeType = node::class.simpleName
+                    )
+                }
+            }
+
             // Validate component-specific invariants
             if (node is SliderNode) {
                 if (node.min.isNaN() || node.max.isNaN() || node.value.isNaN() || node.min >= node.max) {

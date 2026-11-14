@@ -64,6 +64,7 @@ import org.wip.plugintoolkit.api.sdui.UiEvent
 import org.wip.plugintoolkit.api.sdui.UiNode
 import org.wip.plugintoolkit.api.sdui.UiNodeTree
 import org.wip.plugintoolkit.api.sdui.UiSessionContext
+import org.wip.plugintoolkit.api.sdui.UiShortcut
 import org.wip.plugintoolkit.api.sdui.VectorPathData
 import java.io.File
 import kotlin.test.Test
@@ -195,6 +196,11 @@ class CompleteExampleTest {
             updatedSettings[key] = value
             onSettingsMutated(updatedSettings.toMap())
         }
+
+        override suspend fun clearSetting(key: String) {
+            updatedSettings.remove(key)
+            onSettingsMutated(updatedSettings.toMap())
+        }
     }
 
     private class TestWiredSessionContext(
@@ -237,6 +243,11 @@ class CompleteExampleTest {
 
         override suspend fun updateSetting(key: String, value: JsonElement) {
             baseContext.updateSetting(key, value)
+            settingsState.value = baseContext.settings.toMap()
+        }
+
+        override suspend fun clearSetting(key: String) {
+            baseContext.clearSetting(key)
             settingsState.value = baseContext.settings.toMap()
         }
 
@@ -841,9 +852,51 @@ class CompleteExampleTest {
         eventsFlow.emit(UiEvent.Click("insp_open_board_btn", "open_page_in_board"))
         advanceUntilIdle()
 
-        val afterPickGrid = collectNodes(emittedTrees.last().root).filterIsInstance<GridNode>().first { it.id == "insp_pages_grid" }
+        val afterPickNodes = collectNodes(emittedTrees.last().root)
+        val afterPickGrid = afterPickNodes.filterIsInstance<GridNode>().first { it.id == "insp_pages_grid" }
         assertEquals(7, afterPickGrid.children.size, "Expected picked page appended to grid")
         assertEquals(1, sessionContext.savedFiles.size, "Expected saveFile called for chapter JSON export")
+
+        // Assert workspace shortcuts & OS file drop target modifiers and trigger both events
+        val scaffoldNode = emittedTrees.last().root as ScaffoldNode
+        assertTrue(scaffoldNode.modifier.shortcuts.any { it.action == "save_draft_changes" && it.ctrl })
+        assertTrue(scaffoldNode.modifier.shortcuts.any { it.action == "shortcut_escape" && it.key == UiShortcut.KEY_ESCAPE })
+
+        val imgPane = afterPickNodes.first { it.id == "img_grid_pane" }
+        assertNotNull(imgPane.modifier.dropTarget)
+        assertEquals("drop_page_files", imgPane.modifier.dropTarget?.action)
+        assertTrue(imgPane.modifier.shortcuts.any { it.key == UiShortcut.KEY_DELETE && it.action == "remove_selected_page" })
+
+        eventsFlow.emit(
+            UiEvent.FilesDropped(
+                nodeId = "img_grid_pane",
+                action = "drop_page_files",
+                paths = listOf("/tmp/dropped_page_08.webp")
+            )
+        )
+        advanceUntilIdle()
+        val afterDropGrid = collectNodes(emittedTrees.last().root).filterIsInstance<GridNode>().first { it.id == "insp_pages_grid" }
+        assertEquals(8, afterDropGrid.children.size, "Expected OS-dropped page image appended to grid")
+
+        eventsFlow.emit(
+            UiEvent.ShortcutTriggered(
+                nodeId = "img_grid_pane",
+                action = "remove_selected_page",
+                key = UiShortcut.KEY_DELETE
+            )
+        )
+        eventsFlow.emit(
+            UiEvent.ShortcutTriggered(
+                nodeId = "publisher_scaffold",
+                action = "save_draft_changes",
+                key = "S",
+                ctrl = true
+            )
+        )
+        advanceUntilIdle()
+        val afterDeleteShortcutGrid = collectNodes(emittedTrees.last().root).filterIsInstance<GridNode>().first { it.id == "insp_pages_grid" }
+        assertEquals(7, afterDeleteShortcutGrid.children.size, "Expected Delete shortcut to remove selected page")
+
         val handoff = sessionContext.openedTools.firstOrNull()
         assertNotNull(handoff)
         assertEquals("interactiveBoardCompositor", handoff.first)
@@ -913,6 +966,18 @@ class CompleteExampleTest {
         assertEquals("/tmp/local_cubari_repo", testContext.storage.get("chapter_publisher_repo_path")?.jsonPrimitive?.contentOrNull)
         assertTrue(testContext.fakeNetworkClient.requests.any { it.method == HttpMethod.GET })
         assertEquals(true, locksState.value["feature_unlocked"])
+
+        eventsFlow.emit(UiEvent.Click("cfg_reset_api_key_btn", "reset_api_key"))
+        eventsFlow.emit(
+            UiEvent.FilesDropped(
+                nodeId = "cfg_integrations_card",
+                action = "drop_repo_folder",
+                paths = listOf("/tmp/dropped_cubari_repo")
+            )
+        )
+        advanceUntilIdle()
+        assertFalse(settingsState.value.containsKey("apiKey"), "Expected clearSetting to remove overridden apiKey")
+        assertEquals("/tmp/dropped_cubari_repo", testContext.storage.get("chapter_publisher_repo_path")?.jsonPrimitive?.contentOrNull)
         } finally {
             job.cancel()
         }

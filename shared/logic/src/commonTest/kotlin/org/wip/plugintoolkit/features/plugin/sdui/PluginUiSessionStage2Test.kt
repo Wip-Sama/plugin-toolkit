@@ -32,6 +32,7 @@ import org.wip.plugintoolkit.api.sdui.TextNode
 import org.wip.plugintoolkit.api.sdui.UiEvent
 import org.wip.plugintoolkit.api.sdui.UiNodeTree
 import org.wip.plugintoolkit.api.sdui.UiSessionContext
+import org.wip.plugintoolkit.api.sdui.UiShortcut
 import org.wip.plugintoolkit.api.sdui.uiTree
 import org.wip.plugintoolkit.features.plugin.logic.HostFileSystemImpl
 import org.wip.plugintoolkit.features.plugin.logic.ResourceUsageTracker
@@ -245,6 +246,69 @@ class PluginUiSessionStage2Test {
 
             scope.cancel()
         }
+
+    @Test
+    fun testFilesDroppedGrantsHostAccessAndShortcutTriggeredDispatches() = runTest {
+        val droppedImage = File(pickedExternalDir, "dropped_page_01.png").apply {
+            writeBytes(byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47))
+        }
+        val tracker = ResourceUsageTracker()
+        val trackingHostFs = TrackingHostFileSystem(
+            delegate = HostFileSystemImpl(allowedPaths = listOf(initialAllowedDir.canonicalPath), isDestructiveAllowed = false),
+            tracker = tracker
+        )
+        val context = createStage2TestContext(trackingHostFs)
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val manager = PluginUiSessionManager(appScope = scope, dispatcher = Dispatchers.Default)
+
+        val receivedEvents = mutableListOf<UiEvent>()
+        val processor = object : InteractiveUiProcessor {
+            override fun openUiSession(context: UiSessionContext, events: Flow<UiEvent>): Flow<UiNodeTree> =
+                channelFlow {
+                    send(uiTree { text("Ready for drops & hotkeys") })
+                    events.collect { event ->
+                        receivedEvents += event
+                        if (receivedEvents.size >= 2) {
+                            context.completeSession(PluginResponse(result = JsonPrimitive("ok")))
+                        }
+                    }
+                }
+        }
+
+        val handle = manager.startSession(
+            pluginId = "test.uploader",
+            capabilityName = "chapterPublisher",
+            context = context,
+            processor = processor
+        )
+
+        handle.dispatchEvent(
+            UiEvent.FilesDropped(
+                nodeId = "img_grid_pane",
+                action = "drop_page_files",
+                paths = listOf(droppedImage.canonicalPath)
+            )
+        )
+        handle.dispatchEvent(
+            UiEvent.ShortcutTriggered(
+                nodeId = "img_grid_pane",
+                action = "remove_selected_page",
+                key = UiShortcut.KEY_DELETE
+            )
+        )
+
+        val completion = handle.completionDeferred.await()
+        assertIs<ExecutionResult.Success>(completion)
+        assertTrue(trackingHostFs.exists(droppedImage.canonicalPath), "Dropped file path must be granted host read access")
+        assertEquals(4, trackingHostFs.readFile(droppedImage.canonicalPath)?.size)
+        val dropEvent = receivedEvents.filterIsInstance<UiEvent.FilesDropped>().single()
+        assertEquals(listOf(droppedImage.canonicalPath), dropEvent.paths)
+        val shortcutEvent = receivedEvents.filterIsInstance<UiEvent.ShortcutTriggered>().single()
+        assertEquals(UiShortcut.KEY_DELETE, shortcutEvent.key)
+        assertEquals("remove_selected_page", shortcutEvent.action)
+
+        scope.cancel()
+    }
 
     private fun createStage2TestContext(hostFileSystem: HostFileSystem): PluginContext = object : PluginContext {
         override val logger: PluginLogger = object : PluginLogger {

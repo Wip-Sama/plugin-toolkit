@@ -27,10 +27,12 @@ import org.wip.plugintoolkit.api.sdui.SpacingSize
 import org.wip.plugintoolkit.api.sdui.TabItem
 import org.wip.plugintoolkit.api.sdui.TypographyRole
 import org.wip.plugintoolkit.api.sdui.UiContainerBuilder
+import org.wip.plugintoolkit.api.sdui.UiDropTarget
 import org.wip.plugintoolkit.api.sdui.UiEvent
 import org.wip.plugintoolkit.api.sdui.UiModifier
 import org.wip.plugintoolkit.api.sdui.UiNodeTree
 import org.wip.plugintoolkit.api.sdui.UiSessionContext
+import org.wip.plugintoolkit.api.sdui.UiShortcut
 import org.wip.plugintoolkit.api.sdui.uiTree
 
 private val publisherJson = Json {
@@ -278,6 +280,118 @@ internal fun runChapterPublisherSession(
             capabilityName = "interactiveBoardCompositor",
             initialParameters = params
         )
+    }
+
+    suspend fun appendPagesFromPaths(paths: List<String>, sourceLabel: String) {
+        if (paths.isEmpty()) return
+        val current = stateFlow.value
+        val targetId = current.inspectedChapterId ?: return
+        val target = current.chapters.find { it.id == targetId } ?: return
+        val startIdx = target.pages.size + 1
+        val newPages = paths.mapIndexed { offset, path ->
+            val fileName = path.substringAfterLast('/').substringAfterLast('\\')
+            ChapterPageRecord(
+                id = "${target.id}_${sourceLabel}_${startIdx + offset}",
+                label = fileName.ifBlank { "Page ${startIdx + offset}" },
+                asset = AssetReference.Uri(path)
+            )
+        }
+        val updatedChapter = target.copy(
+            pages = target.pages + newPages,
+            pageCount = target.pages.size + newPages.size
+        )
+        val updatedChapters = current.chapters.map { if (it.id == target.id) updatedChapter else it }
+        CompleteExampleCatalogStore.saveLocalCatalog(
+            context.storage,
+            updatedChapters.filter { it.status != ChapterSyncStatus.REMOTE_ONLY }
+        )
+        stateFlow.update {
+            it.copy(
+                chapters = updatedChapters,
+                selectedPageId = newPages.first().id,
+                pageOrderRevision = it.pageOrderRevision + 1,
+                bannerMessage = "Added ${newPages.size} $sourceLabel page image(s) to Chapter ${target.number}.",
+                bannerSeverity = SemanticColor.SUCCESS
+            )
+        }
+    }
+
+    suspend fun applyPageAction(action: String) {
+        val current = stateFlow.value
+        val targetId = current.inspectedChapterId ?: return
+        val target = current.chapters.find { it.id == targetId } ?: return
+        if (target.pages.isEmpty()) return
+        val nextPages = when (action) {
+            "reverse_page_order" -> target.pages.reversed()
+            "move_page_prev" -> movePageBy(target.pages, current.selectedPageId, -1)
+            "move_page_next" -> movePageBy(target.pages, current.selectedPageId, +1)
+            "remove_selected_page" -> target.pages.filterNot { it.id == current.selectedPageId }
+            else -> return
+        }
+        val updatedChapter = target.copy(pages = nextPages, pageCount = nextPages.size)
+        val updatedChapters = current.chapters.map { if (it.id == target.id) updatedChapter else it }
+        CompleteExampleCatalogStore.saveLocalCatalog(
+            context.storage,
+            updatedChapters.filter { it.status != ChapterSyncStatus.REMOTE_ONLY }
+        )
+        val nextSel = current.selectedPageId?.takeIf { id -> nextPages.any { it.id == id } }
+            ?: nextPages.firstOrNull()?.id
+        stateFlow.update {
+            it.copy(
+                chapters = updatedChapters,
+                selectedPageId = nextSel,
+                pageOrderRevision = it.pageOrderRevision + 1,
+                bannerMessage = "Updated page order for Ch. ${target.number}."
+            )
+        }
+    }
+
+    suspend fun saveDraftChanges() {
+        val current = stateFlow.value
+        val targetId = current.inspectedChapterId ?: return
+        val existing = CompleteExampleCatalogStore.loadLocalCatalog(context.storage).toMutableList()
+        val remote = CompleteExampleCatalogStore.loadRemoteCatalog(context.storage)
+        val idx = existing.indexOfFirst { it.id == targetId }
+        val edited = current.chapters.find { it.id == targetId }?.copy(
+            title = current.draftTitle.ifBlank { "Untitled Chapter" },
+            releaseNotes = current.draftNotes,
+            requiresLock = current.draftRequiresLock,
+            localRevision = (current.chapters.find { it.id == targetId }?.localRevision ?: 0) + 1,
+            status = ChapterSyncStatus.OUT_OF_SYNC
+        ) ?: return
+        if (idx >= 0) existing[idx] = edited else existing.add(edited)
+        CompleteExampleCatalogStore.saveLocalCatalog(context.storage, existing)
+        val reconciled = CompleteExampleCatalogStore.reconcile(existing, remote).map { enrichChapter(it) }
+        stateFlow.update {
+            it.copy(
+                chapters = reconciled,
+                bannerMessage = "Saved local draft revision ${edited.localRevision} for Chapter ${edited.number}.",
+                bannerSeverity = SemanticColor.SUCCESS
+            )
+        }
+    }
+
+    suspend fun linkRepoDirectory(folder: String) {
+        if (folder.isBlank()) return
+        context.storage.put(STORAGE_LINKED_REPO_PATH, JsonPrimitive(folder))
+        stateFlow.update {
+            it.copy(
+                linkedRepoPath = folder,
+                bannerMessage = "Linked local repository folder: $folder",
+                bannerSeverity = SemanticColor.SUCCESS
+            )
+        }
+    }
+
+    fun handleEscapeAction() {
+        stateFlow.update { current ->
+            when {
+                current.showConfirmDialog -> current.copy(showConfirmDialog = false, pendingPushIds = emptyList())
+                current.navLevel == PublisherNavLevel.IMAGES -> current.copy(navLevel = PublisherNavLevel.CHAPTERS)
+                current.navLevel == PublisherNavLevel.CHAPTERS -> current.copy(navLevel = PublisherNavLevel.SERIES)
+                else -> current.copy(selectedChapterIds = emptySet())
+            }
+        }
     }
 
     launch {
@@ -575,33 +689,7 @@ internal fun runChapterPublisherSession(
                             }
                         }
                         action == "reverse_page_order" || action == "move_page_prev" || action == "move_page_next" || action == "remove_selected_page" -> {
-                            val current = stateFlow.value
-                            val targetId = current.inspectedChapterId
-                            val target = current.chapters.find { it.id == targetId }
-                            if (target != null && target.pages.isNotEmpty()) {
-                                val nextPages = when (action) {
-                                    "reverse_page_order" -> target.pages.reversed()
-                                    "move_page_prev" -> movePageBy(target.pages, current.selectedPageId, -1)
-                                    "move_page_next" -> movePageBy(target.pages, current.selectedPageId, +1)
-                                    else -> target.pages.filterNot { it.id == current.selectedPageId }
-                                }
-                                val updatedChapter = target.copy(pages = nextPages, pageCount = nextPages.size)
-                                val updatedChapters = current.chapters.map { if (it.id == target.id) updatedChapter else it }
-                                CompleteExampleCatalogStore.saveLocalCatalog(
-                                    context.storage,
-                                    updatedChapters.filter { it.status != ChapterSyncStatus.REMOTE_ONLY }
-                                )
-                                val nextSel = current.selectedPageId?.takeIf { id -> nextPages.any { it.id == id } }
-                                    ?: nextPages.firstOrNull()?.id
-                                stateFlow.update {
-                                    it.copy(
-                                        chapters = updatedChapters,
-                                        selectedPageId = nextSel,
-                                        pageOrderRevision = it.pageOrderRevision + 1,
-                                        bannerMessage = "Updated page order for Ch. ${target.number}."
-                                    )
-                                }
-                            }
+                            applyPageAction(action)
                         }
                         action == "refresh_catalog" || event.nodeId == "pub_refresh_btn" -> {
                             refreshCatalog(stateFlow.value.environment, "Re-queried remote & local chapter catalogs.")
@@ -650,51 +738,12 @@ internal fun runChapterPublisherSession(
                                 title = "Select Chapter Page Images",
                                 allowedExtensions = listOf("png", "jpg", "jpeg", "webp")
                             )
-                            if (picked.isNotEmpty()) {
-                                val current = stateFlow.value
-                                val targetId = current.inspectedChapterId
-                                val target = current.chapters.find { it.id == targetId }
-                                if (target != null) {
-                                    val startIdx = target.pages.size + 1
-                                    val newPages = picked.mapIndexed { offset, path ->
-                                        val fileName = path.substringAfterLast('/').substringAfterLast('\\')
-                                        ChapterPageRecord(
-                                            id = "${target.id}_picked_${startIdx + offset}",
-                                            label = fileName.ifBlank { "Page ${startIdx + offset}" },
-                                            asset = AssetReference.Uri(path)
-                                        )
-                                    }
-                                    val updatedChapter = target.copy(
-                                        pages = target.pages + newPages,
-                                        pageCount = target.pages.size + newPages.size
-                                    )
-                                    val updatedChapters = current.chapters.map { if (it.id == target.id) updatedChapter else it }
-                                    CompleteExampleCatalogStore.saveLocalCatalog(
-                                        context.storage,
-                                        updatedChapters.filter { it.status != ChapterSyncStatus.REMOTE_ONLY }
-                                    )
-                                    stateFlow.update {
-                                        it.copy(
-                                            chapters = updatedChapters,
-                                            selectedPageId = newPages.first().id,
-                                            bannerMessage = "Added ${newPages.size} page image(s) to Chapter ${target.number}.",
-                                            bannerSeverity = SemanticColor.SUCCESS
-                                        )
-                                    }
-                                }
-                            }
+                            appendPagesFromPaths(picked, "picked")
                         }
                         action == "pick_repo_folder" -> {
                             val folder = context.pickDirectory("Select Local Repository Directory")
                             if (!folder.isNullOrBlank()) {
-                                context.storage.put(STORAGE_LINKED_REPO_PATH, JsonPrimitive(folder))
-                                stateFlow.update {
-                                    it.copy(
-                                        linkedRepoPath = folder,
-                                        bannerMessage = "Linked local repository folder: $folder",
-                                        bannerSeverity = SemanticColor.SUCCESS
-                                    )
-                                }
+                                linkRepoDirectory(folder)
                             }
                         }
                         action == "export_chapter_json" -> {
@@ -793,31 +842,15 @@ internal fun runChapterPublisherSession(
                             dispatchPull(listOf(chId), stateFlow.value.environment)
                         }
                         action == "save_draft_changes" -> {
-                            val current = stateFlow.value
-                            val targetId = current.inspectedChapterId
-                            if (targetId != null) {
-                                val existing = CompleteExampleCatalogStore.loadLocalCatalog(context.storage).toMutableList()
-                                val remote = CompleteExampleCatalogStore.loadRemoteCatalog(context.storage)
-                                val idx = existing.indexOfFirst { it.id == targetId }
-                                val edited = current.chapters.find { it.id == targetId }?.copy(
-                                    title = current.draftTitle.ifBlank { "Untitled Chapter" },
-                                    releaseNotes = current.draftNotes,
-                                    requiresLock = current.draftRequiresLock,
-                                    localRevision = (current.chapters.find { it.id == targetId }?.localRevision ?: 0) + 1,
-                                    status = ChapterSyncStatus.OUT_OF_SYNC
+                            saveDraftChanges()
+                        }
+                        action == "reset_api_key" -> {
+                            context.clearSetting("apiKey")
+                            stateFlow.update {
+                                it.copy(
+                                    bannerMessage = "Reset plugin apiKey setting to manifest default.",
+                                    bannerSeverity = SemanticColor.INFO
                                 )
-                                if (edited != null) {
-                                    if (idx >= 0) existing[idx] = edited else existing.add(edited)
-                                    CompleteExampleCatalogStore.saveLocalCatalog(context.storage, existing)
-                                    val reconciled = CompleteExampleCatalogStore.reconcile(existing, remote).map { enrichChapter(it) }
-                                    stateFlow.update {
-                                        it.copy(
-                                            chapters = reconciled,
-                                            bannerMessage = "Saved local draft revision ${edited.localRevision} for Chapter ${edited.number}.",
-                                            bannerSeverity = SemanticColor.SUCCESS
-                                        )
-                                    }
-                                }
                             }
                         }
                         action == "create_new_draft" -> {
@@ -888,6 +921,19 @@ internal fun runChapterPublisherSession(
                             val jobId = action.removePrefix("cancel_job:")
                             context.cancelCapabilityJob(jobId)
                         }
+                    }
+                }
+                is UiEvent.ShortcutTriggered -> {
+                    when (event.action) {
+                        "save_draft_changes" -> saveDraftChanges()
+                        "shortcut_escape" -> handleEscapeAction()
+                        "move_page_prev", "move_page_next", "remove_selected_page" -> applyPageAction(event.action)
+                    }
+                }
+                is UiEvent.FilesDropped -> {
+                    when (event.action) {
+                        "drop_page_files" -> appendPagesFromPaths(event.paths, "dropped")
+                        "drop_repo_folder" -> event.paths.firstOrNull()?.let { linkRepoDirectory(it) }
                     }
                 }
                 else -> Unit
@@ -1014,7 +1060,22 @@ private fun renderChapterPublisherTree(
     val apiKey = settings["apiKey"]?.jsonPrimitive?.contentOrNull ?: ""
     val featureUnlocked = locks["feature_unlocked"] == true
 
-    scaffold(id = "publisher_scaffold", modifier = UiModifier.fillMaxSize()) {
+    scaffold(
+        id = "publisher_scaffold",
+        modifier = UiModifier.fillMaxSize()
+            .shortcut(
+                key = "S",
+                action = "save_draft_changes",
+                ctrl = true,
+                allowWhileTyping = true,
+                label = "Save Chapter Draft"
+            )
+            .shortcut(
+                key = UiShortcut.KEY_ESCAPE,
+                action = "shortcut_escape",
+                label = "Navigate Back / Dismiss"
+            )
+    ) {
         topBar {
             row(
                 id = "publisher_top_row",
@@ -1670,7 +1731,17 @@ private fun UiContainerBuilder.renderImagesLevel(
             scrollableColumn(
                 id = "img_grid_pane",
                 spacing = SpacingSize.SMALL,
-                modifier = UiModifier.fillMaxSize().padding(SpacingSize.SMALL)
+                modifier = UiModifier.fillMaxSize()
+                    .padding(SpacingSize.SMALL)
+                    .shortcut(key = UiShortcut.KEY_DELETE, action = "remove_selected_page", label = "Remove Selected Page")
+                    .shortcut(key = UiShortcut.KEY_BACKSPACE, action = "remove_selected_page", label = "Remove Selected Page")
+                    .shortcut(key = UiShortcut.KEY_ARROW_LEFT, action = "move_page_prev", label = "Move Page Earlier")
+                    .shortcut(key = UiShortcut.KEY_ARROW_RIGHT, action = "move_page_next", label = "Move Page Later")
+                    .onFileDrop(
+                        action = "drop_page_files",
+                        allowedExtensions = listOf("png", "jpg", "jpeg", "webp"),
+                        hint = "Drop PNG, JPG, or WEBP page images here"
+                    )
             ) {
                 row(id = "img_toolbar_row", spacing = SpacingSize.SMALL, modifier = UiModifier.fillMaxWidth()) {
                     button(
@@ -1694,7 +1765,7 @@ private fun UiContainerBuilder.renderImagesLevel(
                 }
                 text(
                     id = "img_drag_hint",
-                    text = "${selectedSeries?.title ?: "Series"} / Ch. ${selectedChapter.number}: drag tiles horizontally or vertically to reorder (${selectedChapter.pages.size} pages).",
+                    text = "${selectedSeries?.title ?: "Series"} / Ch. ${selectedChapter.number}: drag tiles to reorder, drop OS image files to append, or use ←/→/Del/Ctrl+S (${selectedChapter.pages.size} pages).",
                     role = TypographyRole.BODY_SMALL
                 )
                 if (selectedChapter.pages.isEmpty()) {
@@ -1931,6 +2002,12 @@ private fun UiContainerBuilder.renderSettingsTab(
                 label = "Plugin API Key (writes directly to plugin settings)",
                 placeholder = "Enter secret-key..."
             )
+            button(
+                id = "cfg_reset_api_key_btn",
+                label = "Reset API Key to Default",
+                action = "reset_api_key",
+                isPrimary = false
+            )
         }
 
         card(id = "cfg_locks_card", title = "Capability Feature Locks (locksFlow)") {
@@ -1954,7 +2031,19 @@ private fun UiContainerBuilder.renderSettingsTab(
             )
         }
 
-        card(id = "cfg_integrations_card", title = "Encrypted Credentials & Integrations") {
+        card(
+            id = "cfg_integrations_card",
+            title = "Encrypted Credentials & Integrations",
+            modifier = UiModifier.dropTarget(
+                UiDropTarget(
+                    action = "drop_repo_folder",
+                    acceptFiles = false,
+                    acceptDirectories = true,
+                    maxFiles = 1,
+                    hint = "Drop local repository folder here"
+                )
+            )
+        ) {
             row(id = "cfg_secret_status_row", spacing = SpacingSize.SMALL) {
                 badge(
                     id = "cfg_secret_status_badge",

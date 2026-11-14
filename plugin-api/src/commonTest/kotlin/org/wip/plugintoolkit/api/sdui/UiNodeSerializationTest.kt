@@ -212,5 +212,68 @@ class UiNodeSerializationTest {
         assertTrue(sidebar.isCollapsible)
         assertEquals(1, sidebar.children.size)
     }
+
+    @Test
+    fun testRoundTripShortcutsDropTargetAndEventsSerialization() {
+        val tree = uiTree {
+            column(
+                id = "workspace_col",
+                modifier = UiModifier.fillMaxSize()
+                    .shortcut(
+                        key = "S",
+                        action = "save_draft",
+                        ctrl = true,
+                        allowWhileTyping = true,
+                        label = "Save"
+                    )
+                    .shortcut(
+                        key = UiShortcut.KEY_DELETE,
+                        action = "delete_selected",
+                        label = "Delete Page"
+                    )
+                    .onFileDrop(
+                        action = "drop_pages",
+                        allowedExtensions = listOf("png", "webp"),
+                        hint = "Drop page images"
+                    )
+            ) {
+                text("Workspace", id = "ws_lbl")
+            }
+        }
+
+        val encodedTree = json.encodeToString(tree)
+        val decodedTree = json.decodeFromString<UiNodeTree>(encodedTree)
+        val rootCol = decodedTree.root as ColumnNode
+        assertEquals(2, rootCol.modifier.shortcuts.size)
+        assertEquals("S", rootCol.modifier.shortcuts[0].key)
+        assertEquals(true, rootCol.modifier.shortcuts[0].ctrl)
+        assertEquals(true, rootCol.modifier.shortcuts[0].allowWhileTyping)
+        assertEquals(UiShortcut.KEY_DELETE, rootCol.modifier.shortcuts[1].key)
+
+        val drop = rootCol.modifier.dropTarget
+        assertNotNull(drop)
+        assertEquals("drop_pages", drop.action)
+        assertEquals(listOf("png", "webp"), drop.allowedExtensions)
+        assertEquals("Drop page images", drop.hint)
+
+        val shortcutEvent = UiEvent.ShortcutTriggered(
+            nodeId = "workspace_col",
+            action = "save_draft",
+            key = "S",
+            ctrl = true
+        )
+        val encodedShortcut = json.encodeToString(UiEventSerializer, shortcutEvent)
+        val decodedShortcut = json.decodeFromString(UiEventSerializer, encodedShortcut)
+        assertEquals(shortcutEvent, decodedShortcut)
+
+        val dropEvent = UiEvent.FilesDropped(
+            nodeId = "workspace_col",
+            action = "drop_pages",
+            paths = listOf("/tmp/p1.png", "/tmp/p2.webp")
+        )
+        val encodedDrop = json.encodeToString(UiEventSerializer, dropEvent)
+        val decodedDrop = json.decodeFromString(UiEventSerializer, encodedDrop)
+        assertEquals(dropEvent, decodedDrop)
+    }
 }
 
