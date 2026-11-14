@@ -8,6 +8,7 @@ import org.wip.plugintoolkit.api.sdui.ColumnNode
 import org.wip.plugintoolkit.api.sdui.DialogNode
 import org.wip.plugintoolkit.api.sdui.ErrorBoundaryNode
 import org.wip.plugintoolkit.api.sdui.FloatingPanelNode
+import org.wip.plugintoolkit.api.sdui.GridNode
 import org.wip.plugintoolkit.api.sdui.ListItemNode
 import org.wip.plugintoolkit.api.sdui.ProgressBarNode
 import org.wip.plugintoolkit.api.sdui.RowNode
@@ -31,7 +32,7 @@ import org.wip.plugintoolkit.api.sdui.UiNodeTree
  */
 object UiAstSanitizer {
     const val DEFAULT_MAX_DEPTH = 32
-    const val DEFAULT_MAX_NODES = 1000
+    const val DEFAULT_MAX_NODES = 4000
 
     fun sanitize(
         tree: UiNodeTree,
@@ -188,6 +189,19 @@ object UiAstSanitizer {
                 is BoxNode -> node.copy(children = node.children.map { sanitizeNode(it, depth + 1) })
                 is CardNode -> node.copy(children = node.children.map { sanitizeNode(it, depth + 1) })
                 is ScrollableColumnNode -> node.copy(children = node.children.map { sanitizeNode(it, depth + 1) })
+                is GridNode -> {
+                    val safeColumns = node.columns?.coerceIn(1, 12)
+                    val safeMinWidth = if (node.minItemWidthDp.isNaN() || node.minItemWidthDp.isInfinite()) {
+                        156f
+                    } else {
+                        node.minItemWidthDp.coerceIn(72f, 600f)
+                    }
+                    node.copy(
+                        columns = safeColumns,
+                        minItemWidthDp = safeMinWidth,
+                        children = node.children.map { sanitizeNode(it, depth + 1) }
+                    )
+                }
                 is TabsNode -> node.copy(content = sanitizeNode(node.content, depth + 1))
                 is ListItemNode -> node.copy(trailingContent = node.trailingContent.map { sanitizeNode(it, depth + 1) })
                 is DialogNode -> node.copy(children = node.children.map { sanitizeNode(it, depth + 1) })

@@ -8,6 +8,7 @@ expect object PlatformUtils {
     val isMac: Boolean
     fun getSystemAccentColor(): Color?
     suspend fun pickFolder(): String?
+    suspend fun pickFolder(title: String): String?
     suspend fun pickFile(): String?
     fun copyFile(source: String, destination: String)
     fun copyDirectory(source: String, destination: String): Boolean
@@ -26,6 +27,7 @@ expect object PlatformUtils {
     fun installUpdate(path: String)
     suspend fun saveFile(baseName: String, extension: String, bytes: ByteArray): String?
     suspend fun pickFile(title: String, allowedExtensions: List<String>): String?
+    suspend fun pickFiles(title: String, allowedExtensions: List<String> = emptyList()): List<String>
     fun readBytes(path: String): ByteArray?
     fun writeBytes(path: String, bytes: ByteArray)
     fun zipEntries(entries: Map<String, String>): ByteArray

@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
 import org.wip.plugintoolkit.api.Capability
 import org.wip.plugintoolkit.api.PluginEntry
@@ -27,6 +28,8 @@ import org.wip.plugintoolkit.features.job.model.BackgroundJob
 import org.wip.plugintoolkit.features.job.model.JobStatus
 import org.wip.plugintoolkit.features.job.model.JobType
 import org.wip.plugintoolkit.features.plugin.logic.PluginManager
+import org.wip.plugintoolkit.features.plugin.sdui.PlatformUiHostBridge
+import org.wip.plugintoolkit.features.plugin.sdui.PluginUiHostBridge
 import org.wip.plugintoolkit.features.plugin.sdui.PluginUiSessionHandle
 import org.wip.plugintoolkit.features.plugin.sdui.PluginUiSessionManager
 import org.wip.plugintoolkit.features.plugin.utils.SettingsUtils
@@ -42,7 +45,8 @@ class SinglePluginHostViewModel(
     private val jobManager: JobManager,
     private val notificationService: NotificationService,
     private val pluginManager: PluginManager,
-    private val uiSessionManager: PluginUiSessionManager? = null
+    private val uiSessionManager: PluginUiSessionManager? = null,
+    private val hostBridge: PluginUiHostBridge = PlatformUiHostBridge
 ) : ViewModel() {
 
     val manifest: PluginManifest = pluginEntry.getManifest().getOrThrow()
@@ -96,13 +100,36 @@ class SinglePluginHostViewModel(
     }.stateIn(viewModelScope, SharingStarted.Eagerly, !hasSetupHandler)
 
     init {
+        if (uiSessionManager != null && uiSessionManager.hostBridge == null) {
+            uiSessionManager.hostBridge = hostBridge
+        }
         selectedCapability?.let { selectCapability(it) }
         viewModelScope.launch {
             pluginManager.refreshLocks(pluginId)
         }
+        uiSessionManager?.let { manager ->
+            viewModelScope.launch {
+                manager.navigationRequests.collect { request ->
+                    if (request.pluginId == pluginId) {
+                        val targetCap = capabilities.find {
+                            it.name == request.capabilityName && it.isInteractive
+                        }
+                        if (targetCap != null) {
+                            selectCapability(targetCap)
+                            launchInteractiveSession(targetCap, request.initialParameters)
+                        } else {
+                            notificationService.toast("Interactive tool '${request.capabilityName}' not found")
+                        }
+                    }
+                }
+            }
+        }
     }
 
     fun selectCapability(capability: Capability?) {
+        if (selectedCapability?.name != capability?.name && activeSessionHandle?.isActive == true) {
+            closeActiveSession()
+        }
         selectedCapability = capability
         parameterValues.clear()
         manuallyModifiedParameters.clear()
@@ -203,8 +230,43 @@ class SinglePluginHostViewModel(
     }
 
     fun closeActiveSession() {
-        activeSessionHandle?.close()
+        activeSessionHandle?.let { handle ->
+            if (handle.isActive) {
+                handle.cancel("Session closed by user")
+            } else {
+                handle.close()
+            }
+        }
         activeSessionHandle = null
+    }
+
+    fun restartActiveSession() {
+        val capability = selectedCapability?.takeIf { it.isInteractive } ?: return
+        launchInteractiveSession(capability)
+    }
+
+    private fun launchInteractiveSession(
+        capability: Capability,
+        initialParameters: Map<String, JsonElement> = emptyMap()
+    ): Boolean {
+        closeActiveSession()
+        val interactiveProcessor = pluginEntry.getInteractiveProcessor()?.getOrNull() ?: return false
+        val sessionManager = uiSessionManager ?: return false
+        val context = pluginManager.createPluginContext(
+            pkg = pluginId,
+            capabilityName = capability.name,
+            manifest = manifest
+        )
+        activeSessionHandle = sessionManager.startSession(
+            pluginId = pluginId,
+            capabilityName = capability.name,
+            context = context,
+            processor = interactiveProcessor,
+            initialParameters = initialParameters,
+            hostBridge = hostBridge
+        )
+        notificationService.toast("Started interactive session for ${capability.name}")
+        return true
     }
 
     fun executeCapability() {
@@ -220,23 +282,8 @@ class SinglePluginHostViewModel(
             return
         }
 
-        if (capability.isInteractive) {
-            val interactiveProcessor = pluginEntry.getInteractiveProcessor()?.getOrNull()
-            if (interactiveProcessor != null && uiSessionManager != null) {
-                val context = pluginManager.createPluginContext(
-                    pkg = pluginId,
-                    capabilityName = capability.name,
-                    manifest = manifest
-                )
-                activeSessionHandle = uiSessionManager.startSession(
-                    pluginId = pluginId,
-                    capabilityName = capability.name,
-                    context = context,
-                    processor = interactiveProcessor
-                )
-                notificationService.toast("Started interactive session for ${capability.name}")
-                return
-            }
+        if (capability.isInteractive && launchInteractiveSession(capability)) {
+            return
         }
 
         viewModelScope.launch {

@@ -18,9 +18,14 @@ import org.wip.plugintoolkit.api.PluginFileSystem
 import org.wip.plugintoolkit.api.PluginLogger
 import org.wip.plugintoolkit.api.PluginManifest
 import org.wip.plugintoolkit.api.PluginMigration
+import org.wip.plugintoolkit.api.PluginNotificationType
+import org.wip.plugintoolkit.api.PluginSecretStorage
+import org.wip.plugintoolkit.api.NoOpPluginSecretStorage
 import org.wip.plugintoolkit.api.PluginSignal
 import org.wip.plugintoolkit.api.PluginSignalManager
 import org.wip.plugintoolkit.api.ProgressReporter
+import org.wip.plugintoolkit.core.notification.NotificationService
+import org.wip.plugintoolkit.core.notification.NotificationType
 import org.wip.plugintoolkit.core.utils.FileSystem
 import org.wip.plugintoolkit.core.utils.FileUtils
 import org.wip.plugintoolkit.features.job.logic.JobManager
@@ -41,7 +46,6 @@ import org.wip.plugintoolkit.features.job.utils.LiveProcessWatcher
 
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
-import org.wip.plugintoolkit.core.notification.NotificationService
 
 /**
  * Manages the runtime lifecycle of plugins (loading, unloading, context creation).
@@ -515,6 +519,7 @@ class PluginLifecycleManager(
             hostFileSystem = trackedHostFs,
             settings = mergedSettings,
             storage = DefaultPluginStorage(installPath, fileSystem),
+            secrets = DefaultPluginSecretStorage(installPath, fileSystem),
             tracker = tracker,
             networkClient = trackedNet,
             onRequiredActionChange = { actionName ->
@@ -529,6 +534,14 @@ class PluginLifecycleManager(
             },
             onShowToast = { message ->
                 notificationService.toast(message)
+            },
+            onShowNotification = { title, message, type ->
+                val mappedType = when (type) {
+                    PluginNotificationType.WARNING -> NotificationType.Warning
+                    PluginNotificationType.ERROR -> NotificationType.Error
+                    PluginNotificationType.INFO, PluginNotificationType.SUCCESS -> NotificationType.Info
+                }
+                notificationService.notify(title, message, mappedType)
             }
         )
     }
@@ -660,12 +673,14 @@ class DefaultPluginContext(
     override val hostFileSystem: org.wip.plugintoolkit.api.HostFileSystem,
     settings: Map<String, JsonElement>,
     override val storage: org.wip.plugintoolkit.api.PluginStorage,
+    override val secrets: PluginSecretStorage = NoOpPluginSecretStorage,
     override val signals: PluginSignalManager = DefaultPluginSignalManager(),
     val tracker: ResourceUsageTracker = ResourceUsageTracker(),
     override val networkClient: org.wip.plugintoolkit.api.PluginNetworkClient = org.wip.plugintoolkit.api.NoOpPluginNetworkClient,
     private val onRequiredActionChange: (String?) -> Unit = {},
     private val onUpdateSettings: (suspend (Map<String, JsonElement>) -> Unit)? = null,
-    private val onShowToast: ((String) -> Unit)? = null
+    private val onShowToast: ((String) -> Unit)? = null,
+    private val onShowNotification: ((String, String, PluginNotificationType) -> Unit)? = null
 ) : PluginContext {
     private val _settings = mutableMapOf<String, JsonElement>().apply { putAll(settings) }
     override val settings: Map<String, JsonElement>
@@ -677,6 +692,15 @@ class DefaultPluginContext(
 
     override fun showToast(message: String) {
         onShowToast?.invoke(message)
+    }
+
+    override fun showNotification(title: String, message: String, type: PluginNotificationType) {
+        val handler = onShowNotification
+        if (handler != null) {
+            handler(title, message, type)
+        } else {
+            super.showNotification(title, message, type)
+        }
     }
 
     override suspend fun updateSetting(key: String, value: JsonElement) {

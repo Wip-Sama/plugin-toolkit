@@ -8,6 +8,7 @@ import com.sun.jna.platform.win32.Shell32
 import com.sun.jna.platform.win32.WinUser
 import io.github.vinceglb.filekit.FileKit
 import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
+import io.github.vinceglb.filekit.dialogs.FileKitMode
 import io.github.vinceglb.filekit.dialogs.FileKitType
 import io.github.vinceglb.filekit.dialogs.openDirectoryPicker
 import io.github.vinceglb.filekit.dialogs.openFilePicker
@@ -86,8 +87,12 @@ actual object PlatformUtils {
     }
 
     actual suspend fun pickFolder(): String? {
+        return pickFolder(org.jetbrains.compose.resources.getString(Res.string.dialog_select_folder))
+    }
+
+    actual suspend fun pickFolder(title: String): String? {
         return FileKit.openDirectoryPicker(
-            dialogSettings = FileKitDialogSettings(title = org.jetbrains.compose.resources.getString(Res.string.dialog_select_folder))
+            dialogSettings = FileKitDialogSettings(title = title)
         )?.toKotlinxIoPath()?.toString()
     }
 
@@ -207,16 +212,27 @@ actual object PlatformUtils {
         }
     }
 
-    actual suspend fun pickFile(title: String, allowedExtensions: List<String>): String? {
-        val type = if (allowedExtensions.isEmpty()) {
+    private fun buildFileKitType(allowedExtensions: List<String>): FileKitType {
+        return if (allowedExtensions.isEmpty()) {
             FileKitType.File()
         } else {
             FileKitType.File(extensions = allowedExtensions)
         }
+    }
+
+    actual suspend fun pickFile(title: String, allowedExtensions: List<String>): String? {
         return FileKit.openFilePicker(
-            type = type,
+            type = buildFileKitType(allowedExtensions),
             dialogSettings = FileKitDialogSettings(title = title)
         )?.toKotlinxIoPath()?.toString()
+    }
+
+    actual suspend fun pickFiles(title: String, allowedExtensions: List<String>): List<String> {
+        return FileKit.openFilePicker(
+            type = buildFileKitType(allowedExtensions),
+            mode = FileKitMode.Multiple(),
+            dialogSettings = FileKitDialogSettings(title = title)
+        )?.map { it.toKotlinxIoPath().toString() } ?: emptyList()
     }
 
     actual fun readBytes(path: String): ByteArray? = FileUtils.readBytes(path)

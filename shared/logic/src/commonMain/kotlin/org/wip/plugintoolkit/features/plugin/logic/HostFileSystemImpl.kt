@@ -1,5 +1,8 @@
 package org.wip.plugintoolkit.features.plugin.logic
 
+import kotlinx.atomicfu.atomic
+import kotlinx.atomicfu.update
+import kotlinx.collections.immutable.persistentListOf
 import kotlinx.io.buffered
 import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
@@ -8,24 +11,44 @@ import kotlinx.io.readString
 import kotlinx.io.writeString
 import org.wip.plugintoolkit.api.HostFileSystem
 
+/**
+ * Internal host filesystem extension enabling dynamic session-scoped grants when a user explicitly
+ * selects files or folders via native host dialogs.
+ */
+interface DynamicHostFileSystem : HostFileSystem {
+    fun grantAccess(absolutePath: String)
+}
+
 class HostFileSystemImpl(
-    private val allowedPaths: List<String>,
+    allowedPaths: List<String>,
     private val isDestructiveAllowed: Boolean
-) : HostFileSystem {
+) : DynamicHostFileSystem {
+
+    private val allowedPathsState = atomic(
+        persistentListOf<String>().builder().apply { addAll(allowedPaths) }.build()
+    )
+
+    override fun grantAccess(absolutePath: String) {
+        if (absolutePath.isBlank()) return
+        val normalized = normalizePath(absolutePath)
+        allowedPathsState.update { current ->
+            if (current.any { normalizePath(it) == normalized }) current else current.add(normalized)
+        }
+    }
 
     private fun normalizePath(pathString: String): String {
         return Path(pathString).toString().replace('\\', '/')
     }
 
     private fun isPathAllowed(pathString: String): Boolean {
+        val currentAllowed = allowedPathsState.value
         // If allowedPaths is empty, it means the capability doesn't have any allowed paths configured
-        // (perhaps it wasn't supposed to read/write files based on its parameters)
-        if (allowedPaths.isEmpty()) return false
+        if (currentAllowed.isEmpty()) return false
 
         val normalizedPath = normalizePath(pathString)
 
         // If the path is inside any of the allowedPaths, it is allowed
-        return allowedPaths.any { allowed ->
+        return currentAllowed.any { allowed ->
             val allowedCanonical = normalizePath(allowed)
 
             normalizedPath == allowedCanonical || normalizedPath.startsWith(if (allowedCanonical.endsWith("/")) allowedCanonical else "$allowedCanonical/")

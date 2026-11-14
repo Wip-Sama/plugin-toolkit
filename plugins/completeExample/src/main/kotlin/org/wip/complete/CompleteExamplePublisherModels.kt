@@ -5,6 +5,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.encodeToJsonElement
 import org.wip.plugintoolkit.api.PluginStorage
+import org.wip.plugintoolkit.api.sdui.AssetReference
 
 @Serializable
 enum class ChapterSyncStatus {
@@ -13,6 +14,13 @@ enum class ChapterSyncStatus {
     OUT_OF_SYNC,
     REMOTE_ONLY
 }
+
+@Serializable
+data class ChapterPageRecord(
+    val id: String,
+    val label: String,
+    val asset: AssetReference
+)
 
 @Serializable
 data class ChapterRecord(
@@ -25,7 +33,9 @@ data class ChapterRecord(
     val remoteRevision: Int,
     val status: ChapterSyncStatus,
     val releaseNotes: String = "",
-    val requiresLock: Boolean = false
+    val requiresLock: Boolean = false,
+    val coverAsset: AssetReference? = null,
+    val pages: List<ChapterPageRecord> = emptyList()
 )
 
 object CompleteExampleCatalogStore {

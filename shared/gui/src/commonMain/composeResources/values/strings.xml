@@ -1072,4 +1072,11 @@
     <string name="sdui_confirm">Confirm</string>
     <string name="sdui_cancel">Cancel</string>
     <string name="sdui_empty_title">No items</string>
+    <string name="sdui_show_secret">Show secret</string>
+    <string name="sdui_hide_secret">Hide secret</string>
+    <string name="sdui_drag_reorder">Drag to reorder</string>
+    <string name="sdui_resize_pane">Resize pane</string>
+    <string name="dialog_select_file">Select File</string>
+    <string name="dialog_select_files">Select Files</string>
+    <string name="dialog_save_file">Save File</string>
 </resources>

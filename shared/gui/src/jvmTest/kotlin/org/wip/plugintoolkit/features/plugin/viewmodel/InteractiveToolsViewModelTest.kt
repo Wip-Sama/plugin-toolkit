@@ -5,7 +5,13 @@ import io.mockk.mockk
 import io.mockk.mockkObject
 import io.mockk.unmockkAll
 import io.mockk.verify
-import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.setMain
+import kotlinx.serialization.json.JsonPrimitive
 import org.wip.plugintoolkit.api.Capability
 import org.wip.plugintoolkit.api.CapabilityContext
 import org.wip.plugintoolkit.api.DataType
@@ -21,6 +27,7 @@ import org.wip.plugintoolkit.features.plugin.logic.PluginLoader
 import org.wip.plugintoolkit.features.plugin.logic.PluginManager
 import org.wip.plugintoolkit.features.plugin.sdui.PluginUiSessionHandle
 import org.wip.plugintoolkit.features.plugin.sdui.PluginUiSessionManager
+import org.wip.plugintoolkit.features.plugin.sdui.ToolNavigationRequest
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -29,11 +36,14 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class InteractiveToolsViewModelTest {
 
+    private val testDispatcher = UnconfinedTestDispatcher()
     private val pluginManager = mockk<PluginManager>(relaxed = true)
     private val uiSessionManager = mockk<PluginUiSessionManager>(relaxed = true)
     private val notificationService = mockk<NotificationService>(relaxed = true)
+    private val navigationRequestsFlow = MutableSharedFlow<ToolNavigationRequest>(extraBufferCapacity = 4)
 
     private val standardCap = Capability(
         name = "headlessTask",
@@ -79,17 +89,20 @@ class InteractiveToolsViewModelTest {
 
     @BeforeTest
     fun setup() {
+        Dispatchers.setMain(testDispatcher)
         mockkObject(PluginLoader)
         every { PluginLoader.getPlugins() } returns listOf(pluginEntry)
         every { mockSessionHandle.isActive } returns true
         every { pluginManager.createPluginContext(any(), any(), any(), any(), any(), any(), any()) } returns mockPluginContext
+        every { uiSessionManager.navigationRequests } returns navigationRequestsFlow
         every {
-            uiSessionManager.startSession(any(), any(), any(), any())
+            uiSessionManager.startSession(any(), any(), any(), any(), any(), any())
         } returns mockSessionHandle
     }
 
     @AfterTest
     fun tearDown() {
+        Dispatchers.resetMain()
         unmockkAll()
     }
 
@@ -126,7 +139,40 @@ class InteractiveToolsViewModelTest {
                 pluginId = "org.test.interactive",
                 capabilityName = "drawingBoard",
                 context = mockPluginContext,
-                processor = mockProcessor
+                processor = mockProcessor,
+                initialParameters = any(),
+                hostBridge = any()
+            )
+        }
+    }
+
+    @Test
+    fun testNavigationRequestSelectsTargetToolAndForwardsParameters() {
+        val viewModel = InteractiveToolsViewModel(
+            pluginManager = pluginManager,
+            uiSessionManager = uiSessionManager,
+            notificationService = notificationService
+        )
+
+        val params = mapOf("chapterId" to JsonPrimitive("ch_042"))
+        navigationRequestsFlow.tryEmit(
+            ToolNavigationRequest(
+                pluginId = "org.test.interactive",
+                capabilityName = "drawingBoard",
+                initialParameters = params
+            )
+        )
+
+        assertNotNull(viewModel.selectedTool.value)
+        assertEquals("drawingBoard", viewModel.selectedTool.value?.capability?.name)
+        verify {
+            uiSessionManager.startSession(
+                pluginId = "org.test.interactive",
+                capabilityName = "drawingBoard",
+                context = mockPluginContext,
+                processor = mockProcessor,
+                initialParameters = params,
+                hostBridge = any()
             )
         }
     }

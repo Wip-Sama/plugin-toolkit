@@ -34,36 +34,100 @@ object CompleteExampleSampleAssets {
 
     private const val PAGE_WIDTH = 720
     private const val PAGE_HEIGHT = 960
+    private const val THUMB_WIDTH = 180
+    private const val THUMB_HEIGHT = 240
     private const val STAMP_WIDTH = 200
     private const val STAMP_HEIGHT = 80
 
     private val prettyJson = Json { prettyPrint = true }
 
+    private suspend fun writePngOrDataUri(
+        context: PluginContext,
+        relativePath: String,
+        pngBytes: ByteArray
+    ): AssetReference {
+        val written = runCatching {
+            val relPath = RelativePath.from(relativePath).getOrThrow()
+            context.fileSystem.writeFile(relPath, pngBytes).isSuccess
+        }.getOrDefault(false)
+        return if (written) {
+            AssetReference.Relative(relativePath)
+        } else {
+            AssetReference.Uri("data:image/png;base64," + Base64.getEncoder().encodeToString(pngBytes))
+        }
+    }
+
+    suspend fun ensureChapterCoverAsset(
+        context: PluginContext,
+        chapterId: String,
+        chapterNumber: Int
+    ): AssetReference {
+        val image = BufferedImage(THUMB_WIDTH, THUMB_HEIGHT, BufferedImage.TYPE_INT_ARGB)
+        val g = image.createGraphics()
+        try {
+            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
+            val huePalette = listOf(
+                Color(79, 70, 229) to Color(30, 41, 59),
+                Color(14, 116, 144) to Color(15, 23, 42),
+                Color(185, 28, 28) to Color(69, 10, 10),
+                Color(16, 185, 129) to Color(6, 78, 59)
+            )
+            val (top, bottom) = huePalette[chapterNumber % huePalette.size]
+            drawPanel(g, 0, 0, THUMB_WIDTH, THUMB_HEIGHT, top, bottom)
+            g.color = Color(248, 250, 252)
+            g.font = Font("SansSerif", Font.BOLD, 28)
+            g.drawString("CH.$chapterNumber", 28, 128)
+        } finally {
+            g.dispose()
+        }
+        val bytes = ByteArrayOutputStream().use { baos ->
+            ImageIO.write(image, "png", baos)
+            baos.toByteArray()
+        }
+        return writePngOrDataUri(context, "assets/cover_$chapterId.png", bytes)
+    }
+
+    suspend fun ensurePageThumbnailAsset(
+        context: PluginContext,
+        chapterId: String,
+        pageIndex: Int
+    ): AssetReference {
+        val image = BufferedImage(THUMB_WIDTH, THUMB_HEIGHT, BufferedImage.TYPE_INT_ARGB)
+        val g = image.createGraphics()
+        try {
+            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
+            val palette = listOf(
+                Color(51, 65, 85) to Color(15, 23, 42),
+                Color(67, 56, 202) to Color(30, 27, 75),
+                Color(15, 118, 110) to Color(17, 24, 39),
+                Color(190, 24, 93) to Color(80, 7, 36)
+            )
+            val (top, bottom) = palette[(pageIndex - 1) % palette.size]
+            drawPanel(g, 4, 4, THUMB_WIDTH - 8, THUMB_HEIGHT - 8, top, bottom)
+            g.color = Color(241, 245, 249, 220)
+            g.fillRoundRect(20, 24, THUMB_WIDTH - 40, 60, 10, 10)
+            g.color = Color(15, 23, 42)
+            g.font = Font("SansSerif", Font.BOLD, 20)
+            g.drawString("PAGE $pageIndex", 44, 62)
+            g.color = Color(248, 250, 252, 180)
+            g.font = Font("SansSerif", Font.PLAIN, 13)
+            g.drawString("$chapterId // p${pageIndex.toString().padStart(2, '0')}", 34, 156)
+        } finally {
+            g.dispose()
+        }
+        val bytes = ByteArrayOutputStream().use { baos ->
+            ImageIO.write(image, "png", baos)
+            baos.toByteArray()
+        }
+        return writePngOrDataUri(context, "assets/${chapterId}_page_$pageIndex.png", bytes)
+    }
+
     suspend fun ensureBoardAssets(context: PluginContext): BoardAssetBundle {
         val pageBytes = renderSamplePagePng()
         val stampBytes = renderSampleStampPng()
 
-        val pageWritten = runCatching {
-            val relPath = RelativePath.from(PAGE_ASSET_PATH).getOrThrow()
-            context.fileSystem.writeFile(relPath, pageBytes).isSuccess
-        }.getOrDefault(false)
-
-        val stampWritten = runCatching {
-            val relPath = RelativePath.from(STAMP_ASSET_PATH).getOrThrow()
-            context.fileSystem.writeFile(relPath, stampBytes).isSuccess
-        }.getOrDefault(false)
-
-        val backgroundAsset = if (pageWritten) {
-            AssetReference.Relative(PAGE_ASSET_PATH)
-        } else {
-            AssetReference.Uri("data:image/png;base64," + Base64.getEncoder().encodeToString(pageBytes))
-        }
-
-        val stampAsset = if (stampWritten) {
-            AssetReference.Relative(STAMP_ASSET_PATH)
-        } else {
-            AssetReference.Uri("data:image/png;base64," + Base64.getEncoder().encodeToString(stampBytes))
-        }
+        val backgroundAsset = writePngOrDataUri(context, PAGE_ASSET_PATH, pageBytes)
+        val stampAsset = writePngOrDataUri(context, STAMP_ASSET_PATH, stampBytes)
 
         return BoardAssetBundle(
             backgroundAsset = backgroundAsset,

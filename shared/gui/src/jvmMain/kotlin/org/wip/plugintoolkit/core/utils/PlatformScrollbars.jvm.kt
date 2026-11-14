@@ -4,6 +4,8 @@ import androidx.compose.foundation.HorizontalScrollbar
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.ScrollbarStyle
 import androidx.compose.foundation.VerticalScrollbar
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -35,6 +37,32 @@ actual fun PlatformVerticalScrollbar(
     if (scrollState.maxValue <= 0) return
     VerticalScrollbar(
         adapter = rememberScrollbarAdapter(scrollState),
+        modifier = modifier,
+        style = rememberToolkitScrollbarStyle()
+    )
+}
+
+@Composable
+actual fun PlatformVerticalScrollbar(
+    lazyListState: LazyListState,
+    modifier: Modifier
+) {
+    if (!lazyListState.canScrollForward && !lazyListState.canScrollBackward) return
+    VerticalScrollbar(
+        adapter = rememberScrollbarAdapter(lazyListState),
+        modifier = modifier,
+        style = rememberToolkitScrollbarStyle()
+    )
+}
+
+@Composable
+actual fun PlatformVerticalScrollbar(
+    lazyGridState: LazyGridState,
+    modifier: Modifier
+) {
+    if (!lazyGridState.canScrollForward && !lazyGridState.canScrollBackward) return
+    VerticalScrollbar(
+        adapter = rememberScrollbarAdapter(lazyGridState),
         modifier = modifier,
         style = rememberToolkitScrollbarStyle()
     )

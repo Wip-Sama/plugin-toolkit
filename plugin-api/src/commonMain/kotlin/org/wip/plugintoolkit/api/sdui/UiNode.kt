@@ -15,6 +15,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
+import kotlin.jvm.JvmOverloads
 
 /**
  * Root interface for all declarative, framework-agnostic SDUI components.
@@ -38,11 +39,12 @@ data class UiNodeTree(
 
 @Serializable
 @SerialName("column")
-data class ColumnNode(
+data class ColumnNode @JvmOverloads constructor(
     override val id: String,
     val children: List<UiNode> = emptyList(),
     val spacing: SpacingSize = SpacingSize.NONE,
-    override val modifier: UiModifier = UiModifier.None
+    override val modifier: UiModifier = UiModifier.None,
+    val reorderable: Boolean = false
 ) : UiNode
 
 @Serializable
@@ -73,10 +75,29 @@ data class CardNode(
 
 @Serializable
 @SerialName("scrollable_column")
-data class ScrollableColumnNode(
+data class ScrollableColumnNode @JvmOverloads constructor(
     override val id: String,
     val children: List<UiNode> = emptyList(),
     val spacing: SpacingSize = SpacingSize.NONE,
+    override val modifier: UiModifier = UiModifier.None,
+    val reorderable: Boolean = false
+) : UiNode
+
+/**
+ * Multi-column layout container supporting adaptive item widths, fixed column counts,
+ * lazy virtualization for large collections, and pointer drag-and-drop reordering.
+ *
+ * When [reorderable] is true, dragging and dropping a child card emits [UiEvent.ItemsReordered].
+ */
+@Serializable
+@SerialName("grid")
+data class GridNode @JvmOverloads constructor(
+    override val id: String,
+    val columns: Int? = null,
+    val minItemWidthDp: Float = 156f,
+    val spacing: SpacingSize = SpacingSize.SMALL,
+    val reorderable: Boolean = false,
+    val children: List<UiNode> = emptyList(),
     override val modifier: UiModifier = UiModifier.None
 ) : UiNode
 
@@ -150,15 +171,27 @@ data class ButtonNode(
 ) : UiNode
 
 /**
+ * Image scaling strategy applied inside [ImageNode] containers.
+ */
+@Serializable
+enum class ImageScale {
+    FIT,
+    CROP,
+    FILL_BOUNDS,
+    INSIDE
+}
+
+/**
  * Text input field designed for seamless state synchronization.
  *
  * @property revision Incremented when the plugin intentionally overwrites the text (e.g. form reset),
  * preventing routine recomposition from overriding user typing.
  * @property forceOverwrite When true, applies the plugin text immediately even if currently focused.
+ * @property isSecret When true, masks entered characters with a reveal/hide visibility toggle.
  */
 @Serializable
 @SerialName("text_input")
-data class TextInputNode(
+data class TextInputNode @JvmOverloads constructor(
     override val id: String,
     val text: String = "",
     val label: String? = null,
@@ -169,7 +202,8 @@ data class TextInputNode(
     val forceOverwrite: Boolean = false,
     val regexPattern: String? = null,
     val maxLength: Int? = null,
-    override val modifier: UiModifier = UiModifier.None
+    override val modifier: UiModifier = UiModifier.None,
+    val isSecret: Boolean = false
 ) : UiNode
 
 @Serializable
@@ -207,11 +241,16 @@ data class DropdownNode(
 
 @Serializable
 @SerialName("image")
-data class ImageNode(
+data class ImageNode @JvmOverloads constructor(
     override val id: String,
     val asset: AssetReference,
     val contentDescription: String? = null,
-    override val modifier: UiModifier = UiModifier.None
+    override val modifier: UiModifier = UiModifier.None,
+    val contentScale: ImageScale = ImageScale.FIT,
+    val clickable: Boolean = false,
+    val action: String? = null,
+    val selected: Boolean = false,
+    val badgeText: String? = null
 ) : UiNode
 
 @Serializable
@@ -269,7 +308,7 @@ data class TabsNode(
 
 @Serializable
 @SerialName("list_item")
-data class ListItemNode(
+data class ListItemNode @JvmOverloads constructor(
     override val id: String,
     val title: String,
     val subtitle: String? = null,
@@ -279,7 +318,9 @@ data class ListItemNode(
     val selected: Boolean = false,
     val selectable: Boolean = false,
     val trailingContent: List<UiNode> = emptyList(),
-    override val modifier: UiModifier = UiModifier.None
+    override val modifier: UiModifier = UiModifier.None,
+    val leadingAsset: AssetReference? = null,
+    val action: String? = null
 ) : UiNode
 
 @Serializable
@@ -346,13 +387,14 @@ data class DialogNode(
 
 @Serializable
 @SerialName("split_pane")
-data class SplitPaneNode(
+data class SplitPaneNode @JvmOverloads constructor(
     override val id: String,
     val first: UiNode,
     val second: UiNode,
     val splitFraction: Float = 0.35f,
     val isHorizontal: Boolean = true,
-    override val modifier: UiModifier = UiModifier.None
+    override val modifier: UiModifier = UiModifier.None,
+    val resizable: Boolean = true
 ) : UiNode
 
 @Serializable
@@ -448,7 +490,7 @@ object UnknownNodeCustomSerializer : KSerializer<UnknownNode> {
 
 /**
  * Error boundary node injected by the Pre-Composition AST Sanitizer when a subtree
- * violates tree constraints (e.g. depth > 32, node count > 1000, NaN ranges).
+ * violates tree constraints (e.g. max nesting depth, max node count, NaN ranges).
  */
 @Serializable
 @SerialName("error_boundary")
@@ -472,6 +514,7 @@ object UiNodeSerializer : KSerializer<UiNode> {
             is BoxNode -> "box"
             is CardNode -> "card"
             is ScrollableColumnNode -> "scrollable_column"
+            is GridNode -> "grid"
             is ScaffoldNode -> "scaffold"
             is FloatingPanelNode -> "floating_panel"
             is SidebarNode -> "sidebar"
@@ -507,6 +550,7 @@ object UiNodeSerializer : KSerializer<UiNode> {
             is BoxNode -> jsonEncoder.json.encodeToJsonElement(BoxNode.serializer(), value)
             is CardNode -> jsonEncoder.json.encodeToJsonElement(CardNode.serializer(), value)
             is ScrollableColumnNode -> jsonEncoder.json.encodeToJsonElement(ScrollableColumnNode.serializer(), value)
+            is GridNode -> jsonEncoder.json.encodeToJsonElement(GridNode.serializer(), value)
             is ScaffoldNode -> jsonEncoder.json.encodeToJsonElement(ScaffoldNode.serializer(), value)
             is FloatingPanelNode -> jsonEncoder.json.encodeToJsonElement(FloatingPanelNode.serializer(), value)
             is SidebarNode -> jsonEncoder.json.encodeToJsonElement(SidebarNode.serializer(), value)
@@ -554,6 +598,7 @@ object UiNodeSerializer : KSerializer<UiNode> {
             "box" -> BoxNode.serializer()
             "card" -> CardNode.serializer()
             "scrollable_column" -> ScrollableColumnNode.serializer()
+            "grid" -> GridNode.serializer()
             "scaffold" -> ScaffoldNode.serializer()
             "floating_panel" -> FloatingPanelNode.serializer()
             "sidebar" -> SidebarNode.serializer()

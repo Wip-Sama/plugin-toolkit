@@ -8,12 +8,14 @@ import io.mockk.unmockkAll
 import io.mockk.verify
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import kotlinx.coroutines.withContext
 import org.wip.plugintoolkit.core.SystemConfig
 import org.wip.plugintoolkit.core.notification.NotificationService
 import org.wip.plugintoolkit.core.ui.DialogService
@@ -198,12 +200,22 @@ class PluginManagerViewModelTest {
             fileName = "vision-1.0.2.jar",
             repoUrl = "https://repo-community.com"
         )
+        var updateRemoteCalled = false
         every { pluginManager.getUpdate("org.wip.vision") } returns updatePlugin
-        coEvery { pluginManager.updateRemote("org.wip.vision") } returns Result.success(Unit)
+        coEvery { pluginManager.updateRemote("org.wip.vision") } answers {
+            updateRemoteCalled = true
+            Result.success(Unit)
+        }
 
         val viewModel = createViewModel()
         viewModel.switchSourceRepoAndUpdate("org.wip.vision", "https://repo-community.com")
         advanceUntilIdle()
+        var waitAttempts = 0
+        while (!updateRemoteCalled && waitAttempts < 100) {
+            withContext(Dispatchers.Default) { delay(20) }
+            advanceUntilIdle()
+            waitAttempts++
+        }
 
         verify { repoManager.setPackageSourceOverride("org.wip.vision", "https://repo-community.com") }
         coVerify { pluginManager.updateRemote("org.wip.vision") }

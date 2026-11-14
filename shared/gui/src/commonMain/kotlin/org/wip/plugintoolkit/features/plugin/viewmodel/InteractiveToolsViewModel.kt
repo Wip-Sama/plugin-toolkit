@@ -1,9 +1,11 @@
 package org.wip.plugintoolkit.features.plugin.viewmodel
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonElement
 import org.wip.plugintoolkit.api.Capability
 import org.wip.plugintoolkit.api.CapabilityContext
@@ -11,6 +13,8 @@ import org.wip.plugintoolkit.api.PluginEntry
 import org.wip.plugintoolkit.core.notification.NotificationService
 import org.wip.plugintoolkit.features.plugin.logic.PluginLoader
 import org.wip.plugintoolkit.features.plugin.logic.PluginManager
+import org.wip.plugintoolkit.features.plugin.sdui.PlatformUiHostBridge
+import org.wip.plugintoolkit.features.plugin.sdui.PluginUiHostBridge
 import org.wip.plugintoolkit.features.plugin.sdui.PluginUiSessionHandle
 import org.wip.plugintoolkit.features.plugin.sdui.PluginUiSessionManager
 
@@ -31,7 +35,8 @@ data class InteractiveToolItem(
 class InteractiveToolsViewModel(
     private val pluginManager: PluginManager,
     private val uiSessionManager: PluginUiSessionManager?,
-    private val notificationService: NotificationService? = null
+    private val notificationService: NotificationService? = null,
+    private val hostBridge: PluginUiHostBridge = PlatformUiHostBridge
 ) : ViewModel() {
 
     private val _interactiveTools = MutableStateFlow<List<InteractiveToolItem>>(emptyList())
@@ -47,7 +52,36 @@ class InteractiveToolsViewModel(
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
     init {
+        if (uiSessionManager != null && uiSessionManager.hostBridge == null) {
+            uiSessionManager.hostBridge = hostBridge
+        }
         refreshInteractiveTools()
+        uiSessionManager?.let { manager ->
+            viewModelScope.launch {
+                manager.navigationRequests.collect { request ->
+                    var target = _interactiveTools.value.find { item ->
+                        item.plugin.getManifest().getOrNull()?.plugin?.id == request.pluginId &&
+                            item.capability.name == request.capabilityName
+                    }
+                    if (target == null) {
+                        refreshInteractiveTools()
+                        target = _interactiveTools.value.find { item ->
+                            item.plugin.getManifest().getOrNull()?.plugin?.id == request.pluginId &&
+                                item.capability.name == request.capabilityName
+                        }
+                    }
+                    if (target != null) {
+                        selectTool(
+                            tool = target,
+                            initialParameters = request.initialParameters,
+                            forceRestart = true
+                        )
+                    } else {
+                        notificationService?.toast("Interactive tool '${request.capabilityName}' not found for plugin ${request.pluginId}")
+                    }
+                }
+            }
+        }
     }
 
     fun updateSearchQuery(query: String) {
@@ -93,9 +127,14 @@ class InteractiveToolsViewModel(
     /**
      * Selects a tool and opens a live SDUI session.
      */
-    fun selectTool(tool: InteractiveToolItem, initialParameters: Map<String, JsonElement> = emptyMap()) {
+    fun selectTool(
+        tool: InteractiveToolItem,
+        initialParameters: Map<String, JsonElement> = emptyMap(),
+        forceRestart: Boolean = false
+    ) {
         val current = _selectedTool.value
-        if (current?.plugin?.getManifest()?.getOrNull()?.plugin?.id == tool.plugin.getManifest().getOrNull()?.plugin?.id &&
+        if (!forceRestart &&
+            current?.plugin?.getManifest()?.getOrNull()?.plugin?.id == tool.plugin.getManifest().getOrNull()?.plugin?.id &&
             current?.capability?.name == tool.capability.name &&
             _activeSessionHandle.value?.isActive == true
         ) {
@@ -132,7 +171,8 @@ class InteractiveToolsViewModel(
             capabilityName = tool.capability.name,
             context = context,
             processor = processor,
-            initialParameters = initialParameters
+            initialParameters = initialParameters,
+            hostBridge = hostBridge
         )
         _activeSessionHandle.value = handle
     }

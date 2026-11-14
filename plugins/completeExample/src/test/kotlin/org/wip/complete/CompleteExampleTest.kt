@@ -1,6 +1,7 @@
 package org.wip.complete
 
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -15,19 +16,26 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.wip.plugintoolkit.api.CapabilityContext
 import org.wip.plugintoolkit.api.ExecutionFileSystem
 import org.wip.plugintoolkit.api.ExecutionResult
 import org.wip.plugintoolkit.api.HostFileSystem
+import org.wip.plugintoolkit.api.HttpMethod
+import org.wip.plugintoolkit.api.HttpRequest
+import org.wip.plugintoolkit.api.HttpResponse
 import org.wip.plugintoolkit.api.PluginAction
 import org.wip.plugintoolkit.api.PluginContext
 import org.wip.plugintoolkit.api.PluginEntry
 import org.wip.plugintoolkit.api.PluginFileSystem
 import org.wip.plugintoolkit.api.PluginLogger
+import org.wip.plugintoolkit.api.PluginNetworkClient
+import org.wip.plugintoolkit.api.PluginNotificationType
 import org.wip.plugintoolkit.api.PluginRequest
 import org.wip.plugintoolkit.api.PluginResponse
+import org.wip.plugintoolkit.api.PluginSecretStorage
 import org.wip.plugintoolkit.api.PluginSignal
 import org.wip.plugintoolkit.api.PluginSignalManager
 import org.wip.plugintoolkit.api.PluginStorage
@@ -42,11 +50,15 @@ import org.wip.plugintoolkit.api.sdui.CapabilityJobStatus
 import org.wip.plugintoolkit.api.sdui.ColumnNode
 import org.wip.plugintoolkit.api.sdui.DialogNode
 import org.wip.plugintoolkit.api.sdui.FloatingAnchor
+import org.wip.plugintoolkit.api.sdui.GridNode
+import org.wip.plugintoolkit.api.sdui.ImageNode
+import org.wip.plugintoolkit.api.sdui.ListItemNode
 import org.wip.plugintoolkit.api.sdui.NormalizedPoint
 import org.wip.plugintoolkit.api.sdui.ScaffoldNode
 import org.wip.plugintoolkit.api.sdui.SemanticColor
 import org.wip.plugintoolkit.api.sdui.SplitPaneNode
 import org.wip.plugintoolkit.api.sdui.TabsNode
+import org.wip.plugintoolkit.api.sdui.TextInputNode
 import org.wip.plugintoolkit.api.sdui.UiEvent
 import org.wip.plugintoolkit.api.sdui.UiNode
 import org.wip.plugintoolkit.api.sdui.UiNodeTree
@@ -130,23 +142,52 @@ class CompleteExampleTest {
         override suspend fun extractResource(resourcePath: String, targetRelativePath: RelativePath): Result<Unit> = Result.success(Unit)
     }
 
+    private class FakeSecretStorage : PluginSecretStorage {
+        val values = mutableMapOf<String, String>()
+        override suspend fun getSecret(key: String): String? = values[key]
+        override suspend fun putSecret(key: String, value: String) { values[key] = value }
+        override suspend fun removeSecret(key: String) { values.remove(key) }
+        override suspend fun listSecretKeys(): List<String> = values.keys.toList()
+    }
+
+    private class FakeNetworkClient : PluginNetworkClient {
+        val requests = mutableListOf<HttpRequest>()
+        override suspend fun get(url: String, headers: Map<String, String>): ByteArray = "OK".encodeToByteArray()
+        override suspend fun getText(url: String, headers: Map<String, String>): String = "OK"
+        override suspend fun post(url: String, body: ByteArray, headers: Map<String, String>): ByteArray = "OK".encodeToByteArray()
+        override suspend fun postText(url: String, body: String, headers: Map<String, String>): String = "OK"
+        override suspend fun request(request: HttpRequest): HttpResponse {
+            requests.add(request)
+            return HttpResponse(statusCode = 200, body = "OK".encodeToByteArray())
+        }
+    }
+
     private class TestPluginContext(
         override val logger: PluginLogger = FakePluginLogger(),
         override val progress: ProgressReporter = FakeProgressReporter(),
         override val signals: PluginSignalManager = FakePluginSignalManager(),
         override val storage: PluginStorage = FakePluginStorage(),
         override val fileSystem: PluginFileSystem = FakePluginFileSystem(),
+        val secretStorage: FakeSecretStorage = FakeSecretStorage(),
+        val fakeNetworkClient: FakeNetworkClient = FakeNetworkClient(),
         initialSettings: Map<String, JsonElement> = emptyMap(),
         private val onSettingsMutated: (Map<String, JsonElement>) -> Unit = {}
     ) : PluginContext {
         val updatedSettings = mutableMapOf<String, JsonElement>().apply { putAll(initialSettings) }
+        val notifications = mutableListOf<Triple<String, String, PluginNotificationType>>()
         override val settings: Map<String, JsonElement> get() = updatedSettings
+        override val secrets: PluginSecretStorage get() = secretStorage
+        override val networkClient: PluginNetworkClient get() = fakeNetworkClient
 
         override val cacheFileSystem: PluginFileSystem get() = fileSystem
         override val executionFileSystem: ExecutionFileSystem get() = throw UnsupportedOperationException()
         override val hostFileSystem: HostFileSystem get() = throw UnsupportedOperationException()
 
         override fun setRequiredAction(actionName: String?) {}
+
+        override fun showNotification(title: String, message: String, type: PluginNotificationType) {
+            notifications.add(Triple(title, message, type))
+        }
 
         override suspend fun updateSetting(key: String, value: JsonElement) {
             updatedSettings[key] = value
@@ -160,10 +201,15 @@ class CompleteExampleTest {
         private val scope: CoroutineScope,
         private val baseContext: TestPluginContext,
         private val settingsState: MutableStateFlow<Map<String, JsonElement>>,
-        private val locksState: MutableStateFlow<Map<String, Boolean>> = MutableStateFlow(emptyMap())
+        private val locksState: MutableStateFlow<Map<String, Boolean>> = MutableStateFlow(emptyMap()),
+        override val initialParameters: Map<String, JsonElement> = emptyMap(),
+        private val fakePickedFiles: List<String> = emptyList(),
+        private val fakePickedDirectory: String? = null
     ) : UiSessionContext, PluginContext by baseContext {
         private val jobsState = MutableStateFlow<List<CapabilityJobSnapshot>>(emptyList())
         private var jobCounter = 0
+        val savedFiles = mutableListOf<Pair<String, Int>>()
+        val openedTools = mutableListOf<Pair<String, Map<String, JsonElement>>>()
 
         override val sessionId: String = "test_session_$capabilityName"
         override val settingsFlow: StateFlow<Map<String, JsonElement>> = settingsState.asStateFlow()
@@ -172,6 +218,20 @@ class CompleteExampleTest {
 
         override fun completeSession(response: PluginResponse) {}
         override fun cancelSession(reason: String) {}
+
+        override suspend fun pickFiles(title: String?, allowedExtensions: List<String>): List<String> = fakePickedFiles
+
+        override suspend fun pickDirectory(title: String?): String? = fakePickedDirectory
+
+        override suspend fun saveFile(defaultName: String, extension: String, bytes: ByteArray): String? {
+            val outPath = "/tmp/$defaultName"
+            savedFiles.add(outPath to bytes.size)
+            return outPath
+        }
+
+        override fun openInteractiveTool(capabilityName: String, initialParameters: Map<String, JsonElement>) {
+            openedTools.add(capabilityName to initialParameters)
+        }
 
         override suspend fun updateSetting(key: String, value: JsonElement) {
             baseContext.updateSetting(key, value)
@@ -264,6 +324,7 @@ class CompleteExampleTest {
             is org.wip.plugintoolkit.api.sdui.CardNode -> node.children.forEach { result.addAll(collectNodes(it)) }
             is org.wip.plugintoolkit.api.sdui.ScrollableColumnNode -> node.children.forEach { result.addAll(collectNodes(it)) }
             is org.wip.plugintoolkit.api.sdui.ScrollableRowNode -> node.children.forEach { result.addAll(collectNodes(it)) }
+            is GridNode -> node.children.forEach { result.addAll(collectNodes(it)) }
             is org.wip.plugintoolkit.api.sdui.SidebarNode -> node.children.forEach { result.addAll(collectNodes(it)) }
             is org.wip.plugintoolkit.api.sdui.FloatingPanelNode -> node.children.forEach { result.addAll(collectNodes(it)) }
             is DialogNode -> node.children.forEach { result.addAll(collectNodes(it)) }
@@ -675,14 +736,16 @@ class CompleteExampleTest {
         ) { updated -> settingsState.value = updated }
 
         val locksState = MutableStateFlow(mapOf("feature_unlocked" to false))
-        val sessionScope = kotlinx.coroutines.CoroutineScope(coroutineContext)
+        val sessionScope = CoroutineScope(coroutineContext)
         val sessionContext = TestWiredSessionContext(
             capabilityName = "interactiveChapterPublisher",
             entry = entry,
             scope = sessionScope,
             baseContext = testContext,
             settingsState = settingsState,
-            locksState = locksState
+            locksState = locksState,
+            fakePickedFiles = listOf("/tmp/picked_page_05.png"),
+            fakePickedDirectory = "/tmp/local_cubari_repo"
         )
 
         val job = launch {
@@ -701,10 +764,55 @@ class CompleteExampleTest {
         )
         assertTrue(roundTripped.root is ScaffoldNode)
 
-        val initialAllIds = collectNodes(initialTree.root).map { it.id }
+        val initialNodes = collectNodes(initialTree.root)
+        val initialAllIds = initialNodes.map { it.id }
         assertEquals(initialAllIds.size, initialAllIds.toSet().size, "Publisher tree node IDs must be unique")
         assertTrue("pub_row_ch_041" in initialAllIds, "Expected ch_041 in loaded catalog")
         assertTrue("pub_row_ch_043" in initialAllIds, "Expected remote-only ch_043 in reconciled catalog")
+
+        // Verify chapter row has leading cover asset and click action, and inspector renders reorderable page grid
+        val row41 = initialNodes.filterIsInstance<ListItemNode>().first { it.id == "pub_row_ch_041" }
+        assertNotNull(row41.leadingAsset, "Expected generated cover AssetReference on chapter row")
+        assertEquals("inspect:ch_041", row41.action)
+
+        val initialSplit = initialNodes.filterIsInstance<SplitPaneNode>().first { it.id == "pub_chapters_split" }
+        assertTrue(initialSplit.resizable)
+
+        val initialGrid = initialNodes.filterIsInstance<GridNode>().first { it.id == "insp_pages_grid" }
+        assertTrue(initialGrid.reorderable, "Expected page preview grid to be reorderable")
+        assertEquals(4, initialGrid.children.size, "Expected 4 sample pages in initial chapter grid")
+
+        // Select second page preview, reorder grid pages, resize split pane, and exercise pickFiles/saveFile/openInteractiveTool
+        val firstCardId = initialGrid.children[0].id
+        val secondCardId = initialGrid.children[1].id
+        val secondPageId = secondCardId.removePrefix("insp_page_card_")
+        eventsFlow.emit(UiEvent.Click("insp_page_thumb_$secondPageId", "select_page:$secondPageId"))
+        eventsFlow.emit(
+            UiEvent.ItemsReordered(
+                nodeId = "insp_pages_grid",
+                itemIds = listOf(secondCardId, firstCardId, initialGrid.children[2].id, initialGrid.children[3].id),
+                fromIndex = 1,
+                toIndex = 0
+            )
+        )
+        eventsFlow.emit(UiEvent.ValueChanged("pub_chapters_split", 0.42))
+        advanceUntilIdle()
+
+        val afterReorderNodes = collectNodes(emittedTrees.last().root)
+        val reorderedGrid = afterReorderNodes.filterIsInstance<GridNode>().first { it.id == "insp_pages_grid" }
+        assertEquals(secondCardId, reorderedGrid.children.first().id, "Expected reordered page grid order to persist")
+        val updatedSplit = afterReorderNodes.filterIsInstance<SplitPaneNode>().first { it.id == "pub_chapters_split" }
+        assertEquals(0.42f, updatedSplit.splitFraction)
+
+        eventsFlow.emit(UiEvent.Click("insp_add_pages_btn", "pick_page_files"))
+        eventsFlow.emit(UiEvent.Click("insp_export_manifest_btn", "export_chapter_json"))
+        eventsFlow.emit(UiEvent.Click("insp_open_board_btn", "open_in_board:ch_040"))
+        advanceUntilIdle()
+
+        val afterPickGrid = collectNodes(emittedTrees.last().root).filterIsInstance<GridNode>().first { it.id == "insp_pages_grid" }
+        assertEquals(5, afterPickGrid.children.size, "Expected picked page appended to grid")
+        assertEquals(1, sessionContext.savedFiles.size, "Expected saveFile called for chapter JSON export")
+        assertEquals("interactiveBoardCompositor", sessionContext.openedTools.firstOrNull()?.first)
 
         // Select ch_041 and trigger batch push capability
         eventsFlow.emit(UiEvent.ToggleChanged("pub_chk_ch_041", true))
@@ -716,6 +824,10 @@ class CompleteExampleTest {
                 it.capabilityName == "publishChapterBatch" && it.status == CapabilityJobStatus.COMPLETED
             },
             "publishChapterBatch capability job should have completed"
+        )
+        assertTrue(
+            testContext.notifications.any { it.second.contains("publishChapterBatch") },
+            "Expected persistent notification emitted after sync job completion"
         )
         val reconciledAfterPush = CompleteExampleCatalogStore.reconcile(
             CompleteExampleCatalogStore.loadLocalCatalog(testContext.storage),
@@ -732,15 +844,60 @@ class CompleteExampleTest {
         val queueNodeIds = collectNodes(emittedTrees.last().root).map { it.id }
         assertTrue(queueNodeIds.any { it.startsWith("queue_card_") }, "Expected capability job card in queue tab")
 
-        // Switch to settings tab, mutate apiKey & toggle feature lock action
+        // Switch to settings tab, mutate apiKey, save encrypted secret, pick repo folder, ping HTTP endpoint, & toggle feature lock
         eventsFlow.emit(UiEvent.TabSelected("pub_tabs", "settings"))
         advanceUntilIdle()
+        val settingsNodes = collectNodes(emittedTrees.last().root)
+        val secretInput = settingsNodes.filterIsInstance<TextInputNode>().first { it.id == "cfg_secret_token_input" }
+        assertTrue(secretInput.isSecret, "Expected secret input field to mask input")
+
         eventsFlow.emit(UiEvent.TextChanged("cfg_api_key_input", "live_secret_token"))
+        eventsFlow.emit(UiEvent.TextChanged("cfg_secret_token_input", "oauth_refresh_xyz"))
+        eventsFlow.emit(UiEvent.Click("cfg_save_secret_btn", "save_secret_token"))
+        eventsFlow.emit(UiEvent.Click("cfg_pick_repo_btn", "pick_repo_folder"))
+        eventsFlow.emit(UiEvent.Click("cfg_ping_webhook_btn", "ping_webhook"))
         eventsFlow.emit(UiEvent.Click("cfg_toggle_lock_btn", "toggle_feature_lock"))
         advanceUntilIdle()
 
         assertEquals("live_secret_token", settingsState.value["apiKey"]?.jsonPrimitive?.content)
+        assertEquals("oauth_refresh_xyz", testContext.secretStorage.values["publisher_api_secret"])
+        assertEquals("/tmp/local_cubari_repo", testContext.storage.get("chapter_publisher_repo_path")?.jsonPrimitive?.contentOrNull)
+        assertTrue(testContext.fakeNetworkClient.requests.any { it.method == HttpMethod.GET })
         assertEquals(true, locksState.value["feature_unlocked"])
+        } finally {
+            job.cancel()
+        }
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun testInteractiveBoardCompositorReadsInitialParameters() = runTest {
+        val plugin = CompleteExamplePlugin(CompleteExampleSettings())
+        val entry = CompleteExamplePluginPluginEntry(plugin)
+        val processor = entry.getInteractiveProcessor()?.getOrNull()
+        assertNotNull(processor)
+
+        val eventsFlow = MutableSharedFlow<UiEvent>()
+        val emitted = mutableListOf<UiNodeTree>()
+        val testContext = TestPluginContext()
+        val sessionContext = TestWiredSessionContext(
+            capabilityName = "interactiveBoardCompositor",
+            entry = entry,
+            scope = CoroutineScope(coroutineContext),
+            baseContext = testContext,
+            settingsState = MutableStateFlow(emptyMap()),
+            initialParameters = mapOf("chapterTitle" to JsonPrimitive("Ch. 41: Crimson Gate"))
+        )
+
+        val job = launch {
+            processor.openUiSession(sessionContext, eventsFlow).collect { emitted.add(it) }
+        }
+        try {
+            advanceUntilIdle()
+            val titleInput = collectNodes(emitted.last().root)
+                .filterIsInstance<TextInputNode>()
+                .first { it.id == "titleInput" }
+            assertEquals("Ch. 41: Crimson Gate — Page Compositor", titleInput.text)
         } finally {
             job.cancel()
         }

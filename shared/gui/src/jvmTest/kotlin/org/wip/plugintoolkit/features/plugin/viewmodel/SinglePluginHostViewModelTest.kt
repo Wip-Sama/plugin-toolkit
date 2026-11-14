@@ -8,6 +8,7 @@ import io.mockk.unmockkAll
 import io.mockk.verify
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -36,6 +37,7 @@ import org.wip.plugintoolkit.features.plugin.model.InstalledPlugin
 import org.wip.plugintoolkit.features.plugin.model.PluginSettingsStore
 import org.wip.plugintoolkit.features.plugin.sdui.PluginUiSessionManager
 import org.wip.plugintoolkit.features.plugin.sdui.PluginUiSessionHandle
+import org.wip.plugintoolkit.features.plugin.sdui.ToolNavigationRequest
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -386,6 +388,7 @@ class SinglePluginHostViewModelTest {
         val mockProcessor = mockk<InteractiveUiProcessor>(relaxed = true)
         val mockContext = mockk<PluginContext>(relaxed = true)
         val mockHandle = mockk<PluginUiSessionHandle>(relaxed = true)
+        val navFlow = MutableSharedFlow<ToolNavigationRequest>(extraBufferCapacity = 4)
 
         val fakeEntry = object : PluginEntry by pluginEntry {
             override fun getManifest(): Result<PluginManifest> = Result.success(manifestWithInteractive)
@@ -393,7 +396,8 @@ class SinglePluginHostViewModelTest {
         }
 
         every { pluginManager.createPluginContext(any(), any(), any(), any(), any(), any(), any()) } returns mockContext
-        every { mockSessionManager.startSession(any(), any(), any(), any()) } returns mockHandle
+        every { mockSessionManager.navigationRequests } returns navFlow
+        every { mockSessionManager.startSession(any(), any(), any(), any(), any(), any()) } returns mockHandle
 
         val viewModel = SinglePluginHostViewModel(
             pluginEntry = fakeEntry,
@@ -411,8 +415,29 @@ class SinglePluginHostViewModelTest {
         advanceUntilIdle()
 
         assertEquals(mockHandle, viewModel.activeSessionHandle)
-        verify { mockSessionManager.startSession("org.test.plugin", "interactiveDrawing", any(), mockProcessor) }
+        verify { mockSessionManager.startSession("org.test.plugin", "interactiveDrawing", any(), mockProcessor, any(), any()) }
         verify { notificationService.toast("Started interactive session for interactiveDrawing") }
+
+        // Test cross-tool navigation request launches interactive session with parameters
+        val params = mapOf("chapterId" to JsonPrimitive("ch_042"))
+        navFlow.emit(
+            ToolNavigationRequest(
+                pluginId = "org.test.plugin",
+                capabilityName = "interactiveDrawing",
+                initialParameters = params
+            )
+        )
+        advanceUntilIdle()
+        verify {
+            mockSessionManager.startSession(
+                pluginId = "org.test.plugin",
+                capabilityName = "interactiveDrawing",
+                context = mockContext,
+                processor = mockProcessor,
+                initialParameters = params,
+                hostBridge = any()
+            )
+        }
 
         // Test closing active session
         viewModel.closeActiveSession()

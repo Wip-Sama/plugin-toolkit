@@ -48,6 +48,7 @@ fun createStandaloneLogicModule(): Module = module {
             coerceInputValues = true
         }
     }
+    single { createPluginToolkitHttpClient(get<Json>()) }
     single { PluginLockProvider() }
     single { PluginRegistry(get(), get(named("AppScope")), get(named("LoomDispatcher")), get()) }
     single { PluginLifecycleManager(get(), get(), get(), get()) }

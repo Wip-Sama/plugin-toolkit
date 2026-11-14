@@ -190,7 +190,11 @@ class TrackingExecutionFileSystem(
 class TrackingHostFileSystem(
     private val delegate: HostFileSystem,
     private val tracker: ResourceUsageTracker
-) : HostFileSystem {
+) : DynamicHostFileSystem {
+
+    override fun grantAccess(absolutePath: String) {
+        (delegate as? DynamicHostFileSystem)?.grantAccess(absolutePath)
+    }
 
     override suspend fun readFile(absolutePath: String): ByteArray? {
         val bytes = delegate.readFile(absolutePath)

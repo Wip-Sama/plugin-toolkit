@@ -28,12 +28,20 @@ fun PluginCustomUiCard(
         { event -> handle.dispatchEvent(event) }
     }
 
-    val assetContext = remember(handle.fileSystem, handle.cacheFileSystem) {
+    val assetContext = remember(
+        handle.fileSystem,
+        handle.cacheFileSystem,
+        handle.hostFileSystem,
+        handle.networkClient
+    ) {
         PluginAssetContext(
             fileSystem = handle.fileSystem,
-            cacheFileSystem = handle.cacheFileSystem
+            cacheFileSystem = handle.cacheFileSystem,
+            hostFileSystem = handle.hostFileSystem,
+            networkClient = handle.networkClient
         )
     }
+    val sharedImageLoader = rememberPluginAssetImageLoader(assetContext)
 
     // Automatically terminate and clean up the session coroutines when removed from composition
     DisposableEffect(handle.sessionId) {
@@ -46,7 +54,10 @@ fun PluginCustomUiCard(
 
     val treeState by handle.uiNodeTree.collectAsState()
 
-    CompositionLocalProvider(LocalPluginAssetContext provides assetContext) {
+    CompositionLocalProvider(
+        LocalPluginAssetContext provides assetContext,
+        LocalPluginImageLoader provides sharedImageLoader
+    ) {
         Box(
             modifier = modifier
                 .fillMaxSize()

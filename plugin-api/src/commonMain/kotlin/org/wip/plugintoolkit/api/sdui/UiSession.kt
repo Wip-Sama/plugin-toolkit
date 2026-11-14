@@ -166,6 +166,51 @@ interface UiSessionContext : PluginContext {
      * Cancel a queued or running capability job.
      */
     suspend fun cancelCapabilityJob(jobId: String) {}
+
+    /**
+     * Prompt the user via a native file dialog to pick a single file.
+     * On selection, the host grants read access to that file for the active session's [hostFileSystem]
+     * and local image previews.
+     */
+    suspend fun pickFile(
+        title: String? = null,
+        allowedExtensions: List<String> = emptyList()
+    ): String? = null
+
+    /**
+     * Prompt the user via a native file dialog to select one or more files.
+     * Selected file paths are granted read access on the active session's [hostFileSystem].
+     */
+    suspend fun pickFiles(
+        title: String? = null,
+        allowedExtensions: List<String> = emptyList()
+    ): List<String> = emptyList()
+
+    /**
+     * Prompt the user via a native folder dialog to choose a directory.
+     * Read/write access to the chosen directory subtree is granted on the active session's [hostFileSystem].
+     */
+    suspend fun pickDirectory(title: String? = null): String? = null
+
+    /**
+     * Prompt the user via a native Save dialog and persist [bytes] to the chosen location.
+     *
+     * @return Saved absolute file path, or null if cancelled.
+     */
+    suspend fun saveFile(
+        defaultName: String,
+        extension: String,
+        bytes: ByteArray
+    ): String? = null
+
+    /**
+     * Navigate to another `@InteractiveTool` capability exposed by this plugin (or reopen the current tool),
+     * optionally passing [initialParameters] to pre-populate the target session.
+     */
+    fun openInteractiveTool(
+        capabilityName: String,
+        initialParameters: Map<String, JsonElement> = emptyMap()
+    ) {}
 }
 
 /**
@@ -219,8 +264,9 @@ fun <S> interactiveUiSession(
     combine(
         stateFlow,
         context.capabilityJobs,
-        context.settingsFlow
-    ) { currentState, _, _ ->
+        context.settingsFlow,
+        context.locksFlow
+    ) { currentState, _, _, _ ->
         currentState.render(context)
     }.collect { tree ->
         send(tree)
@@ -244,9 +290,10 @@ abstract class UiContainerBuilder {
         id: String = generateNodeId("col"),
         spacing: SpacingSize = SpacingSize.NONE,
         modifier: UiModifier = UiModifier.None,
+        reorderable: Boolean = false,
         block: ColumnBuilder.() -> Unit
     ) {
-        val builder = ColumnBuilder(id, spacing, modifier).apply(block)
+        val builder = ColumnBuilder(id, spacing, modifier, reorderable).apply(block)
         add(builder.build())
     }
 
@@ -274,9 +321,23 @@ abstract class UiContainerBuilder {
         id: String = generateNodeId("scroll"),
         spacing: SpacingSize = SpacingSize.NONE,
         modifier: UiModifier = UiModifier.None,
+        reorderable: Boolean = false,
         block: ScrollableColumnBuilder.() -> Unit
     ) {
-        val builder = ScrollableColumnBuilder(id, spacing, modifier).apply(block)
+        val builder = ScrollableColumnBuilder(id, spacing, modifier, reorderable).apply(block)
+        add(builder.build())
+    }
+
+    fun grid(
+        id: String = generateNodeId("grid"),
+        columns: Int? = null,
+        minItemWidthDp: Float = 156f,
+        spacing: SpacingSize = SpacingSize.SMALL,
+        reorderable: Boolean = false,
+        modifier: UiModifier = UiModifier.None,
+        block: GridBuilder.() -> Unit
+    ) {
+        val builder = GridBuilder(id, columns, minItemWidthDp, spacing, reorderable, modifier).apply(block)
         add(builder.build())
     }
 
@@ -312,6 +373,7 @@ abstract class UiContainerBuilder {
         forceOverwrite: Boolean = false,
         regexPattern: String? = null,
         maxLength: Int? = null,
+        isSecret: Boolean = false,
         modifier: UiModifier = UiModifier.None
     ) {
         add(
@@ -326,7 +388,8 @@ abstract class UiContainerBuilder {
                 forceOverwrite = forceOverwrite,
                 regexPattern = regexPattern,
                 maxLength = maxLength,
-                modifier = modifier
+                modifier = modifier,
+                isSecret = isSecret
             )
         )
     }
@@ -366,9 +429,26 @@ abstract class UiContainerBuilder {
         asset: AssetReference,
         id: String = generateNodeId("img"),
         contentDescription: String? = null,
+        contentScale: ImageScale = ImageScale.FIT,
+        clickable: Boolean = false,
+        action: String? = null,
+        selected: Boolean = false,
+        badgeText: String? = null,
         modifier: UiModifier = UiModifier.None
     ) {
-        add(ImageNode(id = id, asset = asset, contentDescription = contentDescription, modifier = modifier))
+        add(
+            ImageNode(
+                id = id,
+                asset = asset,
+                contentDescription = contentDescription,
+                modifier = modifier,
+                contentScale = contentScale,
+                clickable = clickable,
+                action = action,
+                selected = selected,
+                badgeText = badgeText
+            )
+        )
     }
 
     fun icon(
@@ -451,10 +531,12 @@ abstract class UiContainerBuilder {
         id: String = generateNodeId("item"),
         subtitle: String? = null,
         leadingIcon: String? = null,
+        leadingAsset: AssetReference? = null,
         badgeText: String? = null,
         badgeColor: SemanticColor? = null,
         selected: Boolean = false,
         selectable: Boolean = false,
+        action: String? = null,
         modifier: UiModifier = UiModifier.None,
         trailingBlock: (UiContainerBuilder.() -> Unit)? = null
     ) {
@@ -475,7 +557,9 @@ abstract class UiContainerBuilder {
                 selected = selected,
                 selectable = selectable,
                 trailingContent = trailingContent,
-                modifier = modifier
+                modifier = modifier,
+                leadingAsset = leadingAsset,
+                action = action
             )
         )
     }
@@ -570,6 +654,7 @@ abstract class UiContainerBuilder {
         id: String = generateNodeId("split"),
         splitFraction: Float = 0.35f,
         isHorizontal: Boolean = true,
+        resizable: Boolean = true,
         modifier: UiModifier = UiModifier.None,
         first: UiContainerBuilder.() -> Unit,
         second: UiContainerBuilder.() -> Unit
@@ -583,7 +668,8 @@ abstract class UiContainerBuilder {
                 second = secondBuilder.build(),
                 splitFraction = splitFraction,
                 isHorizontal = isHorizontal,
-                modifier = modifier
+                modifier = modifier,
+                resizable = resizable
             )
         )
     }
@@ -719,9 +805,16 @@ class BoxBuilder(
 class ColumnBuilder(
     val id: String,
     val spacing: SpacingSize,
-    val modifier: UiModifier
+    val modifier: UiModifier,
+    val reorderable: Boolean = false
 ) : UiContainerBuilder() {
-    fun build(): ColumnNode = ColumnNode(id = id, spacing = spacing, modifier = modifier, children = children.toList())
+    fun build(): ColumnNode = ColumnNode(
+        id = id,
+        spacing = spacing,
+        modifier = modifier,
+        reorderable = reorderable,
+        children = children.toList()
+    )
 }
 
 class RowBuilder(
@@ -729,7 +822,7 @@ class RowBuilder(
     val spacing: SpacingSize,
     val modifier: UiModifier
 ) : UiContainerBuilder() {
-    fun build(): RowNode = RowNode(id = id, spacing = spacing, modifier = modifier, children = children.toList())
+    fun build(): RowNode = RowNode(id, children.toList(), spacing, modifier)
 }
 
 class ScrollableRowBuilder(
@@ -751,9 +844,35 @@ class CardBuilder(
 class ScrollableColumnBuilder(
     val id: String,
     val spacing: SpacingSize,
+    val modifier: UiModifier,
+    val reorderable: Boolean = false
+) : UiContainerBuilder() {
+    fun build(): ScrollableColumnNode = ScrollableColumnNode(
+        id = id,
+        spacing = spacing,
+        modifier = modifier,
+        reorderable = reorderable,
+        children = children.toList()
+    )
+}
+
+class GridBuilder(
+    val id: String,
+    val columns: Int?,
+    val minItemWidthDp: Float,
+    val spacing: SpacingSize,
+    val reorderable: Boolean,
     val modifier: UiModifier
 ) : UiContainerBuilder() {
-    fun build(): ScrollableColumnNode = ScrollableColumnNode(id = id, spacing = spacing, modifier = modifier, children = children.toList())
+    fun build(): GridNode = GridNode(
+        id = id,
+        columns = columns,
+        minItemWidthDp = minItemWidthDp,
+        spacing = spacing,
+        reorderable = reorderable,
+        children = children.toList(),
+        modifier = modifier
+    )
 }
 
 class FloatingPanelBuilder(

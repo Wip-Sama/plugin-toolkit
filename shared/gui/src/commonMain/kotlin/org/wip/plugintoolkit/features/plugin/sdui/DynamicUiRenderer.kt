@@ -8,6 +8,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -42,6 +43,8 @@ import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -95,8 +98,15 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -120,9 +130,11 @@ import org.wip.plugintoolkit.api.sdui.EmptyStateNode
 import org.wip.plugintoolkit.api.sdui.ErrorBoundaryNode
 import org.wip.plugintoolkit.api.sdui.FloatingAnchor
 import org.wip.plugintoolkit.api.sdui.FloatingPanelNode
+import org.wip.plugintoolkit.api.sdui.GridNode
 import org.wip.plugintoolkit.api.sdui.IconButtonNode
 import org.wip.plugintoolkit.api.sdui.IconNode
 import org.wip.plugintoolkit.api.sdui.ImageNode
+import org.wip.plugintoolkit.api.sdui.ImageScale
 import org.wip.plugintoolkit.api.sdui.ListItemNode
 import org.wip.plugintoolkit.api.sdui.ProgressBarNode
 import org.wip.plugintoolkit.api.sdui.RowNode
@@ -147,11 +159,15 @@ import org.wip.plugintoolkit.api.sdui.UiNode
 import org.wip.plugintoolkit.api.sdui.UnknownNode
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.core.utils.PlatformHorizontalScrollbar
+import org.wip.plugintoolkit.core.utils.PlatformUtils
 import org.wip.plugintoolkit.core.utils.PlatformVerticalScrollbar
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.sdui_cancel
 import plugintoolkit.composeapp.generated.resources.sdui_confirm
 import plugintoolkit.composeapp.generated.resources.sdui_error_boundary_title
+import plugintoolkit.composeapp.generated.resources.sdui_hide_secret
+import plugintoolkit.composeapp.generated.resources.sdui_resize_pane
+import plugintoolkit.composeapp.generated.resources.sdui_show_secret
 import plugintoolkit.composeapp.generated.resources.sdui_toggle_panel
 import plugintoolkit.composeapp.generated.resources.sdui_toggle_sidebar
 import plugintoolkit.composeapp.generated.resources.sdui_unsupported_node
@@ -159,7 +175,7 @@ import plugintoolkit.composeapp.generated.resources.sdui_unsupported_node
 /**
  * Tracks whether the current composition subtree is already inside a vertical scroll container.
  */
-private val LocalInVerticalScroll = compositionLocalOf { false }
+internal val LocalInVerticalScroll = compositionLocalOf { false }
 
 /**
  * Tracks whether SDUI root CompositionLocals (desktop touch target density) have been applied.
@@ -241,7 +257,7 @@ internal fun SduiTooltipBox(
  * Resolves container item spacing while enforcing Material 3 grid minimums unless inside a compact spatial widget.
  */
 @Composable
-private fun resolveContainerSpacing(
+internal fun resolveContainerSpacing(
     requested: SpacingSize,
     children: List<UiNode>,
     isVertical: Boolean
@@ -257,7 +273,8 @@ private fun resolveContainerSpacing(
             it is DropdownNode ||
             it is AlertBannerNode ||
             it is SplitPaneNode ||
-            it is TabsNode
+            it is TabsNode ||
+            it is GridNode
     }
     val minimumEnforced = when {
         isPureInlineText -> ToolkitTheme.spacing.xs
@@ -299,18 +316,30 @@ fun RenderUiNode(
 
     when (node) {
         is ColumnNode -> {
-            Column(
-                modifier = appliedModifier,
-                verticalArrangement = Arrangement.spacedBy(
-                    resolveContainerSpacing(node.spacing, node.children, isVertical = true)
-                ),
-                horizontalAlignment = node.modifier.alignment?.toHorizontalAlignment() ?: Alignment.Start
-            ) {
-                RenderColumnChildren(
+            val spacingDp = resolveContainerSpacing(node.spacing, node.children, isVertical = true)
+            val horizontalAlignment = node.modifier.alignment?.toHorizontalAlignment() ?: Alignment.Start
+            if (node.reorderable) {
+                RenderReorderableColumnNode(
+                    nodeId = node.id,
                     children = node.children,
+                    spacing = spacingDp,
+                    horizontalAlignment = horizontalAlignment,
+                    scrollable = false,
                     onEvent = onEvent,
-                    allowWeight = !LocalInVerticalScroll.current
+                    modifier = appliedModifier
                 )
+            } else {
+                Column(
+                    modifier = appliedModifier,
+                    verticalArrangement = Arrangement.spacedBy(spacingDp),
+                    horizontalAlignment = horizontalAlignment
+                ) {
+                    RenderColumnChildren(
+                        children = node.children,
+                        onEvent = onEvent,
+                        allowWeight = !LocalInVerticalScroll.current
+                    )
+                }
             }
         }
 
@@ -387,42 +416,11 @@ fun RenderUiNode(
         }
 
         is ScrollableColumnNode -> {
-            val inScroll = LocalInVerticalScroll.current
-            val spacingDp = resolveContainerSpacing(node.spacing, node.children, isVertical = true)
-            if (inScroll) {
-                Column(
-                    modifier = appliedModifier,
-                    verticalArrangement = Arrangement.spacedBy(spacingDp),
-                    horizontalAlignment = node.modifier.alignment?.toHorizontalAlignment() ?: Alignment.Start
-                ) {
-                    RenderColumnChildren(children = node.children, onEvent = onEvent, allowWeight = false)
-                }
-            } else {
-                val scrollState = rememberScrollState()
-                val scrollbarReserve = if (scrollState.maxValue > 0) {
-                    ToolkitTheme.dimensions.sduiScrollbarEndPadding
-                } else {
-                    ToolkitTheme.spacing.none
-                }
-                Box(modifier = appliedModifier) {
-                    CompositionLocalProvider(LocalInVerticalScroll provides true) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .verticalScroll(scrollState)
-                                .padding(end = scrollbarReserve),
-                            verticalArrangement = Arrangement.spacedBy(spacingDp),
-                            horizontalAlignment = node.modifier.alignment?.toHorizontalAlignment() ?: Alignment.Start
-                        ) {
-                            RenderColumnChildren(children = node.children, onEvent = onEvent, allowWeight = false)
-                        }
-                    }
-                    PlatformVerticalScrollbar(
-                        scrollState = scrollState,
-                        modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight()
-                    )
-                }
-            }
+            RenderScrollableColumnNode(node = node, onEvent = onEvent, modifier = appliedModifier)
+        }
+
+        is GridNode -> {
+            RenderGridNode(node = node, onEvent = onEvent, modifier = appliedModifier)
         }
 
         is ScaffoldNode -> {
@@ -563,11 +561,7 @@ fun RenderUiNode(
         }
 
         is ImageNode -> {
-            PluginAssetImage(
-                asset = node.asset,
-                contentDescription = node.contentDescription,
-                modifier = appliedModifier
-            )
+            RenderImageNode(node = node, onEvent = onEvent, modifier = appliedModifier)
         }
 
         is DividerNode -> {
@@ -729,11 +723,18 @@ private fun RenderTextInput(
 ) {
     var localText by remember(node.id) { mutableStateOf(node.text) }
     var lastRevision by remember(node.id) { mutableStateOf(node.revision) }
+    var secretRevealed by remember(node.id) { mutableStateOf(false) }
 
     // When the plugin explicitly increments revision, apply the new server text
     if (node.revision != lastRevision || node.forceOverwrite) {
         localText = node.text
         lastRevision = node.revision
+    }
+
+    val visualTransformation = if (node.isSecret && !secretRevealed) {
+        PasswordVisualTransformation()
+    } else {
+        VisualTransformation.None
     }
 
     OutlinedTextField(
@@ -745,12 +746,153 @@ private fun RenderTextInput(
         enabled = node.modifier.enabled,
         label = node.label?.let { { Text(it, style = ToolkitTheme.typography.labelMedium) } },
         placeholder = node.placeholder?.let { { Text(it, style = ToolkitTheme.typography.bodyMedium) } },
-        singleLine = node.singleLine,
-        minLines = if (node.singleLine) 1 else 2,
+        singleLine = if (node.isSecret) true else node.singleLine,
+        minLines = if (node.isSecret || node.singleLine) 1 else 2,
+        visualTransformation = visualTransformation,
+        trailingIcon = if (node.isSecret) {
+            {
+                val toggleHint = stringResource(
+                    if (secretRevealed) Res.string.sdui_hide_secret else Res.string.sdui_show_secret
+                )
+                SduiTooltipBox(tooltip = toggleHint) {
+                    IconButton(
+                        onClick = { secretRevealed = !secretRevealed },
+                        modifier = Modifier.pointerHoverIcon(PointerIcon.Hand)
+                    ) {
+                        Icon(
+                            imageVector = if (secretRevealed) {
+                                Icons.Default.VisibilityOff
+                            } else {
+                                Icons.Default.Visibility
+                            },
+                            contentDescription = toggleHint,
+                            modifier = Modifier.size(ToolkitTheme.dimensions.denseIconSize)
+                        )
+                    }
+                }
+            }
+        } else {
+            null
+        },
         shape = ToolkitTheme.shapes.medium,
         colors = sduiOutlinedTextFieldColors(),
         modifier = modifier.withFormWidthConstraint(node.modifier)
     )
+}
+
+/**
+ * Interactive image renderer supporting aspect scaling, selection highlight, badges, and click actions.
+ */
+@Composable
+private fun RenderImageNode(
+    node: ImageNode,
+    onEvent: (UiEvent) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val contentScale = when (node.contentScale) {
+        ImageScale.FIT -> ContentScale.Fit
+        ImageScale.CROP -> ContentScale.Crop
+        ImageScale.FILL_BOUNDS -> ContentScale.FillBounds
+        ImageScale.INSIDE -> ContentScale.Inside
+    }
+    val isInteractive = node.clickable || node.action != null
+    val hasOverlayOrFrame = isInteractive || node.selected || !node.badgeText.isNullOrBlank()
+    val hasBoundedExtent = node.modifier.heightDp != null ||
+        node.modifier.fillMaxHeight != null ||
+        node.modifier.aspectRatio != null
+    val imageFillModifier = if (hasBoundedExtent) Modifier.fillMaxSize() else Modifier.fillMaxWidth()
+
+    if (!hasOverlayOrFrame) {
+        PluginAssetImage(
+            asset = node.asset,
+            contentDescription = node.contentDescription,
+            contentScale = contentScale,
+            modifier = modifier
+        )
+        return
+    }
+
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+    val borderStroke = when {
+        node.selected -> BorderStroke(ToolkitTheme.dimensions.borderSelected, MaterialTheme.colorScheme.primary)
+        isHovered && isInteractive -> BorderStroke(
+            ToolkitTheme.dimensions.borderUnselected,
+            MaterialTheme.colorScheme.primary.copy(alpha = ToolkitTheme.opacity.high)
+        )
+        isInteractive -> BorderStroke(
+            ToolkitTheme.dimensions.borderUnselected,
+            MaterialTheme.colorScheme.outlineVariant.copy(alpha = ToolkitTheme.opacity.divider)
+        )
+        else -> null
+    }
+    val shape = if (node.modifier.clipRounded) {
+        ToolkitTheme.shapes.medium
+    } else {
+        ToolkitTheme.shapes.small
+    }
+
+    Surface(
+        modifier = modifier.then(
+            if (isInteractive) {
+                Modifier
+                    .clickable(interactionSource = interactionSource, indication = null) {
+                        onEvent(UiEvent.Click(node.id, node.action))
+                    }
+                    .pointerHoverIcon(PointerIcon.Hand)
+            } else {
+                Modifier.hoverable(interactionSource = interactionSource)
+            }
+        ),
+        shape = shape,
+        border = borderStroke,
+        color = MaterialTheme.colorScheme.surfaceContainerLowest
+    ) {
+        Box {
+            PluginAssetImage(
+                asset = node.asset,
+                contentDescription = node.contentDescription,
+                contentScale = contentScale,
+                modifier = imageFillModifier
+            )
+            node.badgeText?.takeIf { it.isNotBlank() }?.let { badge ->
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(ToolkitTheme.spacing.xs),
+                    shape = ToolkitTheme.shapes.pill,
+                    color = if (node.selected) {
+                        MaterialTheme.colorScheme.primaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.surfaceContainerHighest.copy(
+                            alpha = ToolkitTheme.opacity.almostOpaque
+                        )
+                    },
+                    border = BorderStroke(
+                        ToolkitTheme.dimensions.borderUnselected,
+                        MaterialTheme.colorScheme.outlineVariant.copy(alpha = ToolkitTheme.opacity.divider)
+                    )
+                ) {
+                    Text(
+                        text = badge,
+                        style = ToolkitTheme.typography.labelSmall,
+                        color = if (node.selected) {
+                            MaterialTheme.colorScheme.onPrimaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.onSurface
+                        },
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(
+                            horizontal = ToolkitTheme.spacing.sm,
+                            vertical = ToolkitTheme.spacing.xxs
+                        )
+                    )
+                }
+            }
+        }
+    }
 }
 
 /**
@@ -1035,16 +1177,24 @@ private fun RenderListItem(
         )
     }
 
+    val hasRowAction = node.action != null || node.selectable
+
     Surface(
         modifier = modifier
             .fillMaxWidth()
             .then(
-                if (node.selectable) {
+                if (hasRowAction) {
                     Modifier
                         .clickable(
                             interactionSource = interactionSource,
                             indication = null
-                        ) { onEvent(UiEvent.ToggleChanged(node.id, !node.selected)) }
+                        ) {
+                            if (node.action != null) {
+                                onEvent(UiEvent.Click(node.id, node.action))
+                            } else if (node.selectable) {
+                                onEvent(UiEvent.ToggleChanged(node.id, !node.selected))
+                            }
+                        }
                         .pointerHoverIcon(PointerIcon.Hand)
                 } else {
                     Modifier.hoverable(interactionSource = interactionSource)
@@ -1070,15 +1220,16 @@ private fun RenderListItem(
             } else {
                 ToolkitTheme.spacing.none
             }
+            val leadingVisualSize = when {
+                node.leadingAsset != null -> ToolkitTheme.dimensions.sduiListThumbnailSize + ToolkitTheme.dimensions.sduiCompactSpacing
+                node.leadingIcon != null -> ToolkitTheme.dimensions.iconLarge + ToolkitTheme.dimensions.sduiCompactSpacing
+                else -> ToolkitTheme.spacing.none
+            }
             val leadingReserve = (if (node.selectable) {
                 ToolkitTheme.dimensions.desktopTouchTargetSize + ToolkitTheme.dimensions.sduiCompactSpacing
             } else {
                 ToolkitTheme.spacing.none
-            }) + (if (node.leadingIcon != null) {
-                ToolkitTheme.dimensions.iconLarge + ToolkitTheme.dimensions.sduiCompactSpacing
-            } else {
-                ToolkitTheme.spacing.none
-            })
+            }) + leadingVisualSize
             val stackTrailingBelow = trailingCount >= 3 &&
                 (maxWidth - leadingReserve - estimatedTrailingWidth) < ToolkitTheme.dimensions.sduiTextColumnMinWidth
 
@@ -1100,30 +1251,47 @@ private fun RenderListItem(
                         )
                     }
 
-                    node.leadingIcon?.let { iconName ->
+                    val leadingAsset = node.leadingAsset
+                    if (leadingAsset != null) {
                         Box(
                             modifier = Modifier
-                                .size(ToolkitTheme.dimensions.iconLarge)
+                                .size(ToolkitTheme.dimensions.sduiListThumbnailSize)
                                 .clip(ToolkitTheme.shapes.small)
-                                .background(
-                                    if (node.selected) {
-                                        MaterialTheme.colorScheme.primaryContainer
-                                    } else {
-                                        MaterialTheme.colorScheme.surfaceContainerHighest
-                                    }
-                                ),
-                            contentAlignment = Alignment.Center
+                                .background(MaterialTheme.colorScheme.surfaceContainerHighest)
                         ) {
-                            Icon(
-                                imageVector = SduiIconRegistry.resolve(iconName),
+                            PluginAssetImage(
+                                asset = leadingAsset,
                                 contentDescription = node.title,
-                                modifier = Modifier.size(ToolkitTheme.dimensions.iconMediumSmall),
-                                tint = if (node.selected) {
-                                    MaterialTheme.colorScheme.onPrimaryContainer
-                                } else {
-                                    MaterialTheme.colorScheme.primary
-                                }
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
                             )
+                        }
+                    } else {
+                        node.leadingIcon?.let { iconName ->
+                            Box(
+                                modifier = Modifier
+                                    .size(ToolkitTheme.dimensions.iconLarge)
+                                    .clip(ToolkitTheme.shapes.small)
+                                    .background(
+                                        if (node.selected) {
+                                            MaterialTheme.colorScheme.primaryContainer
+                                        } else {
+                                            MaterialTheme.colorScheme.surfaceContainerHighest
+                                        }
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = SduiIconRegistry.resolve(iconName),
+                                    contentDescription = node.title,
+                                    modifier = Modifier.size(ToolkitTheme.dimensions.iconMediumSmall),
+                                    tint = if (node.selected) {
+                                        MaterialTheme.colorScheme.onPrimaryContainer
+                                    } else {
+                                        MaterialTheme.colorScheme.primary
+                                    }
+                                )
+                            }
                         }
                     }
 
@@ -1563,7 +1731,8 @@ private fun RenderDialog(
 }
 
 /**
- * Desktop master-detail layout split pane separating tonal containers with Material 3 gutters.
+ * Desktop master-detail layout split pane separating tonal containers with Material 3 gutters
+ * and optional interactive pointer drag resizing.
  */
 @Composable
 private fun RenderSplitPane(
@@ -1571,8 +1740,12 @@ private fun RenderSplitPane(
     onEvent: (UiEvent) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val fraction1 = node.splitFraction.coerceIn(0.05f, 0.95f)
-    val fraction2 = (1f - fraction1).coerceIn(0.05f, 0.95f)
+    var fraction1 by remember(node.id, node.splitFraction) {
+        mutableStateOf(node.splitFraction.coerceIn(0.1f, 0.9f))
+    }
+    val fraction2 = (1f - fraction1).coerceIn(0.1f, 0.9f)
+    val resizeLabel = stringResource(Res.string.sdui_resize_pane)
+    val density = LocalDensity.current
 
     @Composable
     fun SplitPaneContainer(
@@ -1603,33 +1776,107 @@ private fun RenderSplitPane(
         }
     }
 
-    if (node.isHorizontal) {
-        Row(
-            modifier = modifier.fillMaxSize(),
-            horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.md)
+    @Composable
+    fun SplitResizeHandle(totalPx: Float) {
+        val interactionSource = remember { MutableInteractionSource() }
+        val isHovered by interactionSource.collectIsHoveredAsState()
+        val handleColor = if (isHovered) {
+            MaterialTheme.colorScheme.primary
+        } else {
+            MaterialTheme.colorScheme.outlineVariant.copy(alpha = ToolkitTheme.opacity.divider)
+        }
+        val pointerIcon = if (node.isHorizontal) {
+            PlatformUtils.horizontalResizePointerIcon()
+        } else {
+            PlatformUtils.verticalResizePointerIcon()
+        }
+        Box(
+            modifier = (if (node.isHorizontal) {
+                Modifier.fillMaxHeight().width(ToolkitTheme.dimensions.sduiSplitHandleThickness)
+            } else {
+                Modifier.fillMaxWidth().height(ToolkitTheme.dimensions.sduiSplitHandleThickness)
+            })
+                .hoverable(interactionSource)
+                .pointerHoverIcon(pointerIcon)
+                .semantics { contentDescription = resizeLabel }
+                .pointerInput(node.id, node.isHorizontal, totalPx) {
+                    detectDragGestures(
+                        onDrag = { change, dragAmount ->
+                            change.consume()
+                            if (totalPx > 1f) {
+                                val delta = if (node.isHorizontal) dragAmount.x else dragAmount.y
+                                fraction1 = (fraction1 + delta / totalPx).coerceIn(0.1f, 0.9f)
+                            }
+                        },
+                        onDragEnd = {
+                            onEvent(UiEvent.ValueChanged(node.id, fraction1.toDouble()))
+                        }
+                    )
+                },
+            contentAlignment = Alignment.Center
         ) {
-            SplitPaneContainer(
-                paneNode = node.first,
-                paneModifier = Modifier.weight(fraction1).fillMaxHeight()
-            )
-            SplitPaneContainer(
-                paneNode = node.second,
-                paneModifier = Modifier.weight(fraction2).fillMaxHeight()
+            Box(
+                modifier = (if (node.isHorizontal) {
+                    Modifier
+                        .width(ToolkitTheme.dimensions.sduiSplitHandlePillThickness)
+                        .height(ToolkitTheme.dimensions.sduiSplitHandlePillLength)
+                } else {
+                    Modifier
+                        .height(ToolkitTheme.dimensions.sduiSplitHandlePillThickness)
+                        .width(ToolkitTheme.dimensions.sduiSplitHandlePillLength)
+                })
+                    .clip(ToolkitTheme.shapes.pill)
+                    .background(handleColor)
             )
         }
-    } else {
-        Column(
-            modifier = modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.md)
-        ) {
-            SplitPaneContainer(
-                paneNode = node.first,
-                paneModifier = Modifier.weight(fraction1).fillMaxWidth()
-            )
-            SplitPaneContainer(
-                paneNode = node.second,
-                paneModifier = Modifier.weight(fraction2).fillMaxWidth()
-            )
+    }
+
+    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+        val totalPx = with(density) {
+            if (node.isHorizontal) maxWidth.toPx() else maxHeight.toPx()
+        }
+        if (node.isHorizontal) {
+            Row(
+                modifier = Modifier.fillMaxSize(),
+                horizontalArrangement = if (node.resizable) {
+                    Arrangement.spacedBy(ToolkitTheme.spacing.xxs)
+                } else {
+                    Arrangement.spacedBy(ToolkitTheme.spacing.md)
+                }
+            ) {
+                SplitPaneContainer(
+                    paneNode = node.first,
+                    paneModifier = Modifier.weight(fraction1).fillMaxHeight()
+                )
+                if (node.resizable) {
+                    SplitResizeHandle(totalPx = totalPx)
+                }
+                SplitPaneContainer(
+                    paneNode = node.second,
+                    paneModifier = Modifier.weight(fraction2).fillMaxHeight()
+                )
+            }
+        } else {
+            Column(
+                modifier = Modifier.fillMaxSize(),
+                verticalArrangement = if (node.resizable) {
+                    Arrangement.spacedBy(ToolkitTheme.spacing.xxs)
+                } else {
+                    Arrangement.spacedBy(ToolkitTheme.spacing.md)
+                }
+            ) {
+                SplitPaneContainer(
+                    paneNode = node.first,
+                    paneModifier = Modifier.weight(fraction1).fillMaxWidth()
+                )
+                if (node.resizable) {
+                    SplitResizeHandle(totalPx = totalPx)
+                }
+                SplitPaneContainer(
+                    paneNode = node.second,
+                    paneModifier = Modifier.weight(fraction2).fillMaxWidth()
+                )
+            }
         }
     }
 }
@@ -2211,7 +2458,7 @@ private fun RenderSidebar(
 }
 
 @Composable
-private fun ColumnScope.RenderColumnChildren(
+internal fun ColumnScope.RenderColumnChildren(
     children: List<UiNode>,
     onEvent: (UiEvent) -> Unit,
     allowWeight: Boolean
@@ -2237,7 +2484,7 @@ private fun ColumnScope.RenderColumnChildren(
 private fun UiNode.containsScrollableOrWeightedContent(): Boolean {
     if ((modifier.weight ?: 0f) > 0f) return true
     return when (this) {
-        is ScrollableColumnNode, is SplitPaneNode, is BoardNode -> true
+        is ScrollableColumnNode, is GridNode, is SplitPaneNode, is BoardNode -> true
         is ColumnNode -> children.any { it.containsScrollableOrWeightedContent() }
         is BoxNode -> children.any { it.containsScrollableOrWeightedContent() }
         is RowNode -> children.any { it.containsScrollableOrWeightedContent() }

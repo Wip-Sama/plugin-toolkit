@@ -43,6 +43,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.text.font.FontWeight
 import kotlinx.serialization.json.JsonPrimitive
 import org.jetbrains.compose.resources.stringResource
@@ -327,10 +328,31 @@ fun SinglePluginRunnerView(
                 color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = ToolkitTheme.opacity.divider)
             )
 
-            // Right Pane: Capability Tester & Execution Results
+            // Right Pane: Bounded Full-Viewport Interactive Tool OR Capability Tester & Execution Results
             Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
+                val activeHandle = viewModel.activeSessionHandle
                 if (selectedCapability == null) {
                     EmptyState(stringResource(Res.string.plugin_select_capability_hint))
+                } else if (activeHandle != null && activeHandle.isActive) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clipToBounds()
+                    ) {
+                        PluginCustomUiCard(
+                            handle = activeHandle,
+                            modifier = Modifier.fillMaxSize(),
+                            onClose = { viewModel.closeActiveSession() }
+                        )
+                        val pluginLabel = "${viewModel.manifest.plugin.name} v${viewModel.manifest.plugin.version}"
+                        InteractiveFloatingBottomBar(
+                            toolName = activeHandle.capabilityName,
+                            pluginName = pluginLabel,
+                            onRestart = { viewModel.restartActiveSession() },
+                            onClose = { viewModel.closeActiveSession() },
+                            modifier = Modifier.align(Alignment.BottomCenter)
+                        )
+                    }
                 } else {
                     Column(
                         modifier = Modifier
@@ -338,16 +360,6 @@ fun SinglePluginRunnerView(
                             .verticalScroll(rememberScrollState())
                             .padding(ToolkitTheme.spacing.extraLarge)
                     ) {
-                        viewModel.activeSessionHandle?.let { handle ->
-                            PluginCustomUiCard(
-                                handle = handle,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(bottom = ToolkitTheme.spacing.extraLarge),
-                                onClose = { viewModel.closeActiveSession() }
-                            )
-                        }
-
                         CapabilityTester(
                             capability = selectedCapability,
                             parameterValues = viewModel.parameterValues.toMap(),

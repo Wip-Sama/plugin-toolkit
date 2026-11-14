@@ -83,6 +83,22 @@ sealed interface UiEvent {
     ) : UiEvent
 
     /**
+     * Item reordering committed on a reorderable container ([GridNode], [ScrollableColumnNode], or [ColumnNode]).
+     *
+     * @property itemIds Full ordered list of child node IDs after the reorder operation.
+     * @property fromIndex Zero-based index the item was moved from.
+     * @property toIndex Zero-based index the item was dropped at.
+     */
+    @Serializable
+    @SerialName("items_reordered")
+    data class ItemsReordered(
+        override val nodeId: String,
+        val itemIds: List<String>,
+        val fromIndex: Int,
+        val toIndex: Int
+    ) : UiEvent
+
+    /**
      * Selection change on a spatial [BoardNode].
      */
     @Serializable
@@ -242,6 +258,7 @@ object UiEventSerializer : KSerializer<UiEvent> {
             is UiEvent.TabSelected -> "tab_selected"
             is UiEvent.ChipSelected -> "chip_selected"
             is UiEvent.DialogAction -> "dialog_action"
+            is UiEvent.ItemsReordered -> "items_reordered"
             is UiEvent.Custom -> "custom"
         }
         val element = when (value) {
@@ -262,6 +279,7 @@ object UiEventSerializer : KSerializer<UiEvent> {
             is UiEvent.TabSelected -> jsonEncoder.json.encodeToJsonElement(UiEvent.TabSelected.serializer(), value)
             is UiEvent.ChipSelected -> jsonEncoder.json.encodeToJsonElement(UiEvent.ChipSelected.serializer(), value)
             is UiEvent.DialogAction -> jsonEncoder.json.encodeToJsonElement(UiEvent.DialogAction.serializer(), value)
+            is UiEvent.ItemsReordered -> jsonEncoder.json.encodeToJsonElement(UiEvent.ItemsReordered.serializer(), value)
             is UiEvent.Custom -> jsonEncoder.json.encodeToJsonElement(UiEvent.Custom.serializer(), value)
         }
         if (element is JsonObject) {
@@ -294,6 +312,7 @@ object UiEventSerializer : KSerializer<UiEvent> {
             "tab_selected" -> UiEvent.TabSelected.serializer()
             "chip_selected" -> UiEvent.ChipSelected.serializer()
             "dialog_action" -> UiEvent.DialogAction.serializer()
+            "items_reordered" -> UiEvent.ItemsReordered.serializer()
             "custom" -> UiEvent.Custom.serializer()
             else -> UiEvent.Custom.serializer()
         }

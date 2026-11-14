@@ -11,8 +11,11 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.conflate
@@ -34,8 +37,10 @@ import org.wip.plugintoolkit.api.PluginContext
 import org.wip.plugintoolkit.api.PluginFileSystem
 import org.wip.plugintoolkit.api.PluginLogger
 import org.wip.plugintoolkit.api.PluginNetworkClient
+import org.wip.plugintoolkit.api.PluginNotificationType
 import org.wip.plugintoolkit.api.PluginRequest
 import org.wip.plugintoolkit.api.PluginResponse
+import org.wip.plugintoolkit.api.PluginSecretStorage
 import org.wip.plugintoolkit.api.PluginSignal
 import org.wip.plugintoolkit.api.PluginSignalManager
 import org.wip.plugintoolkit.api.PluginStorage
@@ -62,10 +67,30 @@ import org.wip.plugintoolkit.features.job.model.BackgroundJob
 import org.wip.plugintoolkit.features.job.model.JobStatus
 import org.wip.plugintoolkit.features.job.model.JobType
 import org.wip.plugintoolkit.features.plugin.logic.DefaultPluginSignalManager
+import org.wip.plugintoolkit.features.plugin.logic.DynamicHostFileSystem
 import org.wip.plugintoolkit.features.plugin.logic.PluginLoader
 import org.wip.plugintoolkit.features.plugin.logic.PluginManager
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.concurrent.Volatile
+
+/**
+ * Navigation request emitted when an active plugin interactive session asks to open another tool.
+ */
+data class ToolNavigationRequest(
+    val pluginId: String,
+    val capabilityName: String,
+    val initialParameters: Map<String, JsonElement> = emptyMap()
+)
+
+/**
+ * Bridge connecting an interactive SDUI session in logic layer to platform GUI dialogs (FileKit, etc.).
+ */
+interface PluginUiHostBridge {
+    suspend fun pickFile(title: String?, allowedExtensions: List<String>): String? = null
+    suspend fun pickFiles(title: String?, allowedExtensions: List<String>): List<String> = emptyList()
+    suspend fun pickDirectory(title: String?): String? = null
+    suspend fun saveFile(defaultName: String, extension: String, bytes: ByteArray): String? = null
+}
 
 /**
  * Handle controlling an active interactive UI session.
@@ -77,6 +102,8 @@ class PluginUiSessionHandle(
     val initialParameters: Map<String, JsonElement> = emptyMap(),
     val fileSystem: PluginFileSystem? = null,
     val cacheFileSystem: PluginFileSystem? = null,
+    val hostFileSystem: HostFileSystem? = null,
+    val networkClient: PluginNetworkClient? = null,
     private val sessionScope: CoroutineScope,
     private val transactionalChannel: Channel<UiEvent>,
     private val continuousChannel: Channel<UiEvent>,
@@ -113,6 +140,7 @@ class PluginUiSessionHandle(
             is UiEvent.TabSelected,
             is UiEvent.ChipSelected,
             is UiEvent.DialogAction,
+            is UiEvent.ItemsReordered,
             is UiEvent.Custom -> {
                 transactionalChannel.trySend(event)
             }
@@ -169,12 +197,19 @@ class PluginUiSessionManager(
     private val sessionLock = Any()
     private var sessionCounter = 0
 
+    @Volatile
+    var hostBridge: PluginUiHostBridge? = null
+
+    private val _navigationRequests = MutableSharedFlow<ToolNavigationRequest>(extraBufferCapacity = 16)
+    val navigationRequests: SharedFlow<ToolNavigationRequest> = _navigationRequests.asSharedFlow()
+
     fun startSession(
         pluginId: String,
         capabilityName: String,
         context: PluginContext,
         processor: InteractiveUiProcessor,
-        initialParameters: Map<String, JsonElement> = emptyMap()
+        initialParameters: Map<String, JsonElement> = emptyMap(),
+        hostBridge: PluginUiHostBridge? = null
     ): PluginUiSessionHandle {
         val sessionId = synchronized(sessionLock) {
             "session_${pluginId}_${capabilityName}_${++sessionCounter}"
@@ -216,6 +251,7 @@ class PluginUiSessionManager(
         val sessionJob = SupervisorJob(appScope.coroutineContext[kotlinx.coroutines.Job])
         val sessionScope = CoroutineScope(dispatcher + sessionJob + exceptionHandler)
 
+        val effectiveBridge = hostBridge ?: this.hostBridge
         val handle = PluginUiSessionHandle(
             sessionId = sessionId,
             pluginId = pluginId,
@@ -223,6 +259,8 @@ class PluginUiSessionManager(
             initialParameters = initialParameters,
             fileSystem = context.fileSystem,
             cacheFileSystem = context.cacheFileSystem,
+            hostFileSystem = context.hostFileSystem,
+            networkClient = context.networkClient,
             sessionScope = sessionScope,
             transactionalChannel = transactionalChannel,
             continuousChannel = continuousChannel,
@@ -491,6 +529,7 @@ class PluginUiSessionManager(
             override val hostFileSystem: HostFileSystem get() = context.hostFileSystem
             override val settings: Map<String, JsonElement> get() = _settingsFlow.value
             override val storage: PluginStorage get() = context.storage
+            override val secrets: PluginSecretStorage get() = context.secrets
             override val signals: PluginSignalManager get() = context.signals
             override val networkClient: PluginNetworkClient get() = context.networkClient
 
@@ -504,6 +543,8 @@ class PluginUiSessionManager(
 
             override fun setRequiredAction(actionName: String?) = context.setRequiredAction(actionName)
             override fun showToast(message: String) = context.showToast(message)
+            override fun showNotification(title: String, message: String, type: PluginNotificationType) =
+                context.showNotification(title, message, type)
 
             override suspend fun updateSetting(key: String, value: JsonElement) {
                 _settingsFlow.update { it + (key to value) }
@@ -705,6 +746,49 @@ class PluginUiSessionManager(
                 } else if (jobManager != null) {
                     jobManager.cancelJob(jobId, force = true)
                 }
+            }
+
+            override suspend fun pickFile(title: String?, allowedExtensions: List<String>): String? {
+                val picked = effectiveBridge?.pickFile(title, allowedExtensions)
+                if (picked != null) {
+                    (context.hostFileSystem as? DynamicHostFileSystem)?.grantAccess(picked)
+                }
+                return picked
+            }
+
+            override suspend fun pickFiles(title: String?, allowedExtensions: List<String>): List<String> {
+                val picked = effectiveBridge?.pickFiles(title, allowedExtensions) ?: emptyList()
+                val dynamicFs = context.hostFileSystem as? DynamicHostFileSystem
+                if (dynamicFs != null) {
+                    picked.forEach { dynamicFs.grantAccess(it) }
+                }
+                return picked
+            }
+
+            override suspend fun pickDirectory(title: String?): String? {
+                val picked = effectiveBridge?.pickDirectory(title)
+                if (picked != null) {
+                    (context.hostFileSystem as? DynamicHostFileSystem)?.grantAccess(picked)
+                }
+                return picked
+            }
+
+            override suspend fun saveFile(defaultName: String, extension: String, bytes: ByteArray): String? {
+                val saved = effectiveBridge?.saveFile(defaultName, extension, bytes)
+                if (saved != null) {
+                    (context.hostFileSystem as? DynamicHostFileSystem)?.grantAccess(saved)
+                }
+                return saved
+            }
+
+            override fun openInteractiveTool(capabilityName: String, initialParameters: Map<String, JsonElement>) {
+                _navigationRequests.tryEmit(
+                    ToolNavigationRequest(
+                        pluginId = pluginId,
+                        capabilityName = capabilityName,
+                        initialParameters = initialParameters
+                    )
+                )
             }
         }
 

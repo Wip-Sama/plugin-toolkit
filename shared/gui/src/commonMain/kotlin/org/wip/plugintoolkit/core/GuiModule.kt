@@ -10,6 +10,8 @@ import org.wip.plugintoolkit.features.flows.viewmodel.FlowViewModel
 import org.wip.plugintoolkit.features.job.viewmodel.JobViewModel
 import org.wip.plugintoolkit.features.navigation.viewmodel.AppViewModel
 import org.wip.plugintoolkit.features.plugin.logic.PluginRegistry
+import org.wip.plugintoolkit.features.plugin.sdui.PlatformUiHostBridge
+import org.wip.plugintoolkit.features.plugin.sdui.PluginUiHostBridge
 import org.wip.plugintoolkit.features.plugin.viewmodel.PluginManagerViewModel
 import org.wip.plugintoolkit.features.plugin.viewmodel.PluginSettingsViewModel
 import org.wip.plugintoolkit.features.plugin.viewmodel.PluginViewModel
@@ -76,8 +78,9 @@ val guiModule: Module = module {
     single { PluginManagerViewModel(get(), get(), get(), get(), get(), get(), get(), get()) }
     factory { (pkg: String) -> PluginSettingsViewModel(pkg, get(), get()) }
     factory { JobViewModel(get()) }
-    factory { (entry: org.wip.plugintoolkit.api.PluginEntry) -> org.wip.plugintoolkit.features.plugin.viewmodel.SinglePluginHostViewModel(entry, get(), get(), get(), getOrNull()) }
-    factory { org.wip.plugintoolkit.features.plugin.viewmodel.SinglePluginHostViewModel(get(), get(), get(), get(), getOrNull()) }
-    factory { org.wip.plugintoolkit.features.plugin.viewmodel.InteractiveToolsViewModel(get(), getOrNull(), getOrNull()) }
+    single<PluginUiHostBridge> { PlatformUiHostBridge }
+    factory { (entry: org.wip.plugintoolkit.api.PluginEntry) -> org.wip.plugintoolkit.features.plugin.viewmodel.SinglePluginHostViewModel(entry, get(), get(), get(), getOrNull(), get()) }
+    factory { org.wip.plugintoolkit.features.plugin.viewmodel.SinglePluginHostViewModel(get(), get(), get(), get(), getOrNull(), get()) }
+    factory { org.wip.plugintoolkit.features.plugin.viewmodel.InteractiveToolsViewModel(get(), getOrNull(), getOrNull(), get()) }
     factory { AppViewModel(get(), get()) }
 }

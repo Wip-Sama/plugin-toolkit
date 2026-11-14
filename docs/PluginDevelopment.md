@@ -436,15 +436,19 @@ Plugins can provide full, reactive graphical user interfaces using declarative S
 Because of this fundamental difference in execution model and user interaction:
 1. **Visual Flows Cannot Use Interactive Tools**: Visual flows are automated, headless batch execution pipelines. Attempting to place an interactive capability into a flow marks the node as unready (`node.isReady = false`) and breaks the flow (`flow.isBroken = true`).
 2. **Dedicated Interactive Tab**: In the host application, interactive tools are surfaced under the dedicated **Interactive** section in the navigation sidebar (under the **Runner** group alongside "Capabilities" and "Flows").
-3. **Declaration**: Annotate interactive methods with `@InteractiveTool` or `@Capability(isInteractive = true)`:
+3. **Declaration & Multi-Tool Routing**: Annotate interactive methods with `@InteractiveTool` or `@Capability(isInteractive = true)` and implement `InteractiveUiProcessor` on your `@PluginInfo` class:
    ```kotlin
-   @InteractiveTool(name = "Vector Canvas", description = "Live vector drawing surface")
+   @InteractiveTool(
+       name = "drawingCanvas",
+       description = "Live vector drawing and spatial composition surface"
+   )
    fun drawingCanvas(): String {
        // KSP automatically infers context = CapabilityContext.INTERACTIVE_ONLY
        return "drawingCanvas"
    }
    ```
-4. **Architecture & DSL**: For full details on the declarative SDUI component tree, vector canvas, reactive state diffing, dual-loop concurrency, and lifecycle management, see the comprehensive [Interactive Plugins Guide](InteractivePlugins.md).
+   A plugin can expose multiple `@InteractiveTool` capabilities (e.g., separate dashboards, upload queues, and repo browsers) and switch between them at runtime with `UiSessionContext.openInteractiveTool(capabilityName, initialParameters)`.
+4. **Architecture & DSL**: For full details on the declarative SDUI component tree (`ScaffoldNode`, `SplitPaneNode`, `TabsNode`, `GridNode` drag-and-drop reordering, `ImageNode` previews, `BoardNode`), native file/directory pickers, encrypted `secrets`, HTTP multipart uploads, reactive state diffing, and host rendering constraints, see the [Interactive Plugins Guide](InteractivePlugins.md).
 
 ### 3. Changelog Management
 
@@ -652,6 +656,69 @@ suspend fun setup(context: PluginContext): Result<Unit> {
 
 Once extracted, you can use `fileSystem.getBasePath()` to get the absolute path if you need to execute a file via `ProcessBuilder`.
 
+### Encrypted Secret Storage (`context.secrets`)
+
+Never store passwords, API keys, OAuth tokens, or webhook secrets inside plain `settings` or `storage`. Every `PluginContext` exposes `secrets: PluginSecretStorage`, which encrypts values at rest per plugin (inside `secrets.json` in the plugin install directory):
+
+```kotlin
+import org.wip.plugintoolkit.api.PluginContext
+
+suspend fun saveApiToken(context: PluginContext, token: String) {
+    context.secrets.putSecret("service_api_token", token)
+}
+
+suspend fun loadApiToken(context: PluginContext): String? {
+    return context.secrets.getSecret("service_api_token")
+}
+```
+
+Available methods: `getSecret(key)`, `putSecret(key, value)`, `removeSecret(key)`, `listSecretKeys()`, and `clearSecrets()`.
+
+### HTTP Requests & Multipart Uploads (`context.networkClient`)
+
+`PluginContext.networkClient` meters traffic into the host dashboard and provides both quick helpers (`get`, `getText`, `post`, `postText`) and full HTTP control via `request(HttpRequest)`:
+
+```kotlin
+import org.wip.plugintoolkit.api.HttpMethod
+import org.wip.plugintoolkit.api.HttpRequest
+import org.wip.plugintoolkit.api.MultipartPart
+import org.wip.plugintoolkit.api.PluginContext
+
+suspend fun uploadPage(context: PluginContext, token: String, bytes: ByteArray) {
+    val response = context.networkClient.request(
+        HttpRequest(
+            url = "https://uploads.example.com/v1/pages",
+            method = HttpMethod.POST,
+            headers = mapOf("Authorization" to "Bearer $token"),
+            multipartParts = listOf(
+                MultipartPart(
+                    name = "file",
+                    data = bytes,
+                    filename = "page_001.png",
+                    contentType = "image/png"
+                )
+            ),
+            timeoutMs = 30_000L
+        )
+    )
+    if (!response.isSuccess) {
+        context.logger.error("Upload failed (${response.statusCode}): ${response.bodyAsText()}")
+    }
+}
+```
+
+- Supported `HttpMethod` values: `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD`.
+- Non-2xx status codes return normally in `HttpResponse(statusCode, headers, body, errorMessage)` rather than discarding headers/body, so plugins can inspect `401`/`404`/`429` JSON payloads and `Retry-After` headers.
+
+### User Feedback: Notifications & Toasts
+
+- `context.showToast(message)` (or `context.toast(message)`) shows a lightweight transient message.
+- `context.showNotification(title, message, type)` records a persistent entry in the host Notification Center and surfaces important/error alerts using `PluginNotificationType.INFO`, `SUCCESS`, `WARNING`, or `ERROR`.
+
+### Dynamic Host File Grants
+
+When an `@InteractiveTool` calls `pickFile(...)`, `pickFiles(...)`, or `pickDirectory(...)` on `UiSessionContext`, the host grants read access (for picked files) or read/write subtree access (for a picked directory) on `context.hostFileSystem` for the duration of the session, and allows local image previews in `ImageNode`. For persistent plugin-managed local Git clones or caches, use `context.fileSystem` (`PluginFileSystem`), whose base path lives in the plugin's own data folder.
+
 ## Plugin Settings
 
 Plugins can define settings that are automatically rendered in the host application's UI and securely stored.
@@ -780,12 +847,40 @@ For local development (loading plugins from the local filesystem), signature ver
 
 ---
 
+## External Dependencies & Packaging (`ChildFirstClassLoader`)
+
+The host loads compiled plugin JARs inside an isolated `ChildFirstClassLoader` (`ServiceLoader` discovers the KSP-generated `PluginModuleProvider`). Class loading delegates as follows:
+
+- **Parent-first (shared with the host application):**
+  - `java.*`, `javax.*`
+  - `kotlin.*`, `kotlinx.*` (stdlib, coroutines, serialization)
+  - `org.wip.plugintoolkit.api.*` (including `org.wip.plugintoolkit.api.sdui.*`)
+  - `org.koin.*`
+- **Child-first (loaded from your plugin JAR first):**
+  - All plugin classes and any third-party JVM dependencies outside the parent-first prefixes above (for example `org.eclipse.jgit`, specialized archive/image libraries, or custom HTTP clients).
+
+**Packaging Rules for External Plugins:**
+1. Declare `plugin-api` (and KSP processor) as `compileOnly` + `ksp` in standalone third-party Gradle builds, or exclude `kotlin.*`, `kotlinx.*`, `org.koin.*`, and `org.wip.plugintoolkit.api.*` when building a shadow/fat JAR.
+2. Never shade or duplicate `plugin-api` classes inside the plugin JAR—type identity across `PluginEntry`, `PluginContext`, and `UiNode` must come from the host classloader.
+3. Preserve `META-INF/services/` and KSP-generated `META-INF/manifest.json` inside the final JAR (`mergeServiceFiles()` if using Gradle Shadow).
+
+---
+
+## Testing Plugins
+
+Plugins can be verified quickly in pure JVM unit tests (`.\gradlew :yourPlugin:test`) using `kotlinx-coroutines-test`:
+- Test `@Capability` methods directly with a fake `PluginContext` and temporary directories for `PluginFileSystem` / `ExecutionFileSystem`.
+- Test `@InteractiveTool` sessions by passing a fake `UiSessionContext` and a `MutableSharedFlow<UiEvent>` into `openUiSession(context, events)`.
+- Reference test suites in the repository: [`CompleteExampleTest.kt`](../plugins/completeExample/src/test/kotlin/org/wip/complete/CompleteExampleTest.kt) and [`MinimalPluginTest.kt`](../plugins/minimalExample/src/test/kotlin/org/wip/minimal/MinimalPluginTest.kt).
+
+---
+
 ## Best Practices
 
 - **Non-blocking**: Always use `suspend` functions for I/O or heavy computation.
 - **Resource Cleanup**: Always implement `shutdown()` or use try-finally blocks to clean up resources.
-- **Isolation**: Plugins should not attempt to access files outside their managed folders.
-- **Security**: Never share your private key or keystore password. Store them securely.
+- **Isolation**: Plugins should not attempt to access files outside their managed folders unless explicitly authorized through `hostFileSystem` or session file/directory pickers.
+- **Security**: Never share your private key or keystore password. Store credentials and tokens with `context.secrets`, not plain settings.
 - **ABI & Version Compatibility**: When updating or extending `plugin-api` models:
   - Always assign default values to newly added properties.
   - Apply `@kotlin.jvm.JvmOverloads constructor(...)` to data classes so that the Kotlin compiler generates JVM bytecode overloads for existing compiled plugins.

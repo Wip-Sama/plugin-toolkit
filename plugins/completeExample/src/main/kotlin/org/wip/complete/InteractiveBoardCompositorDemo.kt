@@ -9,6 +9,7 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import org.wip.plugintoolkit.api.PluginResponse
 import org.wip.plugintoolkit.api.sdui.BoardGridStyle
@@ -108,8 +109,15 @@ fun runBoardCompositorSession(
     events: Flow<UiEvent>
 ): Flow<UiNodeTree> = channelFlow {
     val assets = CompleteExampleSampleAssets.ensureBoardAssets(context)
+    val initialChapterTitle = context.initialParameters["chapterTitle"]?.jsonPrimitive?.contentOrNull
+    val initialTitle = if (!initialChapterTitle.isNullOrBlank()) {
+        "$initialChapterTitle — Page Compositor"
+    } else {
+        "Chapter 42 — Page 01 Compositor"
+    }
     val stateFlow = MutableStateFlow(
         BoardCompositorState(
+            boardTitle = initialTitle,
             assets = assets,
             layers = defaultCompositorLayers(assets.stampAsset)
         )
@@ -482,7 +490,8 @@ private suspend fun handleBoardCompositorEvent(
         }
         is UiEvent.TabSelected,
         is UiEvent.ChipSelected,
-        is UiEvent.DialogAction -> Unit
+        is UiEvent.DialogAction,
+        is UiEvent.ItemsReordered -> Unit
     }
 }
 

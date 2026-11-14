@@ -56,16 +56,7 @@ actual val logicModule: Module = module {
         }
     }
     single {
-        HttpClient(CIO) {
-            install(ContentNegotiation) {
-                json(get<Json>())
-            }
-            install(HttpTimeout) {
-                requestTimeoutMillis = 60000
-                connectTimeoutMillis = 15000
-                socketTimeoutMillis = 30000
-            }
-        }
+        createPluginToolkitHttpClient(get<Json>())
     }
     single { RepoManager(get(), get(), get(), get(named("LoomScope"))) }
     single { PluginLockProvider() }
@@ -85,4 +76,15 @@ actual val logicModule: Module = module {
     single<SystemNodeExecutorRegistry> { DefaultSystemNodeExecutorRegistry(get()) }
     single { UpdateService(get(), get()) }
     single { PluginUiSessionManager(get(named("AppScope")), getOrNull(), getOrNull()) }
+}
+
+internal fun createPluginToolkitHttpClient(jsonSerializer: Json): HttpClient = HttpClient(CIO) {
+    install(ContentNegotiation) {
+        json(jsonSerializer)
+    }
+    install(HttpTimeout) {
+        requestTimeoutMillis = 60000
+        connectTimeoutMillis = 15000
+        socketTimeoutMillis = 30000
+    }
 }

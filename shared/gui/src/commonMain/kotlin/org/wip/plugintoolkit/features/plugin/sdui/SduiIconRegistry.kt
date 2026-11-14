@@ -4,6 +4,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.automirrored.filled.Redo
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.automirrored.filled.Undo
@@ -22,20 +23,26 @@ import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.CropSquare
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.DragIndicator
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.FitScreen
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.NearMe
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.PanTool
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -43,10 +50,12 @@ import androidx.compose.material.icons.filled.Publish
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material.icons.filled.Upload
@@ -124,7 +133,20 @@ object SduiIconRegistry {
         "send" to Icons.AutoMirrored.Filled.Send,
         "history" to Icons.Default.History,
         "code" to Icons.Default.Code,
-        "star" to Icons.Default.Star
+        "star" to Icons.Default.Star,
+        "drag_indicator" to Icons.Default.DragIndicator,
+        "drag" to Icons.Default.DragIndicator,
+        "reorder" to Icons.Default.DragIndicator,
+        "swap_vert" to Icons.Default.SwapVert,
+        "grid_view" to Icons.Default.GridView,
+        "grid" to Icons.Default.GridView,
+        "key" to Icons.Default.Key,
+        "notifications" to Icons.Default.Notifications,
+        "schedule" to Icons.Default.Schedule,
+        "open_in_new" to Icons.AutoMirrored.Filled.OpenInNew,
+        "folder_open" to Icons.Default.FolderOpen,
+        "description" to Icons.Default.Description,
+        "article" to Icons.Default.Description
     )
 
     /**

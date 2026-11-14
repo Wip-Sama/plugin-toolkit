@@ -9,6 +9,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 import org.koin.core.module.Module
+import kotlin.jvm.JvmOverloads
 
 /**
  * The root interface for any plugin.
@@ -347,6 +348,157 @@ interface ProgressReporter {
 }
 
 /**
+ * Encrypted key-value storage scoped to a plugin for sensitive runtime credentials
+ * (API tokens, refresh tokens, session cookies, passwords).
+ *
+ * Values are persisted by the host via platform-backed encryption rather than plaintext JSON.
+ */
+interface PluginSecretStorage {
+    suspend fun getSecret(key: String): String?
+    suspend fun putSecret(key: String, value: String)
+    suspend fun removeSecret(key: String)
+    suspend fun listSecretKeys(): List<String>
+    suspend fun clearSecrets() {
+        listSecretKeys().forEach { removeSecret(it) }
+    }
+}
+
+/**
+ * Fallback no-op implementation of [PluginSecretStorage].
+ */
+object NoOpPluginSecretStorage : PluginSecretStorage {
+    override suspend fun getSecret(key: String): String? = null
+    override suspend fun putSecret(key: String, value: String) {}
+    override suspend fun removeSecret(key: String) {}
+    override suspend fun listSecretKeys(): List<String> = emptyList()
+}
+
+/**
+ * Severity levels for host-persistent notifications raised by a plugin via [PluginContext.showNotification].
+ */
+@Serializable
+enum class PluginNotificationType {
+    INFO,
+    SUCCESS,
+    WARNING,
+    ERROR
+}
+
+/**
+ * Supported HTTP methods for [PluginNetworkClient.request].
+ */
+@Serializable
+enum class HttpMethod {
+    GET,
+    POST,
+    PUT,
+    PATCH,
+    DELETE,
+    HEAD
+}
+
+/**
+ * Single part inside a `multipart/form-data` HTTP request body.
+ */
+@Serializable
+data class MultipartPart(
+    val name: String,
+    val data: ByteArray,
+    val filename: String? = null,
+    val contentType: String? = null
+) {
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is MultipartPart) return false
+        return name == other.name &&
+            filename == other.filename &&
+            contentType == other.contentType &&
+            data.contentEquals(other.data)
+    }
+
+    override fun hashCode(): Int {
+        var result = name.hashCode()
+        result = 31 * result + data.contentHashCode()
+        result = 31 * result + (filename?.hashCode() ?: 0)
+        result = 31 * result + (contentType?.hashCode() ?: 0)
+        return result
+    }
+}
+
+/**
+ * Structured HTTP request descriptor supporting REST verbs, custom headers, raw binary/JSON payloads,
+ * multipart uploads, and per-request timeouts.
+ */
+@Serializable
+data class HttpRequest @JvmOverloads constructor(
+    val url: String,
+    val method: HttpMethod = HttpMethod.GET,
+    val headers: Map<String, String> = emptyMap(),
+    val body: ByteArray? = null,
+    val multipartParts: List<MultipartPart> = emptyList(),
+    val timeoutMs: Long? = null
+) {
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is HttpRequest) return false
+        return url == other.url &&
+            method == other.method &&
+            headers == other.headers &&
+            ((body == null && other.body == null) || (body != null && other.body != null && body.contentEquals(other.body))) &&
+            multipartParts == other.multipartParts &&
+            timeoutMs == other.timeoutMs
+    }
+
+    override fun hashCode(): Int {
+        var result = url.hashCode()
+        result = 31 * result + method.hashCode()
+        result = 31 * result + headers.hashCode()
+        result = 31 * result + (body?.contentHashCode() ?: 0)
+        result = 31 * result + multipartParts.hashCode()
+        result = 31 * result + (timeoutMs?.hashCode() ?: 0)
+        return result
+    }
+}
+
+/**
+ * Structured HTTP response returned by [PluginNetworkClient.request], preserving HTTP status codes,
+ * response headers (e.g. `Retry-After`, `ETag`), and raw body bytes even on non-2xx responses.
+ */
+@Serializable
+data class HttpResponse @JvmOverloads constructor(
+    val statusCode: Int,
+    val headers: Map<String, List<String>> = emptyMap(),
+    val body: ByteArray = ByteArray(0),
+    val errorMessage: String? = null
+) {
+    val isSuccess: Boolean get() = statusCode in 200..299
+
+    fun bodyAsText(): String = body.decodeToString()
+
+    fun header(name: String): String? = headers.entries
+        .firstOrNull { it.key.equals(name, ignoreCase = true) }
+        ?.value
+        ?.firstOrNull()
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is HttpResponse) return false
+        return statusCode == other.statusCode &&
+            headers == other.headers &&
+            body.contentEquals(other.body) &&
+            errorMessage == other.errorMessage
+    }
+
+    override fun hashCode(): Int {
+        var result = statusCode
+        result = 31 * result + headers.hashCode()
+        result = 31 * result + body.contentHashCode()
+        result = 31 * result + (errorMessage?.hashCode() ?: 0)
+        return result
+    }
+}
+
+/**
  * Network client for plugins that tracks throughput, downloaded bytes, and uploaded bytes.
  */
 interface PluginNetworkClient {
@@ -354,6 +506,25 @@ interface PluginNetworkClient {
     suspend fun getText(url: String, headers: Map<String, String> = emptyMap()): String
     suspend fun post(url: String, body: ByteArray, headers: Map<String, String> = emptyMap()): ByteArray
     suspend fun postText(url: String, body: String, headers: Map<String, String> = emptyMap()): String
+
+    /**
+     * Execute a full HTTP request returning status code, headers, and raw payload.
+     * Preserves non-2xx responses (e.g. 401/404/429) rather than discarding status details.
+     */
+    suspend fun request(request: HttpRequest): HttpResponse {
+        return try {
+            when (request.method) {
+                HttpMethod.GET -> HttpResponse(statusCode = 200, body = get(request.url, request.headers))
+                HttpMethod.POST -> HttpResponse(statusCode = 200, body = post(request.url, request.body ?: ByteArray(0), request.headers))
+                else -> HttpResponse(
+                    statusCode = 501,
+                    errorMessage = "HTTP ${request.method.name} is not supported by this legacy PluginNetworkClient implementation"
+                )
+            }
+        } catch (t: Throwable) {
+            HttpResponse(statusCode = 0, errorMessage = t.message ?: t::class.simpleName)
+        }
+    }
 }
 
 /**
@@ -364,6 +535,7 @@ object NoOpPluginNetworkClient : PluginNetworkClient {
     override suspend fun getText(url: String, headers: Map<String, String>): String = ""
     override suspend fun post(url: String, body: ByteArray, headers: Map<String, String>): ByteArray = ByteArray(0)
     override suspend fun postText(url: String, body: String, headers: Map<String, String>): String = ""
+    override suspend fun request(request: HttpRequest): HttpResponse = HttpResponse(statusCode = 0, errorMessage = "No network client configured")
 }
 
 /**
@@ -515,6 +687,12 @@ interface PluginContext {
     val signals: PluginSignalManager
 
     /**
+     * Encrypted runtime secret storage scoped to this plugin for sensitive tokens and passwords
+     * obtained dynamically (e.g. OAuth sessions, API keys).
+     */
+    val secrets: PluginSecretStorage get() = NoOpPluginSecretStorage
+
+    /**
      * Managed network client with automatic download/upload byte tracking and throughput calculation.
      */
     val networkClient: PluginNetworkClient get() = NoOpPluginNetworkClient
@@ -535,6 +713,17 @@ interface PluginContext {
      * @param message The message to display to the user.
      */
     fun showToast(message: String) {}
+
+    /**
+     * Raise a persistent notification recorded in the host notification center (and surfaced as an alert).
+     */
+    fun showNotification(
+        title: String,
+        message: String,
+        type: PluginNotificationType = PluginNotificationType.INFO
+    ) {
+        showToast("$title: $message")
+    }
 
     /**
      * Helper to display a toast notification in the host application UI.

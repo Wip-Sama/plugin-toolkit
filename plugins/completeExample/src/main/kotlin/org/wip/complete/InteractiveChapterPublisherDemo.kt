@@ -13,10 +13,15 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import org.wip.plugintoolkit.api.ExecutionResult
+import org.wip.plugintoolkit.api.HttpMethod
+import org.wip.plugintoolkit.api.HttpRequest
+import org.wip.plugintoolkit.api.PluginNotificationType
+import org.wip.plugintoolkit.api.sdui.AssetReference
 import org.wip.plugintoolkit.api.sdui.CapabilityJobSnapshot
 import org.wip.plugintoolkit.api.sdui.CapabilityJobStatus
 import org.wip.plugintoolkit.api.sdui.ChipItem
 import org.wip.plugintoolkit.api.sdui.ControlSize
+import org.wip.plugintoolkit.api.sdui.ImageScale
 import org.wip.plugintoolkit.api.sdui.SemanticColor
 import org.wip.plugintoolkit.api.sdui.SpacingSize
 import org.wip.plugintoolkit.api.sdui.TabItem
@@ -33,6 +38,9 @@ private val publisherJson = Json {
     encodeDefaults = true
 }
 
+private const val STORAGE_LINKED_REPO_PATH = "chapter_publisher_repo_path"
+private const val SECRET_PUBLISHER_API_KEY = "publisher_api_secret"
+
 private data class ChapterPublisherState(
     val activeTab: String = "chapters",
     val environment: String = "STAGING",
@@ -41,10 +49,18 @@ private data class ChapterPublisherState(
     val chapters: List<ChapterRecord> = emptyList(),
     val selectedChapterIds: Set<String> = emptySet(),
     val inspectedChapterId: String? = null,
+    val selectedPageId: String? = null,
+    val splitFraction: Float = 0.54f,
+    val pageOrderRevision: Int = 0,
     val draftTitle: String = "",
     val draftNotes: String = "",
     val draftRequiresLock: Boolean = false,
     val draftRevision: Int = 0,
+    val draftSecretToken: String = "",
+    val draftSecretRevision: Int = 0,
+    val secretConfigured: Boolean = false,
+    val linkedRepoPath: String = "",
+    val webhookStatus: String? = null,
     val isLoading: Boolean = true,
     val showConfirmDialog: Boolean = false,
     val pendingPushIds: List<String> = emptyList(),
@@ -59,6 +75,28 @@ internal fun runChapterPublisherSession(
     val stateFlow = MutableStateFlow(ChapterPublisherState())
     val handledCompletedJobIds = mutableSetOf<String>()
 
+    suspend fun enrichChapter(chapter: ChapterRecord): ChapterRecord {
+        val cover = chapter.coverAsset ?: CompleteExampleSampleAssets.ensureChapterCoverAsset(
+            context = context,
+            chapterId = chapter.id,
+            chapterNumber = chapter.number
+        )
+        val pages = chapter.pages.ifEmpty {
+            (1..4).map { idx ->
+                ChapterPageRecord(
+                    id = "${chapter.id}_p$idx",
+                    label = "Page ${idx.toString().padStart(2, '0')}",
+                    asset = CompleteExampleSampleAssets.ensurePageThumbnailAsset(
+                        context = context,
+                        chapterId = chapter.id,
+                        pageIndex = idx
+                    )
+                )
+            }
+        }
+        return chapter.copy(coverAsset = cover, pages = pages)
+    }
+
     suspend fun refreshCatalog(environment: String, statusNote: String? = null) {
         val execResult = context.executeCapability(
             capabilityName = "queryChapterCatalog",
@@ -68,7 +106,7 @@ internal fun runChapterPublisherSession(
             ?.response
             ?.metadata
             ?.get("chaptersJson")
-        val chapters = if (!encodedJson.isNullOrBlank()) {
+        val rawChapters = if (!encodedJson.isNullOrBlank()) {
             runCatching { publisherJson.decodeFromString<List<ChapterRecord>>(encodedJson) }.getOrNull()
         } else {
             null
@@ -77,17 +115,25 @@ internal fun runChapterPublisherSession(
             val remote = CompleteExampleCatalogStore.loadRemoteCatalog(context.storage)
             CompleteExampleCatalogStore.reconcile(local, remote)
         }
+        val chapters = rawChapters.map { enrichChapter(it) }
 
         stateFlow.update { current ->
             val validIds = chapters.map { it.id }.toSet()
-            val nextInspected = current.inspectedChapterId?.takeIf { it in validIds }
+            val requestedChapterId = context.initialParameters["chapterId"]?.jsonPrimitive?.contentOrNull
+                ?.takeIf { current.isLoading && it in validIds }
+            val nextInspected = requestedChapterId
+                ?: current.inspectedChapterId?.takeIf { it in validIds }
                 ?: chapters.firstOrNull()?.id
             val inspectedChapter = chapters.find { it.id == nextInspected }
             val changedInspector = nextInspected != current.inspectedChapterId || current.isLoading
+            val validPageIds = inspectedChapter?.pages?.map { it.id }?.toSet().orEmpty()
+            val nextSelectedPage = current.selectedPageId?.takeIf { it in validPageIds }
+                ?: inspectedChapter?.pages?.firstOrNull()?.id
             current.copy(
                 chapters = chapters,
                 selectedChapterIds = current.selectedChapterIds.intersect(validIds),
                 inspectedChapterId = nextInspected,
+                selectedPageId = nextSelectedPage,
                 draftTitle = if (changedInspector) inspectedChapter?.title.orEmpty() else current.draftTitle,
                 draftNotes = if (changedInspector) inspectedChapter?.releaseNotes.orEmpty() else current.draftNotes,
                 draftRequiresLock = if (changedInspector) (inspectedChapter?.requiresLock ?: false) else current.draftRequiresLock,
@@ -158,7 +204,15 @@ internal fun runChapterPublisherSession(
             ?.jsonPrimitive?.contentOrNull
             ?.takeIf { it == "STAGING" || it == "PRODUCTION" }
             ?: "STAGING"
-        stateFlow.update { it.copy(environment = savedEnv) }
+        val savedRepo = context.storage.get(STORAGE_LINKED_REPO_PATH)?.jsonPrimitive?.contentOrNull.orEmpty()
+        val hasSecret = !runCatching { context.secrets.getSecret(SECRET_PUBLISHER_API_KEY) }.getOrNull().isNullOrBlank()
+        stateFlow.update {
+            it.copy(
+                environment = savedEnv,
+                linkedRepoPath = savedRepo,
+                secretConfigured = hasSecret
+            )
+        }
         refreshCatalog(savedEnv, "Loaded ${savedEnv.lowercase()} chapter catalog.")
     }
 
@@ -181,6 +235,15 @@ internal fun runChapterPublisherSession(
                         else -> null
                     }
                     refreshCatalog(stateFlow.value.environment, note)
+                    context.showNotification(
+                        title = if (latest.status == CapabilityJobStatus.COMPLETED) "Publisher Sync Complete" else "Publisher Sync Notice",
+                        message = note ?: "Sync finished for ${latest.capabilityName}.",
+                        type = when (latest.status) {
+                            CapabilityJobStatus.COMPLETED -> PluginNotificationType.SUCCESS
+                            CapabilityJobStatus.FAILED -> PluginNotificationType.ERROR
+                            else -> PluginNotificationType.WARNING
+                        }
+                    )
                 }
             }
         }
@@ -204,11 +267,43 @@ internal fun runChapterPublisherSession(
                         "pub_search_input" -> stateFlow.update { it.copy(searchQuery = event.text) }
                         "insp_title_input" -> stateFlow.update { it.copy(draftTitle = event.text) }
                         "insp_notes_input" -> stateFlow.update { it.copy(draftNotes = event.text) }
+                        "cfg_secret_token_input" -> stateFlow.update { it.copy(draftSecretToken = event.text) }
                         "cfg_api_key_input" -> {
                             context.updateSetting("apiKey", event.text)
                             stateFlow.update {
                                 it.copy(
                                     bannerMessage = "Updated plugin apiKey setting.",
+                                    bannerSeverity = SemanticColor.INFO
+                                )
+                            }
+                        }
+                    }
+                }
+                is UiEvent.ValueChanged -> {
+                    if (event.nodeId == "pub_chapters_split") {
+                        val clamped = event.value.toFloat().coerceIn(0.25f, 0.75f)
+                        stateFlow.update { it.copy(splitFraction = clamped) }
+                    }
+                }
+                is UiEvent.ItemsReordered -> {
+                    if (event.nodeId == "insp_pages_grid") {
+                        val current = stateFlow.value
+                        val targetId = current.inspectedChapterId ?: return@collect
+                        val target = current.chapters.find { it.id == targetId } ?: return@collect
+                        val pageByNodeId = target.pages.associateBy { "insp_page_card_${it.id}" }
+                        val reorderedPages = event.itemIds.mapNotNull { pageByNodeId[it] }
+                        if (reorderedPages.size == target.pages.size) {
+                            val updatedChapter = target.copy(pages = reorderedPages)
+                            val updatedChapters = current.chapters.map { if (it.id == targetId) updatedChapter else it }
+                            CompleteExampleCatalogStore.saveLocalCatalog(
+                                context.storage,
+                                updatedChapters.filter { it.status != ChapterSyncStatus.REMOTE_ONLY }
+                            )
+                            stateFlow.update {
+                                it.copy(
+                                    chapters = updatedChapters,
+                                    pageOrderRevision = it.pageOrderRevision + 1,
+                                    bannerMessage = "Moved page #${event.fromIndex + 1} to #${event.toIndex + 1} in Ch. ${target.number}.",
                                     bannerSeverity = SemanticColor.INFO
                                 )
                             }
@@ -301,12 +396,139 @@ internal fun runChapterPublisherSession(
                                 if (target != null) {
                                     current.copy(
                                         inspectedChapterId = chId,
+                                        selectedPageId = target.pages.firstOrNull()?.id,
                                         draftTitle = target.title,
                                         draftNotes = target.releaseNotes,
                                         draftRequiresLock = target.requiresLock,
                                         draftRevision = current.draftRevision + 1
                                     )
                                 } else current
+                            }
+                        }
+                        action.startsWith("select_page:") -> {
+                            val pageId = action.removePrefix("select_page:")
+                            stateFlow.update { it.copy(selectedPageId = pageId) }
+                        }
+                        action == "pick_page_files" -> {
+                            val picked = context.pickFiles(
+                                title = "Select Chapter Page Images",
+                                allowedExtensions = listOf("png", "jpg", "jpeg", "webp")
+                            )
+                            if (picked.isNotEmpty()) {
+                                val current = stateFlow.value
+                                val targetId = current.inspectedChapterId
+                                val target = current.chapters.find { it.id == targetId }
+                                if (target != null) {
+                                    val startIdx = target.pages.size + 1
+                                    val newPages = picked.mapIndexed { offset, path ->
+                                        val fileName = path.substringAfterLast('/').substringAfterLast('\\')
+                                        ChapterPageRecord(
+                                            id = "${target.id}_picked_${startIdx + offset}",
+                                            label = fileName.ifBlank { "Page ${startIdx + offset}" },
+                                            asset = AssetReference.Uri(path)
+                                        )
+                                    }
+                                    val updatedChapter = target.copy(
+                                        pages = target.pages + newPages,
+                                        pageCount = target.pages.size + newPages.size
+                                    )
+                                    val updatedChapters = current.chapters.map { if (it.id == target.id) updatedChapter else it }
+                                    CompleteExampleCatalogStore.saveLocalCatalog(
+                                        context.storage,
+                                        updatedChapters.filter { it.status != ChapterSyncStatus.REMOTE_ONLY }
+                                    )
+                                    stateFlow.update {
+                                        it.copy(
+                                            chapters = updatedChapters,
+                                            selectedPageId = newPages.first().id,
+                                            bannerMessage = "Added ${newPages.size} page image(s) to Chapter ${target.number}.",
+                                            bannerSeverity = SemanticColor.SUCCESS
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        action == "pick_repo_folder" -> {
+                            val folder = context.pickDirectory("Select Local Repository Directory")
+                            if (!folder.isNullOrBlank()) {
+                                context.storage.put(STORAGE_LINKED_REPO_PATH, JsonPrimitive(folder))
+                                stateFlow.update {
+                                    it.copy(
+                                        linkedRepoPath = folder,
+                                        bannerMessage = "Linked local repository folder: $folder",
+                                        bannerSeverity = SemanticColor.SUCCESS
+                                    )
+                                }
+                            }
+                        }
+                        action == "export_chapter_json" -> {
+                            val target = stateFlow.value.chapters.find { it.id == stateFlow.value.inspectedChapterId }
+                            if (target != null) {
+                                val payload = publisherJson.encodeToString(target).encodeToByteArray()
+                                val savedPath = context.saveFile("${target.id}_manifest.json", "json", payload)
+                                if (!savedPath.isNullOrBlank()) {
+                                    stateFlow.update {
+                                        it.copy(
+                                            bannerMessage = "Exported chapter manifest to $savedPath",
+                                            bannerSeverity = SemanticColor.SUCCESS
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        action.startsWith("open_in_board:") -> {
+                            val chId = action.removePrefix("open_in_board:")
+                            val target = stateFlow.value.chapters.find { it.id == chId }
+                            context.openInteractiveTool(
+                                capabilityName = "interactiveBoardCompositor",
+                                initialParameters = mapOf(
+                                    "chapterId" to JsonPrimitive(chId),
+                                    "chapterTitle" to JsonPrimitive(
+                                        if (target != null) "Ch. ${target.number}: ${target.title}" else chId
+                                    )
+                                )
+                            )
+                        }
+                        action == "save_secret_token" -> {
+                            val secret = stateFlow.value.draftSecretToken
+                            if (secret.isNotBlank()) {
+                                context.secrets.putSecret(SECRET_PUBLISHER_API_KEY, secret)
+                                context.showNotification(
+                                    title = "Credential Vault",
+                                    message = "Encrypted publisher token stored securely.",
+                                    type = PluginNotificationType.INFO
+                                )
+                                stateFlow.update {
+                                    it.copy(
+                                        draftSecretToken = "",
+                                        draftSecretRevision = it.draftSecretRevision + 1,
+                                        secretConfigured = true,
+                                        bannerMessage = "Saved encrypted publisher API token.",
+                                        bannerSeverity = SemanticColor.SUCCESS
+                                    )
+                                }
+                            }
+                        }
+                        action == "ping_webhook" -> {
+                            val response = runCatching {
+                                context.networkClient.request(
+                                    HttpRequest(
+                                        url = "https://httpbin.org/status/200",
+                                        method = HttpMethod.GET,
+                                        timeoutMs = 3000L
+                                    )
+                                )
+                            }
+                            val statusSummary = response.fold(
+                                onSuccess = { "HTTP ${it.statusCode}" },
+                                onFailure = { "Offline / blocked: ${it.message ?: "network error"}" }
+                            )
+                            stateFlow.update {
+                                it.copy(
+                                    webhookStatus = statusSummary,
+                                    bannerMessage = "Sync endpoint probe: $statusSummary",
+                                    bannerSeverity = if (response.isSuccess) SemanticColor.INFO else SemanticColor.WARNING
+                                )
                             }
                         }
                         action.startsWith("push_one:") -> {
@@ -339,7 +561,7 @@ internal fun runChapterPublisherSession(
                                 if (edited != null) {
                                     if (idx >= 0) existing[idx] = edited else existing.add(edited)
                                     CompleteExampleCatalogStore.saveLocalCatalog(context.storage, existing)
-                                    val reconciled = CompleteExampleCatalogStore.reconcile(existing, remote)
+                                    val reconciled = CompleteExampleCatalogStore.reconcile(existing, remote).map { enrichChapter(it) }
                                     stateFlow.update {
                                         it.copy(
                                             chapters = reconciled,
@@ -368,14 +590,16 @@ internal fun runChapterPublisherSession(
                             )
                             existing.add(newChapter)
                             CompleteExampleCatalogStore.saveLocalCatalog(context.storage, existing)
-                            val reconciled = CompleteExampleCatalogStore.reconcile(existing, remote)
+                            val reconciled = CompleteExampleCatalogStore.reconcile(existing, remote).map { enrichChapter(it) }
+                            val created = reconciled.find { it.id == newId } ?: newChapter
                             stateFlow.update {
                                 it.copy(
                                     chapters = reconciled,
                                     inspectedChapterId = newId,
-                                    draftTitle = newChapter.title,
-                                    draftNotes = newChapter.releaseNotes,
-                                    draftRequiresLock = newChapter.requiresLock,
+                                    selectedPageId = created.pages.firstOrNull()?.id,
+                                    draftTitle = created.title,
+                                    draftNotes = created.releaseNotes,
+                                    draftRequiresLock = created.requiresLock,
                                     draftRevision = it.draftRevision + 1,
                                     bannerMessage = "Created local draft Chapter $nextNum.",
                                     bannerSeverity = SemanticColor.SUCCESS
@@ -617,8 +841,9 @@ private fun UiContainerBuilder.renderChaptersTab(
 
     splitPane(
         id = "pub_chapters_split",
-        splitFraction = 0.56f,
+        splitFraction = state.splitFraction,
         isHorizontal = true,
+        resizable = true,
         modifier = UiModifier.fillMaxSize(),
         first = {
             column(
@@ -675,9 +900,11 @@ private fun UiContainerBuilder.renderChaptersTab(
                                 title = "Ch. ${ch.number}: ${ch.title}",
                                 subtitle = subtitle,
                                 leadingIcon = if (ch.requiresLock) "lock" else "layers",
+                                leadingAsset = ch.coverAsset,
                                 badgeText = statusLabel,
                                 badgeColor = statusColor,
                                 selected = ch.id == state.inspectedChapterId,
+                                action = "inspect:${ch.id}",
                                 trailingBlock = {
                                     checkbox(
                                         id = "pub_chk_${ch.id}",
@@ -783,6 +1010,71 @@ private fun UiContainerBuilder.renderChaptersTab(
                                 isPrimary = true,
                                 isDestructive = state.environment == "PRODUCTION"
                             )
+                        }
+                    }
+
+                    val activePage = selected.pages.find { it.id == state.selectedPageId } ?: selected.pages.firstOrNull()
+                    card(id = "insp_pages_card", title = "Chapter Pages (${selected.pages.size}) — Drag to Reorder") {
+                        if (activePage != null) {
+                            text(
+                                id = "insp_selected_page_label",
+                                text = "Previewing: ${activePage.label} (${selected.pages.indexOf(activePage) + 1}/${selected.pages.size})",
+                                role = TypographyRole.BODY_SMALL
+                            )
+                            image(
+                                id = "insp_selected_page_preview",
+                                asset = activePage.asset,
+                                contentDescription = activePage.label,
+                                contentScale = ImageScale.FIT,
+                                badgeText = activePage.label,
+                                modifier = UiModifier.fillMaxWidth()
+                            )
+                        }
+                        row(id = "insp_pages_toolbar", spacing = SpacingSize.SMALL) {
+                            button(
+                                id = "insp_add_pages_btn",
+                                label = "Add Pages...",
+                                action = "pick_page_files",
+                                isPrimary = false
+                            )
+                            button(
+                                id = "insp_export_manifest_btn",
+                                label = "Export JSON",
+                                action = "export_chapter_json",
+                                isPrimary = false
+                            )
+                            button(
+                                id = "insp_open_board_btn",
+                                label = "Open in Board",
+                                action = "open_in_board:${selected.id}",
+                                isPrimary = false
+                            )
+                        }
+                        if (selected.pages.isNotEmpty()) {
+                            grid(
+                                id = "insp_pages_grid",
+                                columns = 2,
+                                minItemWidthDp = 120f,
+                                spacing = SpacingSize.SMALL,
+                                reorderable = true,
+                                modifier = UiModifier.fillMaxWidth()
+                            ) {
+                                selected.pages.forEachIndexed { idx, page ->
+                                    card(id = "insp_page_card_${page.id}", title = "#${idx + 1} ${page.label}") {
+                                        image(
+                                            id = "insp_page_thumb_${page.id}",
+                                            asset = page.asset,
+                                            contentDescription = page.label,
+                                            contentScale = ImageScale.CROP,
+                                            clickable = true,
+                                            action = "select_page:${page.id}",
+                                            selected = page.id == activePage?.id,
+                                            badgeText = "p${idx + 1}",
+                                            modifier = UiModifier.fillMaxWidth()
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
 
@@ -953,6 +1245,62 @@ private fun UiContainerBuilder.renderSettingsTab(
                 text = "Clicking the button above invokes @PluginAction toggleFeatureLock and immediately updates locksFlow across all open views.",
                 role = TypographyRole.BODY_SMALL
             )
+        }
+
+        card(id = "cfg_integrations_card", title = "Encrypted Credentials & Integrations") {
+            row(id = "cfg_secret_status_row", spacing = SpacingSize.SMALL) {
+                badge(
+                    id = "cfg_secret_status_badge",
+                    text = if (state.secretConfigured) "Encrypted Vault: Configured" else "Encrypted Vault: Not Set",
+                    color = if (state.secretConfigured) SemanticColor.SUCCESS else SemanticColor.WARNING
+                )
+            }
+            textInput(
+                id = "cfg_secret_token_input",
+                text = state.draftSecretToken,
+                label = "Publisher Secret Token (AES-GCM Vault)",
+                placeholder = "Enter API token or password...",
+                isSecret = true,
+                revision = state.draftSecretRevision,
+                forceOverwrite = true
+            )
+            row(id = "cfg_integrations_actions", spacing = SpacingSize.SMALL) {
+                button(
+                    id = "cfg_save_secret_btn",
+                    label = "Save Encrypted Secret",
+                    action = "save_secret_token",
+                    isPrimary = true
+                )
+                button(
+                    id = "cfg_pick_repo_btn",
+                    label = "Choose Repo Folder...",
+                    action = "pick_repo_folder",
+                    isPrimary = false
+                )
+                button(
+                    id = "cfg_ping_webhook_btn",
+                    label = "Test Sync Endpoint",
+                    action = "ping_webhook",
+                    isPrimary = false
+                )
+            }
+            text(
+                id = "cfg_repo_path_text",
+                text = if (state.linkedRepoPath.isBlank()) {
+                    "Linked Local Repository: Not selected"
+                } else {
+                    "Linked Local Repository: ${state.linkedRepoPath}"
+                },
+                role = TypographyRole.BODY_SMALL
+            )
+            val webhook = state.webhookStatus
+            if (!webhook.isNullOrBlank()) {
+                text(
+                    id = "cfg_webhook_status_text",
+                    text = "Last endpoint check: $webhook",
+                    role = TypographyRole.BODY_SMALL
+                )
+            }
         }
     }
 }
