@@ -29,6 +29,7 @@ import org.wip.plugintoolkit.api.sdui.CardNode
 import org.wip.plugintoolkit.api.sdui.GridNode
 import org.wip.plugintoolkit.api.sdui.ImageNode
 import org.wip.plugintoolkit.api.sdui.ListItemNode
+import org.wip.plugintoolkit.api.sdui.ScrollableColumnNode
 import org.wip.plugintoolkit.api.sdui.SpacingSize
 import org.wip.plugintoolkit.api.sdui.SplitPaneNode
 import org.wip.plugintoolkit.api.sdui.TextInputNode
@@ -207,6 +208,84 @@ class PluginAssetFetcherAndUiExtensionsTest {
         assertEquals(0, reordered.last().fromIndex)
         assertEquals(1, reordered.last().toIndex)
         assertEquals(listOf("page_2", "page_1", "page_3"), reordered.last().itemIds)
+    }
+
+    @Test
+    fun `GridNode vertical drag reorders across rows inside ScrollableColumnNode and preserves clickable thumbnails`() {
+        val events = mutableListOf<UiEvent>()
+        val container = ScrollableColumnNode(
+            id = "outer_scroll",
+            spacing = SpacingSize.SMALL,
+            modifier = UiModifier.fillMaxSize(),
+            children = listOf(
+                GridNode(
+                    id = "vertical_pages_grid",
+                    columns = 2,
+                    spacing = SpacingSize.SMALL,
+                    reorderable = true,
+                    modifier = UiModifier.fillMaxWidth(),
+                    children = (1..4).map { idx ->
+                        CardNode(
+                            id = "page_$idx",
+                            children = listOf(
+                                ImageNode(
+                                    id = "thumb_$idx",
+                                    asset = AssetReference.Uri(TINY_PNG_DATA_URI),
+                                    contentDescription = "Tile Image $idx",
+                                    clickable = true,
+                                    action = "select_$idx",
+                                    modifier = UiModifier.fillMaxWidth().height(72)
+                                ),
+                                TextNode(id = "lbl_$idx", text = "Tile 0$idx")
+                            )
+                        )
+                    }
+                )
+            )
+        )
+
+        renderSduiNode(
+            node = container,
+            width = 640.dp,
+            height = 600.dp,
+            onEvent = { events += it }
+        )
+
+        // Inner clickable thumbnail click must still emit UiEvent.Click cleanly
+        composeTestRule.onNodeWithContentDescription("Tile Image 1").performClick()
+        composeTestRule.waitForIdle()
+        val clicks = events.filterIsInstance<UiEvent.Click>()
+        assertTrue(clicks.any { it.nodeId == "thumb_1" && it.action == "select_1" })
+
+        events.clear()
+        val thumb1Bounds = composeTestRule.onNodeWithContentDescription("Tile Image 1").getBoundsInRoot()
+        val thumb3Bounds = composeTestRule.onNodeWithContentDescription("Tile Image 3").getBoundsInRoot()
+        val thumb1CenterY = (thumb1Bounds.top + thumb1Bounds.bottom) / 2f
+        val thumb3CenterY = (thumb3Bounds.top + thumb3Bounds.bottom) / 2f
+        val verticalDistancePx = (thumb3CenterY - thumb1CenterY).value * composeTestRule.density.density
+
+        composeTestRule.onNodeWithContentDescription("Tile Image 1").performMouseInput {
+            moveTo(center)
+            press(MouseButton.Primary)
+            val steps = 12
+            val stepY = verticalDistancePx / steps
+            repeat(steps) {
+                moveBy(Offset(x = 0f, y = stepY))
+            }
+            release(MouseButton.Primary)
+        }
+        composeTestRule.waitForIdle()
+
+        val reordered = events.filterIsInstance<UiEvent.ItemsReordered>()
+        assertTrue(reordered.isNotEmpty(), "Expected vertical cross-row drag to emit UiEvent.ItemsReordered")
+        assertEquals("vertical_pages_grid", reordered.last().nodeId)
+        assertEquals(0, reordered.last().fromIndex)
+        assertEquals(2, reordered.last().toIndex)
+        assertEquals(listOf("page_2", "page_3", "page_1", "page_4"), reordered.last().itemIds)
+        assertTrue(
+            events.filterIsInstance<UiEvent.Click>().isEmpty(),
+            "Releasing a cross-row drag must not trigger a spurious thumbnail click"
+        )
     }
 
     @Test

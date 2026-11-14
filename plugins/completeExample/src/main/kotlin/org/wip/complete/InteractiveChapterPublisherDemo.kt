@@ -40,10 +40,22 @@ private val publisherJson = Json {
 
 private const val STORAGE_LINKED_REPO_PATH = "chapter_publisher_repo_path"
 private const val SECRET_PUBLISHER_API_KEY = "publisher_api_secret"
+private const val DEFAULT_PAGES_PER_CHAPTER = 6
+
+private enum class PublisherNavLevel {
+    SERIES,
+    CHAPTERS,
+    IMAGES
+}
 
 private data class ChapterPublisherState(
     val activeTab: String = "chapters",
+    val navLevel: PublisherNavLevel = PublisherNavLevel.SERIES,
     val environment: String = "STAGING",
+    val seriesList: List<SeriesRecord> = emptyList(),
+    val selectedSeriesId: String = CompleteExampleCatalogStore.SERIES_OBSIDIAN_ID,
+    val seriesSearchQuery: String = "",
+    val seriesSortMode: String = "CUSTOM",
     val searchQuery: String = "",
     val statusFilter: String = "ALL",
     val chapters: List<ChapterRecord> = emptyList(),
@@ -64,7 +76,7 @@ private data class ChapterPublisherState(
     val isLoading: Boolean = true,
     val showConfirmDialog: Boolean = false,
     val pendingPushIds: List<String> = emptyList(),
-    val bannerMessage: String? = "Loaded synced & remote chapter catalogs.",
+    val bannerMessage: String? = "Browse a series to manage chapters and reorder pages.",
     val bannerSeverity: SemanticColor = SemanticColor.INFO
 )
 
@@ -75,6 +87,17 @@ internal fun runChapterPublisherSession(
     val stateFlow = MutableStateFlow(ChapterPublisherState())
     val handledCompletedJobIds = mutableSetOf<String>()
 
+    suspend fun enrichSeries(series: List<SeriesRecord>): List<SeriesRecord> =
+        series.mapIndexed { idx, entry ->
+            val cover = entry.coverAsset ?: CompleteExampleSampleAssets.ensureSeriesCoverAsset(
+                context = context,
+                seriesId = entry.id,
+                title = entry.title,
+                accentIndex = idx
+            )
+            entry.copy(coverAsset = cover)
+        }
+
     suspend fun enrichChapter(chapter: ChapterRecord): ChapterRecord {
         val cover = chapter.coverAsset ?: CompleteExampleSampleAssets.ensureChapterCoverAsset(
             context = context,
@@ -82,7 +105,7 @@ internal fun runChapterPublisherSession(
             chapterNumber = chapter.number
         )
         val pages = chapter.pages.ifEmpty {
-            (1..4).map { idx ->
+            (1..DEFAULT_PAGES_PER_CHAPTER).map { idx ->
                 ChapterPageRecord(
                     id = "${chapter.id}_p$idx",
                     label = "Page ${idx.toString().padStart(2, '0')}",
@@ -98,6 +121,7 @@ internal fun runChapterPublisherSession(
     }
 
     suspend fun refreshCatalog(environment: String, statusNote: String? = null) {
+        val loadedSeries = enrichSeries(CompleteExampleCatalogStore.loadSeriesCatalog(context.storage))
         val execResult = context.executeCapability(
             capabilityName = "queryChapterCatalog",
             parameters = mapOf("environment" to JsonPrimitive(environment))
@@ -118,20 +142,45 @@ internal fun runChapterPublisherSession(
         val chapters = rawChapters.map { enrichChapter(it) }
 
         stateFlow.update { current ->
-            val validIds = chapters.map { it.id }.toSet()
+            val validSeriesIds = loadedSeries.map { it.id }.toSet()
             val requestedChapterId = context.initialParameters["chapterId"]?.jsonPrimitive?.contentOrNull
-                ?.takeIf { current.isLoading && it in validIds }
+                ?.takeIf { current.isLoading && it in chapters.map { c -> c.id } }
+            val requestedSeriesId = context.initialParameters["seriesId"]?.jsonPrimitive?.contentOrNull
+                ?.takeIf { current.isLoading && it in validSeriesIds }
+            val requestedNavRaw = context.initialParameters["navLevel"]?.jsonPrimitive?.contentOrNull
+                ?.takeIf { current.isLoading }
+
+            val targetSeriesId = requestedSeriesId
+                ?: requestedChapterId?.let { chId -> chapters.find { it.id == chId }?.seriesId }
+                ?: current.selectedSeriesId.takeIf { it in validSeriesIds }
+                ?: loadedSeries.firstOrNull()?.id
+                ?: CompleteExampleCatalogStore.SERIES_OBSIDIAN_ID
+
+            val seriesChapters = chapters.filter { it.seriesId == targetSeriesId }
+            val validChapterIds = chapters.map { it.id }.toSet()
             val nextInspected = requestedChapterId
-                ?: current.inspectedChapterId?.takeIf { it in validIds }
+                ?: current.inspectedChapterId?.takeIf { chId -> seriesChapters.any { it.id == chId } }
+                ?: seriesChapters.firstOrNull()?.id
                 ?: chapters.firstOrNull()?.id
+
+            val nextNav = when (requestedNavRaw) {
+                "IMAGES" -> if (nextInspected != null) PublisherNavLevel.IMAGES else PublisherNavLevel.CHAPTERS
+                "CHAPTERS" -> PublisherNavLevel.CHAPTERS
+                "SERIES" -> PublisherNavLevel.SERIES
+                else -> if (requestedChapterId != null) PublisherNavLevel.CHAPTERS else current.navLevel
+            }
+
             val inspectedChapter = chapters.find { it.id == nextInspected }
             val changedInspector = nextInspected != current.inspectedChapterId || current.isLoading
             val validPageIds = inspectedChapter?.pages?.map { it.id }?.toSet().orEmpty()
             val nextSelectedPage = current.selectedPageId?.takeIf { it in validPageIds }
                 ?: inspectedChapter?.pages?.firstOrNull()?.id
             current.copy(
+                seriesList = loadedSeries,
+                selectedSeriesId = targetSeriesId,
+                navLevel = nextNav,
                 chapters = chapters,
-                selectedChapterIds = current.selectedChapterIds.intersect(validIds),
+                selectedChapterIds = current.selectedChapterIds.intersect(validChapterIds),
                 inspectedChapterId = nextInspected,
                 selectedPageId = nextSelectedPage,
                 draftTitle = if (changedInspector) inspectedChapter?.title.orEmpty() else current.draftTitle,
@@ -199,6 +248,38 @@ internal fun runChapterPublisherSession(
         }
     }
 
+    suspend fun openTargetInBoard(chapter: ChapterRecord, page: ChapterPageRecord?) {
+        val activePage = page ?: chapter.pages.firstOrNull()
+        val handoffAsset = activePage?.let {
+            CompleteExampleSampleAssets.prepareBoardHandoffAsset(
+                context = context,
+                chapterId = chapter.id,
+                pageId = it.id,
+                asset = it.asset
+            )
+        }
+        val params = buildMap<String, JsonElement> {
+            put("seriesId", JsonPrimitive(chapter.seriesId))
+            put("chapterId", JsonPrimitive(chapter.id))
+            put("chapterTitle", JsonPrimitive("Ch. ${chapter.number}: ${chapter.title}"))
+            put("releaseNotes", JsonPrimitive(chapter.releaseNotes))
+            if (activePage != null) {
+                put("pageId", JsonPrimitive(activePage.id))
+                put("pageLabel", JsonPrimitive(activePage.label))
+            }
+            if (handoffAsset != null) {
+                put(
+                    "backgroundAssetJson",
+                    JsonPrimitive(publisherJson.encodeToString(AssetReference.serializer(), handoffAsset))
+                )
+            }
+        }
+        context.openInteractiveTool(
+            capabilityName = "interactiveBoardCompositor",
+            initialParameters = params
+        )
+    }
+
     launch {
         val savedEnv = context.storage.get(CompleteExampleCatalogStore.STORAGE_ENVIRONMENT)
             ?.jsonPrimitive?.contentOrNull
@@ -264,6 +345,7 @@ internal fun runChapterPublisherSession(
                 }
                 is UiEvent.TextChanged -> {
                     when (event.nodeId) {
+                        "pub_series_search_input" -> stateFlow.update { it.copy(seriesSearchQuery = event.text) }
                         "pub_search_input" -> stateFlow.update { it.copy(searchQuery = event.text) }
                         "insp_title_input" -> stateFlow.update { it.copy(draftTitle = event.text) }
                         "insp_notes_input" -> stateFlow.update { it.copy(draftNotes = event.text) }
@@ -280,7 +362,10 @@ internal fun runChapterPublisherSession(
                     }
                 }
                 is UiEvent.ValueChanged -> {
-                    if (event.nodeId == "pub_chapters_split") {
+                    if (event.nodeId == "pub_chapters_split" ||
+                        event.nodeId == "pub_series_split" ||
+                        event.nodeId == "pub_images_split"
+                    ) {
                         val clamped = event.value.toFloat().coerceIn(0.25f, 0.75f)
                         stateFlow.update { it.copy(splitFraction = clamped) }
                     }
@@ -311,11 +396,16 @@ internal fun runChapterPublisherSession(
                     }
                 }
                 is UiEvent.OptionSelected -> {
-                    if (event.nodeId == "cfg_env_dropdown") {
-                        val nextEnv = event.selectedKey
-                        context.storage.put(CompleteExampleCatalogStore.STORAGE_ENVIRONMENT, JsonPrimitive(nextEnv))
-                        stateFlow.update { it.copy(environment = nextEnv) }
-                        refreshCatalog(nextEnv, "Switched target environment to $nextEnv.")
+                    when (event.nodeId) {
+                        "cfg_env_dropdown" -> {
+                            val nextEnv = event.selectedKey
+                            context.storage.put(CompleteExampleCatalogStore.STORAGE_ENVIRONMENT, JsonPrimitive(nextEnv))
+                            stateFlow.update { it.copy(environment = nextEnv) }
+                            refreshCatalog(nextEnv, "Switched target environment to $nextEnv.")
+                        }
+                        "series_sort_dropdown" -> {
+                            stateFlow.update { it.copy(seriesSortMode = event.selectedKey) }
+                        }
                     }
                 }
                 is UiEvent.ToggleChanged -> {
@@ -367,6 +457,152 @@ internal fun runChapterPublisherSession(
                 is UiEvent.Click -> {
                     val action = event.action ?: event.nodeId
                     when {
+                        action == "nav_series" -> {
+                            stateFlow.update { it.copy(navLevel = PublisherNavLevel.SERIES) }
+                        }
+                        action == "nav_chapters" || event.nodeId == "img_empty_chapter" -> {
+                            stateFlow.update { it.copy(navLevel = PublisherNavLevel.CHAPTERS) }
+                        }
+                        action == "nav_back" -> {
+                            stateFlow.update { current ->
+                                when (current.navLevel) {
+                                    PublisherNavLevel.IMAGES -> current.copy(navLevel = PublisherNavLevel.CHAPTERS)
+                                    PublisherNavLevel.CHAPTERS -> current.copy(navLevel = PublisherNavLevel.SERIES)
+                                    PublisherNavLevel.SERIES -> current
+                                }
+                            }
+                        }
+                        action.startsWith("select_series:") -> {
+                            val sId = action.removePrefix("select_series:")
+                            selectSeriesInState(stateFlow, sId, openChapters = false)
+                        }
+                        action.startsWith("open_series:") -> {
+                            val sId = action.removePrefix("open_series:")
+                            selectSeriesInState(stateFlow, sId, openChapters = true)
+                        }
+                        action.startsWith("move_series_up:") || action.startsWith("move_series_down:") -> {
+                            val isUp = action.startsWith("move_series_up:")
+                            val sId = action.substringAfter(":")
+                            val sorted = stateFlow.value.seriesList.sortedBy { it.sortOrder }.toMutableList()
+                            val idx = sorted.indexOfFirst { it.id == sId }
+                            val swapIdx = if (isUp) idx - 1 else idx + 1
+                            if (idx >= 0 && swapIdx in sorted.indices) {
+                                val moved = sorted.removeAt(idx)
+                                sorted.add(swapIdx, moved)
+                                val renumbered = sorted.mapIndexed { order, rec -> rec.copy(sortOrder = order) }
+                                CompleteExampleCatalogStore.saveSeriesCatalog(context.storage, renumbered)
+                                stateFlow.update {
+                                    it.copy(
+                                        seriesList = renumbered,
+                                        seriesSortMode = "CUSTOM",
+                                        bannerMessage = "Updated custom series order."
+                                    )
+                                }
+                            }
+                        }
+                        action == "create_new_series" -> {
+                            val current = stateFlow.value
+                            val nextIndex = current.seriesList.size + 1
+                            val newId = "series_custom_$nextIndex"
+                            val title = "New Manga Series #$nextIndex"
+                            val cover = CompleteExampleSampleAssets.ensureSeriesCoverAsset(
+                                context = context,
+                                seriesId = newId,
+                                title = title,
+                                accentIndex = nextIndex
+                            )
+                            val newSeries = SeriesRecord(
+                                id = newId,
+                                title = title,
+                                author = "Studio Draft",
+                                description = "Newly staged series ready for chapters & page uploads.",
+                                sortOrder = current.seriesList.size,
+                                coverAsset = cover
+                            )
+                            val updatedSeries = current.seriesList + newSeries
+                            CompleteExampleCatalogStore.saveSeriesCatalog(context.storage, updatedSeries)
+                            val debutCh = enrichChapter(
+                                ChapterRecord(
+                                    id = "${newId}_ch001",
+                                    number = 1,
+                                    title = "Chapter 1 Debut",
+                                    pageCount = DEFAULT_PAGES_PER_CHAPTER,
+                                    sizeMb = 6.2,
+                                    localRevision = 1,
+                                    remoteRevision = 0,
+                                    status = ChapterSyncStatus.LOCAL_DRAFT,
+                                    releaseNotes = "Created alongside new series.",
+                                    seriesId = newId
+                                )
+                            )
+                            val localCatalog = CompleteExampleCatalogStore.loadLocalCatalog(context.storage) + debutCh
+                            CompleteExampleCatalogStore.saveLocalCatalog(context.storage, localCatalog)
+                            val remoteCatalog = CompleteExampleCatalogStore.loadRemoteCatalog(context.storage)
+                            val reconciled = CompleteExampleCatalogStore.reconcile(localCatalog, remoteCatalog).map { enrichChapter(it) }
+                            stateFlow.update {
+                                it.copy(
+                                    seriesList = updatedSeries,
+                                    selectedSeriesId = newId,
+                                    chapters = reconciled,
+                                    inspectedChapterId = debutCh.id,
+                                    selectedPageId = debutCh.pages.firstOrNull()?.id,
+                                    draftTitle = debutCh.title,
+                                    draftNotes = debutCh.releaseNotes,
+                                    draftRequiresLock = debutCh.requiresLock,
+                                    draftRevision = it.draftRevision + 1,
+                                    navLevel = PublisherNavLevel.CHAPTERS,
+                                    bannerMessage = "Created '$title' with debut Chapter 1.",
+                                    bannerSeverity = SemanticColor.SUCCESS
+                                )
+                            }
+                        }
+                        action.startsWith("open_images:") -> {
+                            val chId = action.removePrefix("open_images:")
+                            stateFlow.update { current ->
+                                val target = current.chapters.find { it.id == chId }
+                                if (target != null) {
+                                    current.copy(
+                                        selectedSeriesId = target.seriesId,
+                                        inspectedChapterId = chId,
+                                        selectedPageId = target.pages.firstOrNull()?.id,
+                                        draftTitle = target.title,
+                                        draftNotes = target.releaseNotes,
+                                        draftRequiresLock = target.requiresLock,
+                                        draftRevision = current.draftRevision + 1,
+                                        navLevel = PublisherNavLevel.IMAGES
+                                    )
+                                } else current
+                            }
+                        }
+                        action == "reverse_page_order" || action == "move_page_prev" || action == "move_page_next" || action == "remove_selected_page" -> {
+                            val current = stateFlow.value
+                            val targetId = current.inspectedChapterId
+                            val target = current.chapters.find { it.id == targetId }
+                            if (target != null && target.pages.isNotEmpty()) {
+                                val nextPages = when (action) {
+                                    "reverse_page_order" -> target.pages.reversed()
+                                    "move_page_prev" -> movePageBy(target.pages, current.selectedPageId, -1)
+                                    "move_page_next" -> movePageBy(target.pages, current.selectedPageId, +1)
+                                    else -> target.pages.filterNot { it.id == current.selectedPageId }
+                                }
+                                val updatedChapter = target.copy(pages = nextPages, pageCount = nextPages.size)
+                                val updatedChapters = current.chapters.map { if (it.id == target.id) updatedChapter else it }
+                                CompleteExampleCatalogStore.saveLocalCatalog(
+                                    context.storage,
+                                    updatedChapters.filter { it.status != ChapterSyncStatus.REMOTE_ONLY }
+                                )
+                                val nextSel = current.selectedPageId?.takeIf { id -> nextPages.any { it.id == id } }
+                                    ?: nextPages.firstOrNull()?.id
+                                stateFlow.update {
+                                    it.copy(
+                                        chapters = updatedChapters,
+                                        selectedPageId = nextSel,
+                                        pageOrderRevision = it.pageOrderRevision + 1,
+                                        bannerMessage = "Updated page order for Ch. ${target.number}."
+                                    )
+                                }
+                            }
+                        }
                         action == "refresh_catalog" || event.nodeId == "pub_refresh_btn" -> {
                             refreshCatalog(stateFlow.value.environment, "Re-queried remote & local chapter catalogs.")
                         }
@@ -476,18 +712,30 @@ internal fun runChapterPublisherSession(
                                 }
                             }
                         }
+                        action == "open_page_in_board" -> {
+                            val current = stateFlow.value
+                            val target = current.chapters.find { it.id == current.inspectedChapterId }
+                            if (target != null) {
+                                val activePage = target.pages.find { it.id == current.selectedPageId } ?: target.pages.firstOrNull()
+                                openTargetInBoard(target, activePage)
+                            }
+                        }
                         action.startsWith("open_in_board:") -> {
                             val chId = action.removePrefix("open_in_board:")
-                            val target = stateFlow.value.chapters.find { it.id == chId }
-                            context.openInteractiveTool(
-                                capabilityName = "interactiveBoardCompositor",
-                                initialParameters = mapOf(
-                                    "chapterId" to JsonPrimitive(chId),
-                                    "chapterTitle" to JsonPrimitive(
-                                        if (target != null) "Ch. ${target.number}: ${target.title}" else chId
+                            val current = stateFlow.value
+                            val target = current.chapters.find { it.id == chId }
+                            if (target != null) {
+                                val activePage = target.pages.find { it.id == current.selectedPageId } ?: target.pages.firstOrNull()
+                                openTargetInBoard(target, activePage)
+                            } else {
+                                context.openInteractiveTool(
+                                    capabilityName = "interactiveBoardCompositor",
+                                    initialParameters = mapOf(
+                                        "chapterId" to JsonPrimitive(chId),
+                                        "chapterTitle" to JsonPrimitive(chId)
                                     )
                                 )
-                            )
+                            }
                         }
                         action == "save_secret_token" -> {
                             val secret = stateFlow.value.draftSecretToken
@@ -573,27 +821,33 @@ internal fun runChapterPublisherSession(
                             }
                         }
                         action == "create_new_draft" -> {
+                            val activeSeriesId = stateFlow.value.selectedSeriesId
                             val existing = CompleteExampleCatalogStore.loadLocalCatalog(context.storage).toMutableList()
                             val remote = CompleteExampleCatalogStore.loadRemoteCatalog(context.storage)
-                            val nextNum = ((existing + remote).maxOfOrNull { it.number } ?: 40) + 1
-                            val newId = "ch_${nextNum.toString().padStart(3, '0')}"
+                            val seriesChapters = (existing + remote).filter { it.seriesId == activeSeriesId }
+                            val nextNum = (seriesChapters.maxOfOrNull { it.number } ?: 0) + 1
+                            val globalNextSuffix = existing.size + remote.size + 1
+                            val newId = "ch_${nextNum.toString().padStart(3, '0')}_$globalNextSuffix"
                             val newChapter = ChapterRecord(
                                 id = newId,
                                 number = nextNum,
                                 title = "New Episode Draft #$nextNum",
-                                pageCount = 24,
+                                pageCount = DEFAULT_PAGES_PER_CHAPTER,
                                 sizeMb = 9.8,
                                 localRevision = 1,
                                 remoteRevision = 0,
                                 status = ChapterSyncStatus.LOCAL_DRAFT,
-                                releaseNotes = "Prepared locally in interactive publisher."
+                                releaseNotes = "Prepared locally in interactive publisher.",
+                                seriesId = activeSeriesId
                             )
                             existing.add(newChapter)
                             CompleteExampleCatalogStore.saveLocalCatalog(context.storage, existing)
                             val reconciled = CompleteExampleCatalogStore.reconcile(existing, remote).map { enrichChapter(it) }
-                            val created = reconciled.find { it.id == newId } ?: newChapter
+                            val created = reconciled.find { it.id == newId } ?: enrichChapter(newChapter)
                             stateFlow.update {
                                 it.copy(
+                                    activeTab = "chapters",
+                                    navLevel = PublisherNavLevel.CHAPTERS,
                                     chapters = reconciled,
                                     inspectedChapterId = newId,
                                     selectedPageId = created.pages.firstOrNull()?.id,
@@ -658,15 +912,72 @@ internal fun runChapterPublisherSession(
     }
 }
 
+private fun selectSeriesInState(
+    stateFlow: MutableStateFlow<ChapterPublisherState>,
+    seriesId: String,
+    openChapters: Boolean
+) {
+    stateFlow.update { current ->
+        val seriesChapters = current.chapters.filter { it.seriesId == seriesId }
+        val firstChapter = seriesChapters.firstOrNull()
+        current.copy(
+            selectedSeriesId = seriesId,
+            navLevel = if (openChapters) PublisherNavLevel.CHAPTERS else current.navLevel,
+            searchQuery = "",
+            statusFilter = "ALL",
+            inspectedChapterId = firstChapter?.id,
+            selectedPageId = firstChapter?.pages?.firstOrNull()?.id,
+            draftTitle = firstChapter?.title.orEmpty(),
+            draftNotes = firstChapter?.releaseNotes.orEmpty(),
+            draftRequiresLock = firstChapter?.requiresLock ?: false,
+            draftRevision = current.draftRevision + 1
+        )
+    }
+}
+
+private fun movePageBy(
+    pages: List<ChapterPageRecord>,
+    selectedPageId: String?,
+    delta: Int
+): List<ChapterPageRecord> {
+    if (pages.size < 2) return pages
+    val index = pages.indexOfFirst { it.id == selectedPageId }
+    if (index < 0) return pages
+    val swapIndex = index + delta
+    if (swapIndex !in pages.indices) return pages
+    return pages.toMutableList().apply {
+        val moved = removeAt(index)
+        add(swapIndex, moved)
+    }
+}
+
+private fun filteredSortedSeries(state: ChapterPublisherState): List<SeriesRecord> {
+    val query = state.seriesSearchQuery.trim().lowercase()
+    val filtered = state.seriesList.filter { s ->
+        query.isEmpty() ||
+            s.title.lowercase().contains(query) ||
+            s.author.lowercase().contains(query) ||
+            s.id.lowercase().contains(query)
+    }
+    return when (state.seriesSortMode) {
+        "TITLE" -> filtered.sortedBy { it.title.lowercase() }
+        "PENDING" -> filtered.sortedByDescending { s ->
+            state.chapters.count { it.seriesId == s.id && it.status != ChapterSyncStatus.PUBLISHED }
+        }
+        else -> filtered.sortedBy { it.sortOrder }
+    }
+}
+
 private fun filteredChapters(state: ChapterPublisherState): List<ChapterRecord> {
     val query = state.searchQuery.trim().lowercase()
     return state.chapters.filter { ch ->
+        val matchesSeries = ch.seriesId == state.selectedSeriesId
         val matchesStatus = state.statusFilter == "ALL" || ch.status.name == state.statusFilter
         val matchesQuery = query.isEmpty() ||
             ch.title.lowercase().contains(query) ||
             "chapter ${ch.number}".contains(query) ||
             ch.id.lowercase().contains(query)
-        matchesStatus && matchesQuery
+        matchesSeries && matchesStatus && matchesQuery
     }
 }
 
@@ -779,7 +1090,7 @@ private fun renderChapterPublisherTree(
                     tabs = listOf(
                         TabItem(
                             key = "chapters",
-                            label = "Chapters",
+                            label = "Catalog",
                             iconName = "layers",
                             badgeText = state.chapters.size.toString()
                         ),
@@ -799,7 +1110,11 @@ private fun renderChapterPublisherTree(
                     modifier = UiModifier.fillMaxWidth().weight(1f)
                 ) {
                     when (state.activeTab) {
-                        "chapters" -> renderChaptersTab(state = state, jobs = jobs, featureUnlocked = featureUnlocked)
+                        "chapters" -> renderCatalogDrilldownTab(
+                            state = state,
+                            jobs = jobs,
+                            featureUnlocked = featureUnlocked
+                        )
                         "queue" -> renderQueueTab(jobs = jobs)
                         "settings" -> renderSettingsTab(
                             state = state,
@@ -831,8 +1146,262 @@ private fun renderChapterPublisherTree(
     }
 }
 
+private fun UiContainerBuilder.renderCatalogDrilldownTab(
+    state: ChapterPublisherState,
+    jobs: List<CapabilityJobSnapshot>,
+    featureUnlocked: Boolean
+) {
+    val selectedSeries = state.seriesList.find { it.id == state.selectedSeriesId }
+        ?: state.seriesList.firstOrNull()
+    val seriesChapters = state.chapters.filter { it.seriesId == (selectedSeries?.id ?: state.selectedSeriesId) }
+    val selectedChapter = seriesChapters.find { it.id == state.inspectedChapterId }
+        ?: state.chapters.find { it.id == state.inspectedChapterId }
+
+    column(
+        id = "pub_drilldown_col",
+        spacing = SpacingSize.SMALL,
+        modifier = UiModifier.fillMaxSize()
+    ) {
+        row(
+            id = "pub_nav_bar",
+            spacing = SpacingSize.SMALL,
+            modifier = UiModifier.fillMaxWidth().padding(SpacingSize.EXTRA_SMALL)
+        ) {
+            if (state.navLevel != PublisherNavLevel.SERIES) {
+                iconButton(
+                    id = "pub_nav_back_btn",
+                    iconName = "arrow_back",
+                    action = "nav_back",
+                    tooltip = "Go up one navigation level"
+                )
+            }
+            button(
+                id = "crumb_series_btn",
+                label = "Series (${state.seriesList.size})",
+                action = "nav_series",
+                isPrimary = state.navLevel == PublisherNavLevel.SERIES
+            )
+            if (selectedSeries != null && state.navLevel != PublisherNavLevel.SERIES) {
+                icon(
+                    name = "arrow_forward",
+                    id = "crumb_sep_series",
+                    size = ControlSize.SMALL,
+                    tint = SemanticColor.SECONDARY
+                )
+                button(
+                    id = "crumb_chapters_btn",
+                    label = "${selectedSeries.title} (${seriesChapters.size})",
+                    action = "nav_chapters",
+                    isPrimary = state.navLevel == PublisherNavLevel.CHAPTERS
+                )
+            }
+            if (selectedChapter != null && state.navLevel == PublisherNavLevel.IMAGES) {
+                icon(
+                    name = "arrow_forward",
+                    id = "crumb_sep_chapters",
+                    size = ControlSize.SMALL,
+                    tint = SemanticColor.SECONDARY
+                )
+                badge(
+                    id = "crumb_images_badge",
+                    text = "Ch. ${selectedChapter.number} Images (${selectedChapter.pages.size})",
+                    color = SemanticColor.PRIMARY
+                )
+            }
+            spacer(id = "crumb_spacer", modifier = UiModifier.weight(1f))
+            badge(
+                id = "crumb_level_badge",
+                text = when (state.navLevel) {
+                    PublisherNavLevel.SERIES -> "1/3 Series"
+                    PublisherNavLevel.CHAPTERS -> "2/3 Chapters"
+                    PublisherNavLevel.IMAGES -> "3/3 Page Grid"
+                },
+                color = SemanticColor.SECONDARY
+            )
+        }
+
+        when (state.navLevel) {
+            PublisherNavLevel.SERIES -> renderSeriesLevel(
+                state = state,
+                selectedSeries = selectedSeries,
+                seriesChapters = seriesChapters
+            )
+            PublisherNavLevel.CHAPTERS -> renderChaptersTab(
+                state = state,
+                selectedSeries = selectedSeries,
+                seriesChapters = seriesChapters,
+                jobs = jobs,
+                featureUnlocked = featureUnlocked
+            )
+            PublisherNavLevel.IMAGES -> renderImagesLevel(
+                state = state,
+                selectedSeries = selectedSeries,
+                selectedChapter = selectedChapter
+            )
+        }
+    }
+}
+
+private fun UiContainerBuilder.renderSeriesLevel(
+    state: ChapterPublisherState,
+    selectedSeries: SeriesRecord?,
+    seriesChapters: List<ChapterRecord>
+) {
+    val visibleSeries = filteredSortedSeries(state)
+
+    splitPane(
+        id = "pub_series_split",
+        splitFraction = state.splitFraction,
+        isHorizontal = true,
+        resizable = true,
+        modifier = UiModifier.fillMaxWidth().weight(1f),
+        first = {
+            column(
+                id = "pub_series_pane",
+                spacing = SpacingSize.SMALL,
+                modifier = UiModifier.fillMaxSize().padding(SpacingSize.SMALL)
+            ) {
+                row(id = "pub_series_controls_row", spacing = SpacingSize.SMALL, modifier = UiModifier.fillMaxWidth()) {
+                    textInput(
+                        id = "pub_series_search_input",
+                        text = state.seriesSearchQuery,
+                        label = "Filter Series",
+                        placeholder = "Search title or author...",
+                        modifier = UiModifier.weight(1f)
+                    )
+                    dropdown(
+                        id = "series_sort_dropdown",
+                        selectedKey = state.seriesSortMode,
+                        options = mapOf(
+                            "CUSTOM" to "Custom Order",
+                            "TITLE" to "Title (A-Z)",
+                            "PENDING" to "Pending First"
+                        ),
+                        label = "Sort"
+                    )
+                    button(
+                        id = "series_new_btn",
+                        label = "+ New Series",
+                        action = "create_new_series",
+                        isPrimary = false
+                    )
+                }
+
+                if (visibleSeries.isEmpty()) {
+                    emptyState(
+                        id = "series_empty_state",
+                        title = "No matching series",
+                        description = "Create a new series or clear your search filter.",
+                        iconName = "book",
+                        modifier = UiModifier.fillMaxWidth().weight(1f)
+                    )
+                } else {
+                    scrollableColumn(
+                        id = "pub_series_list",
+                        spacing = SpacingSize.EXTRA_SMALL,
+                        modifier = UiModifier.fillMaxWidth().weight(1f)
+                    ) {
+                        visibleSeries.forEach { series ->
+                            val chaptersInSeries = state.chapters.filter { it.seriesId == series.id }
+                            val pendingCount = chaptersInSeries.count { it.status != ChapterSyncStatus.PUBLISHED }
+                            listItem(
+                                id = "series_row_${series.id}",
+                                title = series.title,
+                                subtitle = "${series.author} • ${chaptersInSeries.size} chapter(s) • ${chaptersInSeries.sumOf { it.pageCount }} pages",
+                                leadingIcon = "book",
+                                leadingAsset = series.coverAsset,
+                                badgeText = if (pendingCount > 0) "$pendingCount pending" else "Synced",
+                                badgeColor = if (pendingCount > 0) SemanticColor.WARNING else SemanticColor.SUCCESS,
+                                selected = series.id == state.selectedSeriesId,
+                                action = "select_series:${series.id}",
+                                trailingBlock = {
+                                    iconButton(
+                                        id = "series_up_btn_${series.id}",
+                                        iconName = "arrow_upward",
+                                        action = "move_series_up:${series.id}",
+                                        tooltip = "Move series earlier"
+                                    )
+                                    iconButton(
+                                        id = "series_down_btn_${series.id}",
+                                        iconName = "arrow_downward",
+                                        action = "move_series_down:${series.id}",
+                                        tooltip = "Move series later"
+                                    )
+                                    button(
+                                        id = "series_open_btn_${series.id}",
+                                        label = "Chapters",
+                                        action = "open_series:${series.id}",
+                                        isPrimary = series.id == state.selectedSeriesId
+                                    )
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        second = {
+            scrollableColumn(
+                id = "series_inspector_pane",
+                spacing = SpacingSize.SMALL,
+                modifier = UiModifier.fillMaxSize().padding(SpacingSize.SMALL)
+            ) {
+                if (selectedSeries == null) {
+                    emptyState(
+                        id = "series_insp_empty",
+                        title = "Select a Series",
+                        description = "Choose a series on the left to inspect its catalog summary and open chapters.",
+                        iconName = "book"
+                    )
+                } else {
+                    val publishedCount = seriesChapters.count { it.status == ChapterSyncStatus.PUBLISHED }
+                    val draftCount = seriesChapters.count { it.status == ChapterSyncStatus.LOCAL_DRAFT }
+                    val outOfSyncCount = seriesChapters.count { it.status == ChapterSyncStatus.OUT_OF_SYNC }
+                    val remoteOnlyCount = seriesChapters.count { it.status == ChapterSyncStatus.REMOTE_ONLY }
+
+                    card(id = "series_detail_card", title = selectedSeries.title) {
+                        selectedSeries.coverAsset?.let { cover ->
+                            image(
+                                id = "series_detail_cover",
+                                asset = cover,
+                                contentDescription = selectedSeries.title,
+                                contentScale = ImageScale.FIT,
+                                badgeText = "Author: ${selectedSeries.author}",
+                                modifier = UiModifier.fillMaxWidth().height(160)
+                            )
+                        }
+                        text(
+                            id = "series_detail_desc",
+                            text = selectedSeries.description,
+                            role = TypographyRole.BODY_MEDIUM
+                        )
+                        row(id = "series_stats_row", spacing = SpacingSize.SMALL) {
+                            badge(id = "series_stat_pub", text = "$publishedCount Published", color = SemanticColor.SUCCESS)
+                            badge(id = "series_stat_draft", text = "$draftCount Draft", color = SemanticColor.INFO)
+                            if (outOfSyncCount > 0) {
+                                badge(id = "series_stat_sync", text = "$outOfSyncCount Out of Sync", color = SemanticColor.WARNING)
+                            }
+                            if (remoteOnlyCount > 0) {
+                                badge(id = "series_stat_remote", text = "$remoteOnlyCount Remote", color = SemanticColor.ACCENT)
+                            }
+                        }
+                        button(
+                            id = "series_drill_btn",
+                            label = "Open Chapters (${seriesChapters.size}) ->",
+                            action = "open_series:${selectedSeries.id}",
+                            isPrimary = true
+                        )
+                    }
+                }
+            }
+        }
+    )
+}
+
 private fun UiContainerBuilder.renderChaptersTab(
     state: ChapterPublisherState,
+    selectedSeries: SeriesRecord?,
+    seriesChapters: List<ChapterRecord>,
     jobs: List<CapabilityJobSnapshot>,
     featureUnlocked: Boolean
 ) {
@@ -844,7 +1413,7 @@ private fun UiContainerBuilder.renderChaptersTab(
         splitFraction = state.splitFraction,
         isHorizontal = true,
         resizable = true,
-        modifier = UiModifier.fillMaxSize(),
+        modifier = UiModifier.fillMaxWidth().weight(1f),
         first = {
             column(
                 id = "pub_catalog_pane",
@@ -854,7 +1423,7 @@ private fun UiContainerBuilder.renderChaptersTab(
                 textInput(
                     id = "pub_search_input",
                     text = state.searchQuery,
-                    label = "Filter Chapters",
+                    label = "Filter ${selectedSeries?.title ?: "Chapters"}",
                     placeholder = "Search title, ID, or chapter number..."
                 )
                 chipGroup(
@@ -862,7 +1431,7 @@ private fun UiContainerBuilder.renderChaptersTab(
                     selectedKeys = setOf(state.statusFilter),
                     multiSelect = false,
                     chips = listOf(
-                        ChipItem("ALL", "All (${state.chapters.size})"),
+                        ChipItem("ALL", "All (${seriesChapters.size})"),
                         ChipItem("OUT_OF_SYNC", "Out of Sync"),
                         ChipItem("LOCAL_DRAFT", "Drafts"),
                         ChipItem("REMOTE_ONLY", "Remote Only"),
@@ -911,6 +1480,12 @@ private fun UiContainerBuilder.renderChaptersTab(
                                         checked = ch.id in state.selectedChapterIds
                                     )
                                     iconButton(
+                                        id = "pub_images_btn_${ch.id}",
+                                        iconName = "grid_view",
+                                        action = "open_images:${ch.id}",
+                                        tooltip = "Open page grid & preview"
+                                    )
+                                    iconButton(
                                         id = "pub_inspect_btn_${ch.id}",
                                         iconName = "edit",
                                         action = "inspect:${ch.id}",
@@ -947,7 +1522,7 @@ private fun UiContainerBuilder.renderChaptersTab(
                     emptyState(
                         id = "insp_empty_state",
                         title = "Select a chapter",
-                        description = "Choose a chapter from the catalog list to inspect diffs, edit metadata, or push/pull.",
+                        description = "Choose a chapter from the catalog list to inspect diffs, edit metadata, or manage pages.",
                         iconName = "info"
                     )
                 } else {
@@ -1014,28 +1589,28 @@ private fun UiContainerBuilder.renderChaptersTab(
                     }
 
                     val activePage = selected.pages.find { it.id == state.selectedPageId } ?: selected.pages.firstOrNull()
-                    card(id = "insp_pages_card", title = "Chapter Pages (${selected.pages.size}) — Drag to Reorder") {
+                    card(id = "insp_pages_summary_card", title = "Chapter Pages (${selected.pages.size})") {
                         if (activePage != null) {
-                            text(
-                                id = "insp_selected_page_label",
-                                text = "Previewing: ${activePage.label} (${selected.pages.indexOf(activePage) + 1}/${selected.pages.size})",
-                                role = TypographyRole.BODY_SMALL
-                            )
                             image(
-                                id = "insp_selected_page_preview",
+                                id = "insp_summary_thumb",
                                 asset = activePage.asset,
                                 contentDescription = activePage.label,
                                 contentScale = ImageScale.FIT,
                                 badgeText = activePage.label,
-                                modifier = UiModifier.fillMaxWidth()
+                                modifier = UiModifier.fillMaxWidth().height(120)
                             )
                         }
+                        text(
+                            id = "insp_pages_summary_hint",
+                            text = "Open the dedicated Images view to preview full pages, drag tiles in 2D to reorder, or launch the Spatial Board compositor.",
+                            role = TypographyRole.BODY_SMALL
+                        )
                         row(id = "insp_pages_toolbar", spacing = SpacingSize.SMALL) {
                             button(
-                                id = "insp_add_pages_btn",
-                                label = "Add Pages...",
-                                action = "pick_page_files",
-                                isPrimary = false
+                                id = "insp_open_images_btn",
+                                label = "Open Images (${selected.pages.size}) ->",
+                                action = "open_images:${selected.id}",
+                                isPrimary = true
                             )
                             button(
                                 id = "insp_export_manifest_btn",
@@ -1050,32 +1625,6 @@ private fun UiContainerBuilder.renderChaptersTab(
                                 isPrimary = false
                             )
                         }
-                        if (selected.pages.isNotEmpty()) {
-                            grid(
-                                id = "insp_pages_grid",
-                                columns = 2,
-                                minItemWidthDp = 120f,
-                                spacing = SpacingSize.SMALL,
-                                reorderable = true,
-                                modifier = UiModifier.fillMaxWidth()
-                            ) {
-                                selected.pages.forEachIndexed { idx, page ->
-                                    card(id = "insp_page_card_${page.id}", title = "#${idx + 1} ${page.label}") {
-                                        image(
-                                            id = "insp_page_thumb_${page.id}",
-                                            asset = page.asset,
-                                            contentDescription = page.label,
-                                            contentScale = ImageScale.CROP,
-                                            clickable = true,
-                                            action = "select_page:${page.id}",
-                                            selected = page.id == activePage?.id,
-                                            badgeText = "p${idx + 1}",
-                                            modifier = UiModifier.fillMaxWidth()
-                                        )
-                                    }
-                                }
-                            }
-                        }
                     }
 
                     val latestJob = jobs.lastOrNull()
@@ -1083,6 +1632,164 @@ private fun UiContainerBuilder.renderChaptersTab(
                         card(id = "insp_job_card", title = "Latest Sync Activity") {
                             renderJobCardContent(prefix = "insp_job", job = latestJob)
                         }
+                    }
+                }
+            }
+        }
+    )
+}
+
+private fun UiContainerBuilder.renderImagesLevel(
+    state: ChapterPublisherState,
+    selectedSeries: SeriesRecord?,
+    selectedChapter: ChapterRecord?
+) {
+    if (selectedChapter == null) {
+        emptyState(
+            id = "img_empty_chapter",
+            title = "Chapter not selected",
+            description = "Return to Chapters and choose an episode to inspect or reorder its pages.",
+            iconName = "image",
+            actionLabel = "Back to Chapters",
+            modifier = UiModifier.fillMaxWidth().weight(1f)
+        )
+        return
+    }
+
+    val activePage = selectedChapter.pages.find { it.id == state.selectedPageId }
+        ?: selectedChapter.pages.firstOrNull()
+    val activeIdx = activePage?.let { page -> selectedChapter.pages.indexOfFirst { it.id == page.id } } ?: -1
+
+    splitPane(
+        id = "pub_images_split",
+        splitFraction = state.splitFraction,
+        isHorizontal = true,
+        resizable = true,
+        modifier = UiModifier.fillMaxWidth().weight(1f),
+        first = {
+            scrollableColumn(
+                id = "img_grid_pane",
+                spacing = SpacingSize.SMALL,
+                modifier = UiModifier.fillMaxSize().padding(SpacingSize.SMALL)
+            ) {
+                row(id = "img_toolbar_row", spacing = SpacingSize.SMALL, modifier = UiModifier.fillMaxWidth()) {
+                    button(
+                        id = "insp_add_pages_btn",
+                        label = "+ Add Pages...",
+                        action = "pick_page_files",
+                        isPrimary = false
+                    )
+                    button(
+                        id = "img_reverse_btn",
+                        label = "Reverse Order",
+                        action = "reverse_page_order",
+                        isPrimary = false
+                    )
+                    button(
+                        id = "insp_export_manifest_btn",
+                        label = "Export JSON",
+                        action = "export_chapter_json",
+                        isPrimary = false
+                    )
+                }
+                text(
+                    id = "img_drag_hint",
+                    text = "${selectedSeries?.title ?: "Series"} / Ch. ${selectedChapter.number}: drag tiles horizontally or vertically to reorder (${selectedChapter.pages.size} pages).",
+                    role = TypographyRole.BODY_SMALL
+                )
+                if (selectedChapter.pages.isEmpty()) {
+                    emptyState(
+                        id = "img_empty_pages",
+                        title = "No pages in chapter",
+                        description = "Add PNG, JPG, or WEBP pages from disk to preview and reorder them.",
+                        iconName = "image"
+                    )
+                } else {
+                    grid(
+                        id = "insp_pages_grid",
+                        columns = null,
+                        minItemWidthDp = 124f,
+                        spacing = SpacingSize.SMALL,
+                        reorderable = true,
+                        modifier = UiModifier.fillMaxWidth()
+                    ) {
+                        selectedChapter.pages.forEachIndexed { idx, page ->
+                            card(id = "insp_page_card_${page.id}") {
+                                image(
+                                    id = "insp_page_thumb_${page.id}",
+                                    asset = page.asset,
+                                    contentDescription = page.label,
+                                    contentScale = ImageScale.CROP,
+                                    clickable = true,
+                                    action = "select_page:${page.id}",
+                                    selected = page.id == activePage?.id,
+                                    badgeText = "#${idx + 1}",
+                                    modifier = UiModifier.fillMaxWidth().height(96)
+                                )
+                                text(
+                                    id = "insp_page_caption_${page.id}",
+                                    text = page.label,
+                                    role = TypographyRole.LABEL
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        second = {
+            scrollableColumn(
+                id = "img_preview_pane",
+                spacing = SpacingSize.SMALL,
+                modifier = UiModifier.fillMaxSize().padding(SpacingSize.SMALL)
+            ) {
+                if (activePage == null) {
+                    emptyState(
+                        id = "img_preview_empty",
+                        title = "Select a page tile",
+                        description = "Click any thumbnail in the grid to inspect it at larger size or open it in the Board.",
+                        iconName = "image"
+                    )
+                } else {
+                    card(
+                        id = "img_preview_card",
+                        title = "Preview — ${activePage.label} (${activeIdx + 1}/${selectedChapter.pages.size})"
+                    ) {
+                        image(
+                            id = "insp_selected_page_preview",
+                            asset = activePage.asset,
+                            contentDescription = activePage.label,
+                            contentScale = ImageScale.FIT,
+                            badgeText = "#${activeIdx + 1}",
+                            modifier = UiModifier.fillMaxWidth().height(230)
+                        )
+                        row(id = "img_preview_actions", spacing = SpacingSize.SMALL) {
+                            button(
+                                id = "img_move_prev_btn",
+                                label = "Move Earlier",
+                                action = "move_page_prev",
+                                isPrimary = false
+                            )
+                            button(
+                                id = "img_move_next_btn",
+                                label = "Move Later",
+                                action = "move_page_next",
+                                isPrimary = false
+                            )
+                            button(
+                                id = "img_remove_page_btn",
+                                label = "Remove",
+                                action = "remove_selected_page",
+                                isPrimary = false,
+                                isDestructive = true
+                            )
+                        }
+                        button(
+                            id = "insp_open_board_btn",
+                            label = "Open Page in Board",
+                            action = "open_page_in_board",
+                            isPrimary = true
+                        )
                     }
                 }
             }

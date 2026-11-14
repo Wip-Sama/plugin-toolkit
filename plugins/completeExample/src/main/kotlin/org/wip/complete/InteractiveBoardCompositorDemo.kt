@@ -8,10 +8,12 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import org.wip.plugintoolkit.api.PluginResponse
+import org.wip.plugintoolkit.api.sdui.AssetReference
 import org.wip.plugintoolkit.api.sdui.BoardGridStyle
 import org.wip.plugintoolkit.api.sdui.BoardLayer
 import org.wip.plugintoolkit.api.sdui.BoardShapeType
@@ -32,6 +34,8 @@ import org.wip.plugintoolkit.api.sdui.UiNodeTree
 import org.wip.plugintoolkit.api.sdui.UiSessionContext
 import org.wip.plugintoolkit.api.sdui.uiTree
 
+private val boardHandoffJson = Json { ignoreUnknownKeys = true }
+
 private data class BoardCompositorState(
     val boardTitle: String = "Chapter 42 — Page 01 Compositor",
     val activeToolType: String = "SELECT",
@@ -46,10 +50,17 @@ private data class BoardCompositorState(
     val selectedLayerIds: Set<String> = setOf("text_1"),
     val layers: List<BoardLayer> = defaultCompositorLayers(),
     val lastExportJobId: String? = null,
-    val bannerMessage: String? = null
+    val bannerMessage: String? = null,
+    val sourceSeriesId: String? = null,
+    val sourceChapterId: String? = null
 )
 
-private fun defaultCompositorLayers(stampAsset: org.wip.plugintoolkit.api.sdui.AssetReference? = null): List<BoardLayer> {
+private fun defaultCompositorLayers(
+    stampAsset: AssetReference? = null,
+    calloutLabel: String = "Class-S Spatial Gate Opening!",
+    captionLabel: String = "Click to edit caption inline",
+    narrationLabel: String = "SECTOR 07 // OVERRIDE"
+): List<BoardLayer> {
     val base = mutableListOf<BoardLayer>(
         BoardLayer.ShapeLayer(
             id = "callout_1",
@@ -59,12 +70,12 @@ private fun defaultCompositorLayers(stampAsset: org.wip.plugintoolkit.api.sdui.A
             strokeColor = SemanticColor.PRIMARY,
             fillColor = SemanticColor.SURFACE,
             strokeWidth = 3f,
-            text = "Class-S Spatial Gate Opening!",
+            text = calloutLabel,
             zIndex = 1
         ),
         BoardLayer.TextLayer(
             id = "text_1",
-            text = "Click to edit caption inline",
+            text = captionLabel,
             position = NormalizedPoint(0.10f, 0.36f),
             color = SemanticColor.ON_SURFACE,
             backgroundColor = SemanticColor.SURFACE,
@@ -80,7 +91,7 @@ private fun defaultCompositorLayers(stampAsset: org.wip.plugintoolkit.api.sdui.A
             strokeColor = SemanticColor.WARNING,
             fillColor = SemanticColor.SURFACE,
             strokeWidth = 2.5f,
-            text = "SECTOR 07 // OVERRIDE",
+            text = narrationLabel,
             zIndex = 3
         )
     )
@@ -108,18 +119,46 @@ fun runBoardCompositorSession(
     context: UiSessionContext,
     events: Flow<UiEvent>
 ): Flow<UiNodeTree> = channelFlow {
-    val assets = CompleteExampleSampleAssets.ensureBoardAssets(context)
+    val defaultAssets = CompleteExampleSampleAssets.ensureBoardAssets(context)
+    val initialSeriesId = context.initialParameters["seriesId"]?.jsonPrimitive?.contentOrNull
+    val initialChapterId = context.initialParameters["chapterId"]?.jsonPrimitive?.contentOrNull
     val initialChapterTitle = context.initialParameters["chapterTitle"]?.jsonPrimitive?.contentOrNull
-    val initialTitle = if (!initialChapterTitle.isNullOrBlank()) {
-        "$initialChapterTitle — Page Compositor"
+    val initialPageLabel = context.initialParameters["pageLabel"]?.jsonPrimitive?.contentOrNull
+    val initialReleaseNotes = context.initialParameters["releaseNotes"]?.jsonPrimitive?.contentOrNull
+    val passedBackgroundAsset = context.initialParameters["backgroundAssetJson"]?.jsonPrimitive?.contentOrNull
+        ?.let { encoded -> runCatching { boardHandoffJson.decodeFromString(AssetReference.serializer(), encoded) }.getOrNull() }
+
+    val assets = if (passedBackgroundAsset != null) {
+        defaultAssets.copy(backgroundAsset = passedBackgroundAsset)
     } else {
-        "Chapter 42 — Page 01 Compositor"
+        defaultAssets
     }
+
+    val initialTitle = when {
+        !initialChapterTitle.isNullOrBlank() && !initialPageLabel.isNullOrBlank() ->
+            "$initialChapterTitle — $initialPageLabel"
+        !initialChapterTitle.isNullOrBlank() ->
+            "$initialChapterTitle — Page Compositor"
+        else -> "Chapter 42 — Page 01 Compositor"
+    }
+    val initialLayers = if (!initialChapterTitle.isNullOrBlank()) {
+        defaultCompositorLayers(
+            stampAsset = assets.stampAsset,
+            calloutLabel = initialChapterTitle,
+            captionLabel = initialReleaseNotes?.takeIf { it.isNotBlank() } ?: "Editing ${initialPageLabel ?: "page"} — Click to edit",
+            narrationLabel = "STAGE // ${(initialPageLabel ?: initialChapterId ?: "ACTIVE").uppercase()}"
+        )
+    } else {
+        defaultCompositorLayers(assets.stampAsset)
+    }
+
     val stateFlow = MutableStateFlow(
         BoardCompositorState(
             boardTitle = initialTitle,
             assets = assets,
-            layers = defaultCompositorLayers(assets.stampAsset)
+            layers = initialLayers,
+            sourceSeriesId = initialSeriesId,
+            sourceChapterId = initialChapterId
         )
     )
 
@@ -144,6 +183,15 @@ private suspend fun handleBoardCompositorEvent(
     when (event) {
         is UiEvent.Click -> {
             when (event.action ?: event.nodeId) {
+                "back_to_publisher" -> {
+                    val s = stateFlow.value
+                    val params = buildMap<String, JsonElement> {
+                        s.sourceSeriesId?.let { put("seriesId", JsonPrimitive(it)) }
+                        s.sourceChapterId?.let { put("chapterId", JsonPrimitive(it)) }
+                        put("navLevel", JsonPrimitive(if (s.sourceChapterId != null) "IMAGES" else "SERIES"))
+                    }
+                    context.openInteractiveTool("interactiveChapterPublisher", params)
+                }
                 "clear_canvas", "clearBtn" -> {
                     stateFlow.update {
                         it.copy(
@@ -524,6 +572,14 @@ private fun renderBoardCompositorTree(
                 spacing = SpacingSize.SMALL,
                 modifier = UiModifier.fillMaxWidth().padding(SpacingSize.SMALL)
             ) {
+                if (state.sourceChapterId != null) {
+                    button(
+                        id = "backToPublisherBtn",
+                        label = "Back to Images",
+                        action = "back_to_publisher",
+                        isPrimary = false
+                    )
+                }
                 icon(id = "topIcon", name = "layers", tint = SemanticColor.PRIMARY, size = ControlSize.MEDIUM)
                 text(
                     id = "topTitle",

@@ -42,6 +42,7 @@ import org.wip.plugintoolkit.api.PluginStorage
 import org.wip.plugintoolkit.api.ProgressData
 import org.wip.plugintoolkit.api.ProgressReporter
 import org.wip.plugintoolkit.api.RelativePath
+import org.wip.plugintoolkit.api.sdui.AssetReference
 import org.wip.plugintoolkit.api.sdui.BoardLayer
 import org.wip.plugintoolkit.api.sdui.BoardNode
 import org.wip.plugintoolkit.api.sdui.BoardTool
@@ -69,6 +70,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class CompleteExampleTest {
@@ -767,52 +769,94 @@ class CompleteExampleTest {
         val initialNodes = collectNodes(initialTree.root)
         val initialAllIds = initialNodes.map { it.id }
         assertEquals(initialAllIds.size, initialAllIds.toSet().size, "Publisher tree node IDs must be unique")
-        assertTrue("pub_row_ch_041" in initialAllIds, "Expected ch_041 in loaded catalog")
-        assertTrue("pub_row_ch_043" in initialAllIds, "Expected remote-only ch_043 in reconciled catalog")
+        assertTrue("series_row_series_obsidian" in initialAllIds, "Expected initial Series view showing Obsidian series")
+        assertTrue("series_row_series_crimson" in initialAllIds, "Expected Crimson series in Series view")
+        assertTrue("series_row_series_astral" in initialAllIds, "Expected Astral series in Series view")
 
-        // Verify chapter row has leading cover asset and click action, and inspector renders reorderable page grid
-        val row41 = initialNodes.filterIsInstance<ListItemNode>().first { it.id == "pub_row_ch_041" }
+        // Exercise Series custom ordering & sorting, then drill into Obsidian chapters
+        eventsFlow.emit(UiEvent.Click("series_down_btn_series_obsidian", "move_series_down:series_obsidian"))
+        advanceUntilIdle()
+        val reorderedSeriesRows = collectNodes(emittedTrees.last().root)
+            .filterIsInstance<ListItemNode>()
+            .filter { it.id.startsWith("series_row_") }
+        assertEquals("series_row_series_crimson", reorderedSeriesRows.first().id)
+
+        eventsFlow.emit(UiEvent.Click("series_up_btn_series_obsidian", "move_series_up:series_obsidian"))
+        eventsFlow.emit(UiEvent.Click("series_open_btn_series_obsidian", "open_series:series_obsidian"))
+        advanceUntilIdle()
+
+        val chapterNodes = collectNodes(emittedTrees.last().root)
+        val chapterAllIds = chapterNodes.map { it.id }
+        assertEquals(chapterAllIds.size, chapterAllIds.toSet().size, "Chapters tree node IDs must be unique")
+        assertTrue("pub_row_ch_041" in chapterAllIds, "Expected ch_041 in loaded series catalog")
+        assertTrue("pub_row_ch_043" in chapterAllIds, "Expected remote-only ch_043 in reconciled series catalog")
+
+        val row41 = chapterNodes.filterIsInstance<ListItemNode>().first { it.id == "pub_row_ch_041" }
         assertNotNull(row41.leadingAsset, "Expected generated cover AssetReference on chapter row")
         assertEquals("inspect:ch_041", row41.action)
 
-        val initialSplit = initialNodes.filterIsInstance<SplitPaneNode>().first { it.id == "pub_chapters_split" }
-        assertTrue(initialSplit.resizable)
+        val chaptersSplit = chapterNodes.filterIsInstance<SplitPaneNode>().first { it.id == "pub_chapters_split" }
+        assertTrue(chaptersSplit.resizable)
 
-        val initialGrid = initialNodes.filterIsInstance<GridNode>().first { it.id == "insp_pages_grid" }
+        // Drill into ch_040 Images workspace (Series -> Chapters -> Images)
+        eventsFlow.emit(UiEvent.Click("pub_images_btn_ch_040", "open_images:ch_040"))
+        advanceUntilIdle()
+
+        val imageNodes = collectNodes(emittedTrees.last().root)
+        val imageAllIds = imageNodes.map { it.id }
+        assertEquals(imageAllIds.size, imageAllIds.toSet().size, "Images tree node IDs must be unique")
+        val initialGrid = imageNodes.filterIsInstance<GridNode>().first { it.id == "insp_pages_grid" }
         assertTrue(initialGrid.reorderable, "Expected page preview grid to be reorderable")
-        assertEquals(4, initialGrid.children.size, "Expected 4 sample pages in initial chapter grid")
+        assertNull(initialGrid.columns, "Expected adaptive responsive columns on compact page grid")
+        assertEquals(6, initialGrid.children.size, "Expected 6 sample pages in initial chapter grid")
+
+        val previewThumb = imageNodes.filterIsInstance<ImageNode>().first { it.id == initialGrid.children[0].id.let { c -> "insp_page_thumb_" + c.removePrefix("insp_page_card_") } }
+        assertEquals(96, previewThumb.modifier.heightDp, "Expected compact bounded tile thumbnail height")
 
         // Select second page preview, reorder grid pages, resize split pane, and exercise pickFiles/saveFile/openInteractiveTool
         val firstCardId = initialGrid.children[0].id
         val secondCardId = initialGrid.children[1].id
         val secondPageId = secondCardId.removePrefix("insp_page_card_")
+        val reorderedCardIds = listOf(secondCardId, firstCardId) + initialGrid.children.drop(2).map { it.id }
         eventsFlow.emit(UiEvent.Click("insp_page_thumb_$secondPageId", "select_page:$secondPageId"))
         eventsFlow.emit(
             UiEvent.ItemsReordered(
                 nodeId = "insp_pages_grid",
-                itemIds = listOf(secondCardId, firstCardId, initialGrid.children[2].id, initialGrid.children[3].id),
+                itemIds = reorderedCardIds,
                 fromIndex = 1,
                 toIndex = 0
             )
         )
-        eventsFlow.emit(UiEvent.ValueChanged("pub_chapters_split", 0.42))
+        eventsFlow.emit(UiEvent.ValueChanged("pub_images_split", 0.58))
         advanceUntilIdle()
 
         val afterReorderNodes = collectNodes(emittedTrees.last().root)
         val reorderedGrid = afterReorderNodes.filterIsInstance<GridNode>().first { it.id == "insp_pages_grid" }
         assertEquals(secondCardId, reorderedGrid.children.first().id, "Expected reordered page grid order to persist")
-        val updatedSplit = afterReorderNodes.filterIsInstance<SplitPaneNode>().first { it.id == "pub_chapters_split" }
-        assertEquals(0.42f, updatedSplit.splitFraction)
+        val updatedSplit = afterReorderNodes.filterIsInstance<SplitPaneNode>().first { it.id == "pub_images_split" }
+        assertEquals(0.58f, updatedSplit.splitFraction)
 
         eventsFlow.emit(UiEvent.Click("insp_add_pages_btn", "pick_page_files"))
         eventsFlow.emit(UiEvent.Click("insp_export_manifest_btn", "export_chapter_json"))
-        eventsFlow.emit(UiEvent.Click("insp_open_board_btn", "open_in_board:ch_040"))
+        eventsFlow.emit(UiEvent.Click("insp_open_board_btn", "open_page_in_board"))
         advanceUntilIdle()
 
         val afterPickGrid = collectNodes(emittedTrees.last().root).filterIsInstance<GridNode>().first { it.id == "insp_pages_grid" }
-        assertEquals(5, afterPickGrid.children.size, "Expected picked page appended to grid")
+        assertEquals(7, afterPickGrid.children.size, "Expected picked page appended to grid")
         assertEquals(1, sessionContext.savedFiles.size, "Expected saveFile called for chapter JSON export")
-        assertEquals("interactiveBoardCompositor", sessionContext.openedTools.firstOrNull()?.first)
+        val handoff = sessionContext.openedTools.firstOrNull()
+        assertNotNull(handoff)
+        assertEquals("interactiveBoardCompositor", handoff.first)
+        assertEquals("series_obsidian", handoff.second["seriesId"]?.jsonPrimitive?.contentOrNull)
+        assertEquals("ch_040", handoff.second["chapterId"]?.jsonPrimitive?.contentOrNull)
+        val passedBgJson = handoff.second["backgroundAssetJson"]?.jsonPrimitive?.contentOrNull
+        assertNotNull(passedBgJson, "Expected backgroundAssetJson passed to Board Compositor")
+        assertTrue(Json.decodeFromString(AssetReference.serializer(), passedBgJson) is AssetReference)
+
+        // Navigate back up (Images -> Chapters -> Series) using internal nav_back
+        eventsFlow.emit(UiEvent.Click("pub_nav_back_btn", "nav_back"))
+        advanceUntilIdle()
+        assertTrue(collectNodes(emittedTrees.last().root).any { it.id == "pub_chapters_split" }, "Expected nav_back to return to Chapters")
 
         // Select ch_041 and trigger batch push capability
         eventsFlow.emit(UiEvent.ToggleChanged("pub_chk_ch_041", true))
@@ -837,6 +881,11 @@ class CompleteExampleTest {
             ChapterSyncStatus.PUBLISHED,
             reconciledAfterPush.first { it.id == "ch_041" }.status
         )
+
+        // Navigate back from Chapters to Series
+        eventsFlow.emit(UiEvent.Click("pub_nav_back_btn", "nav_back"))
+        advanceUntilIdle()
+        assertTrue(collectNodes(emittedTrees.last().root).any { it.id == "pub_series_split" }, "Expected nav_back to return to Series")
 
         // Switch to queue tab and verify job card appears
         eventsFlow.emit(UiEvent.TabSelected("pub_tabs", "queue"))
@@ -877,6 +926,7 @@ class CompleteExampleTest {
         val processor = entry.getInteractiveProcessor()?.getOrNull()
         assertNotNull(processor)
 
+        val expectedPageAsset = AssetReference.Relative("assets/ch_040_page_2.png")
         val eventsFlow = MutableSharedFlow<UiEvent>()
         val emitted = mutableListOf<UiNodeTree>()
         val testContext = TestPluginContext()
@@ -886,7 +936,14 @@ class CompleteExampleTest {
             scope = CoroutineScope(coroutineContext),
             baseContext = testContext,
             settingsState = MutableStateFlow(emptyMap()),
-            initialParameters = mapOf("chapterTitle" to JsonPrimitive("Ch. 41: Crimson Gate"))
+            initialParameters = mapOf(
+                "seriesId" to JsonPrimitive("series_obsidian"),
+                "chapterId" to JsonPrimitive("ch_040"),
+                "chapterTitle" to JsonPrimitive("Ch. 40: Echoes"),
+                "pageLabel" to JsonPrimitive("Page 02"),
+                "releaseNotes" to JsonPrimitive("SFX check"),
+                "backgroundAssetJson" to JsonPrimitive(Json.encodeToString(AssetReference.serializer(), expectedPageAsset))
+            )
         )
 
         val job = launch {
@@ -894,10 +951,19 @@ class CompleteExampleTest {
         }
         try {
             advanceUntilIdle()
-            val titleInput = collectNodes(emitted.last().root)
-                .filterIsInstance<TextInputNode>()
-                .first { it.id == "titleInput" }
-            assertEquals("Ch. 41: Crimson Gate — Page Compositor", titleInput.text)
+            val nodes = collectNodes(emitted.last().root)
+            val titleInput = nodes.filterIsInstance<TextInputNode>().first { it.id == "titleInput" }
+            assertEquals("Ch. 40: Echoes — Page 02", titleInput.text)
+            val board = nodes.filterIsInstance<BoardNode>().first { it.id == "drawingBoard" }
+            assertEquals(expectedPageAsset, board.backgroundAsset)
+
+            eventsFlow.emit(UiEvent.Click("backToPublisherBtn", "back_to_publisher"))
+            advanceUntilIdle()
+            val backHandoff = sessionContext.openedTools.firstOrNull()
+            assertNotNull(backHandoff)
+            assertEquals("interactiveChapterPublisher", backHandoff.first)
+            assertEquals("IMAGES", backHandoff.second["navLevel"]?.jsonPrimitive?.contentOrNull)
+            assertEquals("ch_040", backHandoff.second["chapterId"]?.jsonPrimitive?.contentOrNull)
         } finally {
             job.cancel()
         }

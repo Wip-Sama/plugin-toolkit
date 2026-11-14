@@ -10,11 +10,13 @@ import java.awt.BasicStroke
 import java.awt.Color
 import java.awt.Font
 import java.awt.GradientPaint
+import java.awt.Graphics2D
 import java.awt.RenderingHints
 import java.awt.image.BufferedImage
 import java.io.ByteArrayOutputStream
 import java.util.Base64
 import javax.imageio.ImageIO
+import kotlin.math.abs
 
 data class BoardAssetBundle(
     val backgroundAsset: AssetReference,
@@ -34,6 +36,8 @@ object CompleteExampleSampleAssets {
 
     private const val PAGE_WIDTH = 720
     private const val PAGE_HEIGHT = 960
+    private const val PREVIEW_PAGE_WIDTH = 360
+    private const val PREVIEW_PAGE_HEIGHT = 480
     private const val THUMB_WIDTH = 180
     private const val THUMB_HEIGHT = 240
     private const val STAMP_WIDTH = 200
@@ -87,12 +91,49 @@ object CompleteExampleSampleAssets {
         return writePngOrDataUri(context, "assets/cover_$chapterId.png", bytes)
     }
 
+    suspend fun ensureSeriesCoverAsset(
+        context: PluginContext,
+        seriesId: String,
+        title: String,
+        accentIndex: Int
+    ): AssetReference {
+        val image = BufferedImage(THUMB_WIDTH, THUMB_HEIGHT, BufferedImage.TYPE_INT_ARGB)
+        val g = image.createGraphics()
+        try {
+            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
+            val palettes = listOf(
+                Color(67, 56, 202) to Color(15, 23, 42),
+                Color(185, 28, 28) to Color(39, 10, 10),
+                Color(13, 148, 136) to Color(17, 24, 39)
+            )
+            val (top, bottom) = palettes[abs(accentIndex) % palettes.size]
+            drawPanel(g, 0, 0, THUMB_WIDTH, THUMB_HEIGHT, top, bottom)
+            g.color = Color(255, 255, 255, 45)
+            g.fillOval(92, 24, 96, 96)
+            g.color = Color(248, 250, 252)
+            g.font = Font("SansSerif", Font.BOLD, 20)
+            val code = title.split(" ").take(2).joinToString("") { it.take(1).uppercase() }
+            g.drawString(code, 22, 54)
+            g.font = Font("SansSerif", Font.BOLD, 14)
+            title.split(" ").take(3).forEachIndexed { idx, word ->
+                g.drawString(word, 20, 140 + (idx * 22))
+            }
+        } finally {
+            g.dispose()
+        }
+        val bytes = ByteArrayOutputStream().use { baos ->
+            ImageIO.write(image, "png", baos)
+            baos.toByteArray()
+        }
+        return writePngOrDataUri(context, "assets/series_$seriesId.png", bytes)
+    }
+
     suspend fun ensurePageThumbnailAsset(
         context: PluginContext,
         chapterId: String,
         pageIndex: Int
     ): AssetReference {
-        val image = BufferedImage(THUMB_WIDTH, THUMB_HEIGHT, BufferedImage.TYPE_INT_ARGB)
+        val image = BufferedImage(PREVIEW_PAGE_WIDTH, PREVIEW_PAGE_HEIGHT, BufferedImage.TYPE_INT_ARGB)
         val g = image.createGraphics()
         try {
             g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
@@ -100,18 +141,46 @@ object CompleteExampleSampleAssets {
                 Color(51, 65, 85) to Color(15, 23, 42),
                 Color(67, 56, 202) to Color(30, 27, 75),
                 Color(15, 118, 110) to Color(17, 24, 39),
-                Color(190, 24, 93) to Color(80, 7, 36)
+                Color(190, 24, 93) to Color(80, 7, 36),
+                Color(180, 83, 9) to Color(67, 20, 7),
+                Color(37, 99, 235) to Color(23, 37, 84)
             )
-            val (top, bottom) = palette[(pageIndex - 1) % palette.size]
-            drawPanel(g, 4, 4, THUMB_WIDTH - 8, THUMB_HEIGHT - 8, top, bottom)
-            g.color = Color(241, 245, 249, 220)
-            g.fillRoundRect(20, 24, THUMB_WIDTH - 40, 60, 10, 10)
+            val seed = abs(chapterId.hashCode()) + pageIndex
+            val (top, bottom) = palette[seed % palette.size]
+            val (altTop, altBottom) = palette[(seed + 2) % palette.size]
+
+            g.color = Color(244, 244, 248)
+            g.fillRect(0, 0, PREVIEW_PAGE_WIDTH, PREVIEW_PAGE_HEIGHT)
+            g.color = Color(24, 24, 32)
+            g.font = Font("SansSerif", Font.BOLD, 15)
+            g.drawString("${chapterId.uppercase()} // PAGE ${pageIndex.toString().padStart(2, '0')}", 18, 28)
+
+            // Upper wide action panel
+            drawPanel(g, 16, 40, PREVIEW_PAGE_WIDTH - 32, 168, top, bottom)
+            g.color = Color(255, 255, 255, 110)
+            g.stroke = BasicStroke(2.5f)
+            val shift = (seed % 4) * 24
+            g.drawLine(28, 180 - shift, PREVIEW_PAGE_WIDTH - 28, 70 + shift)
+            g.drawOval(60 + shift, 68, 86, 86)
+
+            // Split mid/lower panels whose split varies with pageIndex so pages look visually distinct
+            val splitY = 222
+            if (pageIndex % 2 == 1) {
+                drawPanel(g, 16, splitY, 156, 236, altTop, altBottom)
+                drawPanel(g, 186, splitY, 158, 112, bottom, top)
+                drawPanel(g, 186, splitY + 124, 158, 112, top, altBottom)
+            } else {
+                drawPanel(g, 16, splitY, 198, 114, bottom, altTop)
+                drawPanel(g, 228, splitY, 116, 236, altTop, altBottom)
+                drawPanel(g, 16, splitY + 126, 198, 110, top, bottom)
+            }
+
+            // Crisp floating page badge
+            g.color = Color(248, 250, 252, 235)
+            g.fillRoundRect(28, 52, 118, 42, 10, 10)
             g.color = Color(15, 23, 42)
             g.font = Font("SansSerif", Font.BOLD, 20)
-            g.drawString("PAGE $pageIndex", 44, 62)
-            g.color = Color(248, 250, 252, 180)
-            g.font = Font("SansSerif", Font.PLAIN, 13)
-            g.drawString("$chapterId // p${pageIndex.toString().padStart(2, '0')}", 34, 156)
+            g.drawString("PAGE ${pageIndex.toString().padStart(2, '0')}", 40, 80)
         } finally {
             g.dispose()
         }
@@ -120,6 +189,33 @@ object CompleteExampleSampleAssets {
             baos.toByteArray()
         }
         return writePngOrDataUri(context, "assets/${chapterId}_page_$pageIndex.png", bytes)
+    }
+
+    /**
+     * Copies local session-picked files into the plugin's shared relative filesystem before launching
+     * a separate interactive session (e.g. Board Compositor) so file permissions transfer cleanly.
+     */
+    suspend fun prepareBoardHandoffAsset(
+        context: PluginContext,
+        chapterId: String,
+        pageId: String,
+        asset: AssetReference
+    ): AssetReference {
+        if (asset !is AssetReference.Uri) return asset
+        val uri = asset.uriString
+        if (uri.startsWith("http://", ignoreCase = true) ||
+            uri.startsWith("https://", ignoreCase = true) ||
+            uri.startsWith("data:", ignoreCase = true)
+        ) {
+            return asset
+        }
+        val localPath = if (uri.startsWith("file:", ignoreCase = true)) {
+            uri.removePrefix("file://").removePrefix("file:")
+        } else {
+            uri
+        }
+        val bytes = runCatching { context.hostFileSystem.readFile(localPath) }.getOrNull() ?: return asset
+        return writePngOrDataUri(context, "assets/handoff_${chapterId}_${pageId}.png", bytes)
     }
 
     suspend fun ensureBoardAssets(context: PluginContext): BoardAssetBundle {
@@ -281,7 +377,7 @@ object CompleteExampleSampleAssets {
     }
 
     private fun drawPanel(
-        g: java.awt.Graphics2D,
+        g: Graphics2D,
         x: Int,
         y: Int,
         w: Int,
