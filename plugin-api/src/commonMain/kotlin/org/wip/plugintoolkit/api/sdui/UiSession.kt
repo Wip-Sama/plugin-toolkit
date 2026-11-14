@@ -311,10 +311,12 @@ abstract class UiContainerBuilder {
     fun card(
         id: String = generateNodeId("card"),
         title: String? = null,
+        surfaceRole: SemanticColor? = null,
+        outlined: Boolean = false,
         modifier: UiModifier = UiModifier.None,
         block: CardBuilder.() -> Unit
     ) {
-        val builder = CardBuilder(id, title, modifier).apply(block)
+        val builder = CardBuilder(id, title, surfaceRole, outlined, modifier).apply(block)
         add(builder.build())
     }
 
@@ -358,9 +360,71 @@ abstract class UiContainerBuilder {
         action: String? = null,
         isPrimary: Boolean = true,
         isDestructive: Boolean = false,
+        isTonal: Boolean = false,
+        iconName: String? = null,
         modifier: UiModifier = UiModifier.None
     ) {
-        add(ButtonNode(id = id, label = label, action = action, isPrimary = isPrimary, isDestructive = isDestructive, modifier = modifier))
+        add(
+            ButtonNode(
+                id = id,
+                label = label,
+                action = action,
+                isPrimary = isPrimary,
+                isDestructive = isDestructive,
+                modifier = modifier,
+                isTonal = isTonal,
+                iconName = iconName
+            )
+        )
+    }
+
+    /**
+     * Builds a connected Material 3 Expressive pill [ButtonGroupNode].
+     */
+    fun buttonGroup(
+        id: String = generateNodeId("btn_group"),
+        selectionMode: Boolean = true,
+        modifier: UiModifier = UiModifier.None,
+        block: ButtonGroupBuilder.() -> Unit
+    ) {
+        val builder = ButtonGroupBuilder().apply(block)
+        add(
+            ButtonGroupNode(
+                id = id,
+                items = builder.buildItems(),
+                selectionMode = selectionMode,
+                modifier = modifier
+            )
+        )
+    }
+
+    /**
+     * Builds a Material 3 Expressive [SplitButtonNode] with a primary pill button and a
+     * connected chevron popup menu.
+     */
+    fun splitButton(
+        label: String,
+        primaryAction: String,
+        id: String = generateNodeId("split_btn"),
+        iconName: String? = null,
+        isTonal: Boolean = false,
+        menuTooltip: String? = null,
+        modifier: UiModifier = UiModifier.None,
+        block: SplitButtonMenuBuilder.() -> Unit
+    ) {
+        val builder = SplitButtonMenuBuilder().apply(block)
+        add(
+            SplitButtonNode(
+                id = id,
+                label = label,
+                primaryAction = primaryAction,
+                iconName = iconName,
+                isTonal = isTonal,
+                menuItems = builder.buildItems(),
+                menuTooltip = menuTooltip,
+                modifier = modifier
+            )
+        )
     }
 
     fun textInput(
@@ -768,10 +832,11 @@ abstract class UiContainerBuilder {
         title: String? = null,
         isCollapsible: Boolean = true,
         isCollapsed: Boolean = false,
+        compact: Boolean = false,
         modifier: UiModifier = UiModifier.None,
         block: FloatingPanelBuilder.() -> Unit
     ) {
-        val builder = FloatingPanelBuilder(id, anchor, title, isCollapsible, isCollapsed, modifier).apply(block)
+        val builder = FloatingPanelBuilder(id, anchor, title, isCollapsible, isCollapsed, compact, modifier).apply(block)
         add(builder.build())
     }
 
@@ -837,9 +902,78 @@ class ScrollableRowBuilder(
 class CardBuilder(
     val id: String,
     val title: String?,
+    val surfaceRole: SemanticColor?,
+    val outlined: Boolean,
     val modifier: UiModifier
 ) : UiContainerBuilder() {
-    fun build(): CardNode = CardNode(id = id, title = title, modifier = modifier, children = children.toList())
+    fun build(): CardNode = CardNode(
+        id = id,
+        title = title,
+        children = children.toList(),
+        modifier = modifier,
+        surfaceRole = surfaceRole,
+        outlined = outlined
+    )
+}
+
+@UiDslMarker
+class ButtonGroupBuilder {
+    private val items = mutableListOf<ButtonGroupItem>()
+
+    fun item(
+        key: String,
+        label: String,
+        action: String? = null,
+        iconName: String? = null,
+        selected: Boolean = false,
+        color: SemanticColor? = null,
+        enabled: Boolean = true,
+        tooltip: String? = null
+    ) {
+        items.add(
+            ButtonGroupItem(
+                key = key,
+                label = label,
+                action = action,
+                iconName = iconName,
+                selected = selected,
+                color = color,
+                enabled = enabled,
+                tooltip = tooltip
+            )
+        )
+    }
+
+    internal fun buildItems(): List<ButtonGroupItem> = items.toList()
+}
+
+@UiDslMarker
+class SplitButtonMenuBuilder {
+    private val items = mutableListOf<ActionMenuItem>()
+
+    fun item(
+        key: String,
+        label: String,
+        action: String? = null,
+        iconName: String? = null,
+        isDestructive: Boolean = false,
+        enabled: Boolean = true,
+        startsSection: Boolean = false
+    ) {
+        items.add(
+            ActionMenuItem(
+                key = key,
+                label = label,
+                action = action,
+                iconName = iconName,
+                isDestructive = isDestructive,
+                enabled = enabled,
+                startsSection = startsSection
+            )
+        )
+    }
+
+    internal fun buildItems(): List<ActionMenuItem> = items.toList()
 }
 
 class ScrollableColumnBuilder(
@@ -882,6 +1016,7 @@ class FloatingPanelBuilder(
     val title: String?,
     val isCollapsible: Boolean,
     val isCollapsed: Boolean,
+    val compact: Boolean,
     val modifier: UiModifier
 ) : UiContainerBuilder() {
     fun build(): FloatingPanelNode = FloatingPanelNode(
@@ -891,7 +1026,8 @@ class FloatingPanelBuilder(
         isCollapsible = isCollapsible,
         isCollapsed = isCollapsed,
         modifier = modifier,
-        children = children.toList()
+        children = children.toList(),
+        compact = compact
     )
 }
 
@@ -1035,10 +1171,11 @@ class ScaffoldBuilder(
         title: String? = null,
         isCollapsible: Boolean = true,
         isCollapsed: Boolean = false,
+        compact: Boolean = false,
         modifier: UiModifier = UiModifier.None,
         block: FloatingPanelBuilder.() -> Unit
     ) {
-        val builder = FloatingPanelBuilder(id, anchor, title, isCollapsible, isCollapsed, modifier).apply(block)
+        val builder = FloatingPanelBuilder(id, anchor, title, isCollapsible, isCollapsed, compact, modifier).apply(block)
         floatingPanels.add(builder.build())
     }
 

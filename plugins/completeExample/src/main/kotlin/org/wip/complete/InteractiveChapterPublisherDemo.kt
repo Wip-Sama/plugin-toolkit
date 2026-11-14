@@ -841,6 +841,9 @@ internal fun runChapterPublisherSession(
                             val chId = action.removePrefix("pull_one:")
                             dispatchPull(listOf(chId), stateFlow.value.environment)
                         }
+                        action == "open_settings_tab" -> {
+                            stateFlow.update { it.copy(activeTab = "settings") }
+                        }
                         action == "save_draft_changes" -> {
                             saveDraftChanges()
                         }
@@ -1098,6 +1101,25 @@ private fun renderChapterPublisherTree(
                     text = userId,
                     color = SemanticColor.SECONDARY
                 )
+                buttonGroup(
+                    id = "pub_target_status_group",
+                    selectionMode = false
+                ) {
+                    item(
+                        key = "cubari",
+                        label = "Cubari",
+                        action = "open_settings_tab",
+                        color = if (state.linkedRepoPath.isNotBlank()) SemanticColor.SUCCESS_CONTAINER else SemanticColor.WARNING_CONTAINER,
+                        tooltip = "Open Settings to configure Cubari repository"
+                    )
+                    item(
+                        key = "remote",
+                        label = "Remote",
+                        action = "open_settings_tab",
+                        color = if (state.secretConfigured) SemanticColor.SUCCESS_CONTAINER else SemanticColor.SECONDARY_CONTAINER,
+                        tooltip = "Remote publisher target status"
+                    )
+                }
                 spacer(id = "pub_top_spacer", modifier = UiModifier.weight(1f))
                 iconButton(
                     id = "pub_new_draft_btn",
@@ -1115,15 +1137,37 @@ private fun renderChapterPublisherTree(
                     id = "pub_pull_selected_btn",
                     label = "Pull (${state.selectedChapterIds.size})",
                     action = "pull_selected",
-                    isPrimary = false
+                    isPrimary = false,
+                    isTonal = true,
+                    iconName = "cloud_download"
                 )
-                button(
+                splitButton(
                     id = "pub_push_selected_btn",
                     label = "Push (${state.selectedChapterIds.size})",
-                    action = "push_selected",
-                    isPrimary = true,
-                    isDestructive = state.environment == "PRODUCTION"
-                )
+                    primaryAction = "push_selected",
+                    iconName = "publish",
+                    menuTooltip = "Batch actions"
+                ) {
+                    item(
+                        key = "push_menu",
+                        label = "Push Selected Chapters",
+                        action = "push_selected",
+                        iconName = "publish"
+                    )
+                    item(
+                        key = "pull_menu",
+                        label = "Pull Remote Chapters",
+                        action = "pull_selected",
+                        iconName = "cloud_download"
+                    )
+                    item(
+                        key = "new_draft_menu",
+                        label = "New Local Draft",
+                        action = "create_new_draft",
+                        iconName = "add",
+                        startsSection = true
+                    )
+                }
             }
         }
 
@@ -1588,7 +1632,11 @@ private fun UiContainerBuilder.renderChaptersTab(
                     )
                 } else {
                     val (statusLabel, statusColor) = statusMeta(selected.status)
-                    card(id = "insp_header_card", title = "Chapter ${selected.number} Details") {
+                    card(
+                        id = "insp_header_card",
+                        title = "Chapter ${selected.number} Details",
+                        surfaceRole = SemanticColor.SURFACE_CONTAINER_LOW
+                    ) {
                         row(id = "insp_meta_row", spacing = SpacingSize.SMALL) {
                             badge(id = "insp_status_badge", text = statusLabel, color = statusColor)
                             text(
@@ -1631,26 +1679,34 @@ private fun UiContainerBuilder.renderChaptersTab(
                                 id = "insp_save_btn",
                                 label = "Save Draft",
                                 action = "save_draft_changes",
-                                isPrimary = false
+                                isPrimary = false,
+                                isTonal = true,
+                                iconName = "save"
                             )
                             button(
                                 id = "insp_pull_btn",
                                 label = "Pull Remote",
                                 action = "pull_one:${selected.id}",
-                                isPrimary = false
+                                isPrimary = false,
+                                iconName = "cloud_download"
                             )
                             button(
                                 id = "insp_push_btn",
                                 label = "Push Chapter",
                                 action = "push_one:${selected.id}",
                                 isPrimary = true,
-                                isDestructive = state.environment == "PRODUCTION"
+                                isDestructive = state.environment == "PRODUCTION",
+                                iconName = "publish"
                             )
                         }
                     }
 
                     val activePage = selected.pages.find { it.id == state.selectedPageId } ?: selected.pages.firstOrNull()
-                    card(id = "insp_pages_summary_card", title = "Chapter Pages (${selected.pages.size})") {
+                    card(
+                        id = "insp_pages_summary_card",
+                        title = "Chapter Pages (${selected.pages.size})",
+                        surfaceRole = SemanticColor.SURFACE_CONTAINER_HIGH
+                    ) {
                         if (activePage != null) {
                             image(
                                 id = "insp_summary_thumb",

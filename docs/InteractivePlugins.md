@@ -194,14 +194,14 @@ Every DSL call inside `uiTree { ... }` builds immutable `UiNode` models with det
 | `column(...) { ... }` | `ColumnNode` | `id`, `spacing: SpacingSize = SpacingSize.NONE`, `modifier`, `reorderable: Boolean = false` |
 | `row(...) { ... }` | `RowNode` | `id`, `spacing: SpacingSize = SpacingSize.NONE`, `modifier` |
 | `box(...) { ... }` | `BoxNode` | `id`, `modifier` |
-| `card(...) { ... }` | `CardNode` | `id`, `title: String? = null`, `modifier` |
+| `card(...) { ... }` | `CardNode` | `id`, `title: String? = null`, `surfaceRole: SemanticColor? = null` (solid M3 tonal fill), `outlined: Boolean = false`, `modifier` |
 | `scrollableColumn(...) { ... }` | `ScrollableColumnNode` | `id`, `spacing: SpacingSize = SpacingSize.NONE`, `modifier`, `reorderable: Boolean = false` |
 | `scrollableRow(...) { ... }` | `ScrollableRowNode` | `id`, `spacing: SpacingSize = SpacingSize.NONE`, `modifier` |
 | `grid(...) { ... }` | `GridNode` | `id`, `columns: Int? = null`, `minItemWidthDp: Float = 156f`, `spacing: SpacingSize = SpacingSize.SMALL`, `reorderable: Boolean = false`, `modifier` |
 | `splitPane(...)` | `SplitPaneNode` | `id`, `splitFraction: Float = 0.35f`, `isHorizontal: Boolean = true`, `resizable: Boolean = true`, `modifier`, `first = { ... }`, `second = { ... }` |
 | `scaffold(...) { ... }` | `ScaffoldNode` | `content`, `leftSidebar`, `rightSidebar`, `sidebar`, `topBar`, `bottomBar`, `floatingPanel` |
 | `sidebar(...) { ... }` | `SidebarNode` | `id`, `attachPoint: SidebarAttachPoint`, `title`, `isCollapsible = true`, `isCollapsed = false`, `modifier` |
-| `floatingPanel(...) { ... }` | `FloatingPanelNode` | `id`, `anchor: FloatingAnchor`, `title`, `isCollapsible = true`, `isCollapsed = false`, `modifier` |
+| `floatingPanel(...) { ... }` | `FloatingPanelNode` | `id`, `anchor: FloatingAnchor`, `title`, `isCollapsible = true`, `isCollapsed = false`, `compact: Boolean = false`, `modifier` |
 | `tabs(...) { ... }` | `TabsNode` | `selectedTabKey: String`, `tabs: List<TabItem>`, `id`, `modifier`, `contentBlock` |
 | `dialog(...) { ... }` | `DialogNode` | `title`, `id`, `isOpen = true`, `confirmLabel = "OK"`, `dismissLabel = "Cancel"`, `isDestructive = false`, `modifier` |
 | `spacer(...)` | `SpacerNode` | `size: SpacingSize = SpacingSize.MEDIUM`, `id`, `modifier` |
@@ -214,7 +214,9 @@ Every DSL call inside `uiTree { ... }` builds immutable `UiNode` models with det
 
 | DSL Builder | Node Class | Key Parameters & Emitted Event |
 | :--- | :--- | :--- |
-| `button(...)` | `ButtonNode` | `label`, `id`, `action: String? = null`, `isPrimary: Boolean = true`, `isDestructive: Boolean = false`, `modifier` -> `UiEvent.Click(nodeId, action)` |
+| `button(...)` | `ButtonNode` | `label`, `id`, `action: String? = null`, `isPrimary: Boolean = true`, `isDestructive: Boolean = false`, `isTonal: Boolean = false`, `iconName: String? = null`, `modifier` -> `UiEvent.Click(nodeId, action)` |
+| `buttonGroup(...) { item(...) }` | `ButtonGroupNode` | `id`, `selectionMode: Boolean = true`, `modifier`, items (`key`, `label`, `action`, `iconName`, `selected`, `color: SemanticColor?`, `enabled`, `tooltip`) -> `UiEvent.Click(nodeId, action ?: key)` |
+| `splitButton(...) { item(...) }` | `SplitButtonNode` | `label`, `primaryAction`, `id`, `iconName`, `isTonal = false`, `menuTooltip`, `modifier`, popup menu items (`key`, `label`, `action`, `iconName`, `isDestructive`, `enabled`, `startsSection`) -> `UiEvent.Click(nodeId, action ?: key)` |
 | `iconButton(...)` | `IconButtonNode` | `iconName`, `id`, `action: String? = null`, `tooltip: String? = null`, `tint: SemanticColor? = null`, `isTonal: Boolean = false`, `modifier` -> `UiEvent.Click(nodeId, action)` |
 | `textInput(...)` | `TextInputNode` | `id`, `text = ""`, `label`, `placeholder`, `singleLine = true`, `debounceMs = 150L`, `revision = 0`, `forceOverwrite = false`, `regexPattern = null`, `maxLength = null`, `isSecret = false`, `modifier` -> `UiEvent.TextChanged(nodeId, text)` |
 | `toggle(...)` | `ToggleNode` | `id`, `checked: Boolean`, `label`, `modifier` -> `UiEvent.ToggleChanged(nodeId, checked)` |
@@ -280,7 +282,10 @@ UiModifier
 
 - **`SpacingSize`**: `NONE`, `EXTRA_SMALL`, `SMALL`, `MEDIUM_SMALL`, `MEDIUM`, `LARGE`, `EXTRA_LARGE`
 - **`TypographyRole`**: `DISPLAY`, `HEADLINE`, `TITLE_LARGE`, `TITLE_MEDIUM`, `BODY_LARGE`, `BODY_MEDIUM`, `BODY_SMALL`, `LABEL`
-- **`SemanticColor`**: `PRIMARY`, `SECONDARY`, `TERTIARY`, `ERROR`, `SURFACE`, `ON_SURFACE`, `OUTLINE`, `ACCENT`, `HIGHLIGHT`, `INFO`, `SUCCESS`, `WARNING`
+- **`SemanticColor`**:
+  - Brand & Emphasis: `PRIMARY`, `PRIMARY_CONTAINER`, `SECONDARY`, `SECONDARY_CONTAINER`, `TERTIARY`, `TERTIARY_CONTAINER`, `ERROR`, `ERROR_CONTAINER`, `ACCENT`, `HIGHLIGHT`
+  - Solid Tonal Elevation & Text Hierarchy: `SURFACE`, `SURFACE_CONTAINER_LOWEST`, `SURFACE_CONTAINER_LOW`, `SURFACE_CONTAINER`, `SURFACE_CONTAINER_HIGH`, `SURFACE_CONTAINER_HIGHEST`, `ON_SURFACE`, `ON_SURFACE_VARIANT`, `OUTLINE`
+  - Semantic Status Fills & Containers: `INFO`, `INFO_CONTAINER`, `SUCCESS`, `SUCCESS_CONTAINER`, `WARNING`, `WARNING_CONTAINER`
 - **`ControlSize`**: `SMALL`, `MEDIUM`, `LARGE`
 - **`ImageScale`**: `FIT`, `CROP`, `FILL_BOUNDS`, `INSIDE`
 - **`FloatingAnchor`**: `TOP_START`, `TOP_CENTER`, `TOP_END`, `BOTTOM_START`, `BOTTOM_CENTER`, `BOTTOM_END`, `CENTER_START`, `CENTER_END`, `CENTER`
@@ -487,10 +492,11 @@ if (!response.isSuccess) {
 
 Supported `HttpMethod` values: `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD`.
 
-### Host Toasts & Persistent Notifications
+### Host Toasts, Notifications & Popups
 
-- `context.showToast(message)` (or `context.toast(message)`) displays a transient confirmation toast.
-- `context.showNotification(title, message, type)` records a persistent entry in the host notification center and surfaces critical alerts using `PluginNotificationType.INFO`, `SUCCESS`, `WARNING`, or `ERROR`.
+- **Toasts:** `context.showToast(message)` (or `context.toast(message)`) displays a transient host toast via `ToastHost` at the application root.
+- **Notifications:** `context.showNotification(title, message, type)` records a persistent entry in the host notification center and surfaces critical alerts using `PluginNotificationType.INFO`, `SUCCESS`, `WARNING`, or `ERROR`.
+- **Popups & Overlays:** Use `dialog(...)` (`DialogNode`) for modal confirmation/preview dialogs, `splitButton(...)` (`SplitButtonNode`) for anchored contextual action menus (`ToolkitDropdownMenu`), `dropdown(...)` (`DropdownNode`) for inline option selectors, and `floatingPanel(...)` (`FloatingPanelNode`) for canvas overlays.
 
 ### Live Settings Synchronization (`settingsFlow`, `updateSetting`, `clearSetting`, `locksFlow`)
 
@@ -501,7 +507,7 @@ Inside `UiSessionContext`, your session reads AND writes `@PluginSetting` config
 - `context.updateSetting(key, value)` / `context.updateSettings(map)` — writes directly through the host settings pipeline: encrypts `@PluginSetting(secret = true)` keys at rest in `settings.json`, updates `settingsFlow` AND Host Native Plugin Settings simultaneously, and automatically re-evaluates `@PluginLocks` (`refreshLocks`).
 - `context.clearSetting(key)` — clears a user override so the setting reverts to its manifest `@PluginSetting(defaultValue = ...)` and refreshes locks.
 - `context.locksFlow: StateFlow<Map<String, Boolean>>` — live capability lock states (`@PluginLocks`).
-- `context.capabilityJobs: StateFlow<List<CapabilityJobSnapshot>>` — live progress (`0f..1f`), logs, status (`PENDING`, `RUNNING`, `PAUSED`, `COMPLETED`, `FAILED`, `CANCELLED`), and results of capabilities launched from this session.
+- `context.capabilityJobs: StateFlow<List<CapabilityJobSnapshot>>` — live progress (`0f..1f`), logs, status (`QUEUED`, `RUNNING`, `PAUSE_REQUESTED`, `PAUSED`, `COMPLETED`, `FAILED`, `CANCELLED`), and results of capabilities launched from this session.
 - `context.launchCapability(capabilityName, parameters = emptyMap(), runInBackgroundQueue = true): String` — returns `jobId`.
 - `context.executeCapability(capabilityName, parameters = emptyMap()): ExecutionResult` — awaits result directly.
 - `context.launchAction(actionName, parameters = emptyMap()): Result<Unit>` — invokes `@PluginAction` methods (e.g., to refresh locks).
@@ -527,7 +533,7 @@ The host splits incoming events into two queues so high-frequency pointer/slider
 
 | Event Class | Fields | Source Control(s) |
 | :--- | :--- | :--- |
-| `UiEvent.Click` | `nodeId`, `action: String?` | `ButtonNode`, `IconButtonNode`, clickable `ImageNode`, `ListItemNode`, `AlertBannerNode`, `EmptyStateNode` |
+| `UiEvent.Click` | `nodeId`, `action: String?` | `ButtonNode`, `ButtonGroupNode`, `SplitButtonNode`, `IconButtonNode`, clickable `ImageNode`, `ListItemNode`, `AlertBannerNode`, `EmptyStateNode` |
 | `UiEvent.TextChanged` | `nodeId`, `text: String` | `TextInputNode` (debounced by `debounceMs`) |
 | `UiEvent.ToggleChanged` | `nodeId`, `checked: Boolean` | `ToggleNode`, `CheckboxNode`, selectable `ListItemNode` without `action` |
 | `UiEvent.OptionSelected` | `nodeId`, `selectedKey: String` | `DropdownNode` |

@@ -1,10 +1,13 @@
 package org.wip.plugintoolkit.features.plugin.sdui
 
+import org.wip.plugintoolkit.api.sdui.ActionMenuItem
 import org.wip.plugintoolkit.api.sdui.AssetReference
 import org.wip.plugintoolkit.api.sdui.BoardLayer
 import org.wip.plugintoolkit.api.sdui.BoardNode
 import org.wip.plugintoolkit.api.sdui.BoardShapeType
 import org.wip.plugintoolkit.api.sdui.BoardViewportConfig
+import org.wip.plugintoolkit.api.sdui.ButtonGroupItem
+import org.wip.plugintoolkit.api.sdui.ButtonGroupNode
 import org.wip.plugintoolkit.api.sdui.ColumnNode
 import org.wip.plugintoolkit.api.sdui.ErrorBoundaryNode
 import org.wip.plugintoolkit.api.sdui.FloatingAnchor
@@ -17,6 +20,7 @@ import org.wip.plugintoolkit.api.sdui.SemanticColor
 import org.wip.plugintoolkit.api.sdui.SidebarAttachPoint
 import org.wip.plugintoolkit.api.sdui.SidebarNode
 import org.wip.plugintoolkit.api.sdui.SliderNode
+import org.wip.plugintoolkit.api.sdui.SplitButtonNode
 import org.wip.plugintoolkit.api.sdui.TextNode
 import org.wip.plugintoolkit.api.sdui.UiDropTarget
 import org.wip.plugintoolkit.api.sdui.UiModifier
@@ -364,6 +368,57 @@ class UiAstSanitizerTest {
         assertTrue(assertIs<ErrorBoundaryNode>(root.children[1]).errorMessage.contains("action must not be blank"))
         assertTrue(assertIs<ErrorBoundaryNode>(root.children[2]).errorMessage.contains("must accept files or directories"))
         assertTrue(assertIs<ErrorBoundaryNode>(root.children[3]).errorMessage.contains("maxFiles"))
+    }
+
+    @Test
+    fun testExpressiveButtonGroupAndSplitButtonValidation() {
+        val validTree = UiNodeTree(
+            root = RowNode(
+                id = "expr_row",
+                children = listOf(
+                    ButtonGroupNode(
+                        id = "valid_group",
+                        items = listOf(ButtonGroupItem(key = "cubari", label = "Cubari"))
+                    ),
+                    SplitButtonNode(
+                        id = "valid_split",
+                        label = "Push",
+                        primaryAction = "push_all",
+                        menuItems = listOf(ActionMenuItem(key = "alt", label = "Alt"))
+                    )
+                )
+            )
+        )
+        assertEquals(validTree, validTree.sanitize())
+
+        val invalidTree = UiNodeTree(
+            root = ColumnNode(
+                id = "bad_expr_col",
+                children = listOf(
+                    ButtonGroupNode(
+                        id = "bad_group",
+                        items = listOf(ButtonGroupItem(key = "  ", label = "NoKey"))
+                    ),
+                    SplitButtonNode(
+                        id = "bad_split_action",
+                        label = "Push",
+                        primaryAction = ""
+                    ),
+                    SplitButtonNode(
+                        id = "bad_split_menu",
+                        label = "Push",
+                        primaryAction = "push",
+                        menuItems = listOf(ActionMenuItem(key = "k1", label = "  "))
+                    )
+                )
+            )
+        )
+
+        val sanitized = invalidTree.sanitize()
+        val root = assertIs<ColumnNode>(sanitized.root)
+        assertTrue(assertIs<ErrorBoundaryNode>(root.children[0]).errorMessage.contains("ButtonGroupNode"))
+        assertTrue(assertIs<ErrorBoundaryNode>(root.children[1]).errorMessage.contains("SplitButtonNode"))
+        assertTrue(assertIs<ErrorBoundaryNode>(root.children[2]).errorMessage.contains("SplitButtonNode"))
     }
 }
 

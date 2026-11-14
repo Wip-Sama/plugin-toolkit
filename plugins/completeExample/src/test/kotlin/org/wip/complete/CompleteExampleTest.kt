@@ -666,13 +666,16 @@ class CompleteExampleTest {
         assertTrue(board.layers.any { it is BoardLayer.TextLayer && it.id == "text_1" })
         assertTrue(board.layers.any { it is BoardLayer.ShapeLayer && it.id == "callout_1" })
         assertTrue(board.layers.any { it is BoardLayer.ComponentLayer && it.id == "inspector_widget" })
-        assertEquals(1, scaffold.floatingPanels.size)
+        assertEquals(2, scaffold.floatingPanels.size)
         assertEquals("controlsPanel", scaffold.floatingPanels.first().id)
         assertEquals(FloatingAnchor.TOP_END, scaffold.floatingPanels.first().anchor)
         assertTrue(
             scaffold.floatingPanels.first().isCollapsed,
             "Board controls floating panel must start collapsed on startup so it does not cover the workspace"
         )
+        assertEquals("quickStatusPill", scaffold.floatingPanels[1].id)
+        assertEquals(FloatingAnchor.BOTTOM_START, scaffold.floatingPanels[1].anchor)
+        assertTrue(scaffold.floatingPanels[1].compact)
         assertNotNull(scaffold.rightSidebar, "Compositor must expose layer inspector rightSidebar")
         assertNotNull(scaffold.topBar, "Compositor must expose topBar actions")
 
@@ -780,6 +783,14 @@ class CompleteExampleTest {
         val initialNodes = collectNodes(initialTree.root)
         val initialAllIds = initialNodes.map { it.id }
         assertEquals(initialAllIds.size, initialAllIds.toSet().size, "Publisher tree node IDs must be unique")
+        assertTrue(
+            initialNodes.any { it.id == "pub_target_status_group" && it is org.wip.plugintoolkit.api.sdui.ButtonGroupNode },
+            "Expected M3 Expressive ButtonGroupNode target status strip in topBar"
+        )
+        assertTrue(
+            initialNodes.any { it.id == "pub_push_selected_btn" && it is org.wip.plugintoolkit.api.sdui.SplitButtonNode },
+            "Expected M3 Expressive SplitButtonNode primary push action in topBar"
+        )
         assertTrue("series_row_series_obsidian" in initialAllIds, "Expected initial Series view showing Obsidian series")
         assertTrue("series_row_series_crimson" in initialAllIds, "Expected Crimson series in Series view")
         assertTrue("series_row_series_astral" in initialAllIds, "Expected Astral series in Series view")

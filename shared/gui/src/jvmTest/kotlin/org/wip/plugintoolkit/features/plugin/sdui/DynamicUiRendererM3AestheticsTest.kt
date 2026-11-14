@@ -12,11 +12,15 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import org.junit.Rule
+import org.wip.plugintoolkit.api.sdui.ActionMenuItem
 import org.wip.plugintoolkit.api.sdui.BoardLayer
 import org.wip.plugintoolkit.api.sdui.BoardNode
 import org.wip.plugintoolkit.api.sdui.BoardTool
 import org.wip.plugintoolkit.api.sdui.BoardViewportConfig
+import org.wip.plugintoolkit.api.sdui.ButtonGroupItem
+import org.wip.plugintoolkit.api.sdui.ButtonGroupNode
 import org.wip.plugintoolkit.api.sdui.ButtonNode
+import org.wip.plugintoolkit.api.sdui.CardNode
 import org.wip.plugintoolkit.api.sdui.ColumnNode
 import org.wip.plugintoolkit.api.sdui.FloatingAnchor
 import org.wip.plugintoolkit.api.sdui.FloatingPanelNode
@@ -30,6 +34,7 @@ import org.wip.plugintoolkit.api.sdui.SemanticColor
 import org.wip.plugintoolkit.api.sdui.SidebarAttachPoint
 import org.wip.plugintoolkit.api.sdui.SidebarNode
 import org.wip.plugintoolkit.api.sdui.SpacingSize
+import org.wip.plugintoolkit.api.sdui.SplitButtonNode
 import org.wip.plugintoolkit.api.sdui.SplitPaneNode
 import org.wip.plugintoolkit.api.sdui.TextInputNode
 import org.wip.plugintoolkit.api.sdui.TextNode
@@ -367,5 +372,76 @@ class DynamicUiRendererM3AestheticsTest {
             "Compact spatial widget should preserve 4dp EXTRA_SMALL spacing; actual=$compactGap"
         )
         assertEquals(listOf<UiEvent>(UiEvent.Click("qc_btn", "approve")), clicks)
+    }
+
+    @Test
+    fun testExpressiveButtonGroupSplitButtonAndTonalCard() {
+        val events = mutableListOf<UiEvent>()
+        val root = CardNode(
+            id = "expressive_card",
+            title = "Destinations",
+            surfaceRole = SemanticColor.SURFACE_CONTAINER_LOW,
+            children = listOf(
+                RowNode(
+                    id = "expressive_row",
+                    spacing = SpacingSize.SMALL,
+                    children = listOf(
+                        ButtonGroupNode(
+                            id = "target_status_group",
+                            selectionMode = false,
+                            items = listOf(
+                                ButtonGroupItem(key = "cubari", label = "Cubari", action = "cfg_cubari", color = SemanticColor.SUCCESS_CONTAINER),
+                                ButtonGroupItem(key = "aruba", label = "Aruba", action = "cfg_aruba", color = SemanticColor.WARNING_CONTAINER),
+                                ButtonGroupItem(key = "mangadex", label = "MangaDex", action = "cfg_mangadex", color = SemanticColor.ERROR_CONTAINER)
+                            )
+                        ),
+                        SplitButtonNode(
+                            id = "publish_split",
+                            label = "Publish All",
+                            primaryAction = "publish_all",
+                            menuTooltip = "More publish targets",
+                            menuItems = listOf(
+                                ActionMenuItem(key = "cubari", label = "Cubari Only", action = "publish_cubari"),
+                                ActionMenuItem(key = "mangadex", label = "MangaDex Only", action = "publish_mangadex", startsSection = true)
+                            )
+                        ),
+                        ButtonNode(
+                            id = "tonal_save_btn",
+                            label = "Save Draft",
+                            action = "save_draft",
+                            isPrimary = false,
+                            isTonal = true,
+                            iconName = "save"
+                        )
+                    )
+                )
+            )
+        )
+
+        composeTestRule.setContent {
+            AppTheme(appearance = AppearanceSettings()) {
+                Box(modifier = Modifier.size(width = 920.dp, height = 400.dp)) {
+                    SafeUiNodeRenderer(node = root, onEvent = { events.add(it) })
+                }
+            }
+        }
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithText("Cubari").assertIsDisplayed().performClick()
+        composeTestRule.onNodeWithText("Publish All").assertIsDisplayed().performClick()
+        composeTestRule.onNodeWithText("Save Draft").assertIsDisplayed().performClick()
+        composeTestRule.onNodeWithContentDescription("More publish targets").assertIsDisplayed().performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithText("MangaDex Only").assertIsDisplayed().performClick()
+
+        assertEquals(
+            listOf<UiEvent>(
+                UiEvent.Click("target_status_group", "cfg_cubari"),
+                UiEvent.Click("publish_split", "publish_all"),
+                UiEvent.Click("tonal_save_btn", "save_draft"),
+                UiEvent.Click("publish_split", "publish_mangadex")
+            ),
+            events
+        )
     }
 }

@@ -275,5 +275,80 @@ class UiNodeSerializationTest {
         val decodedDrop = json.decodeFromString(UiEventSerializer, encodedDrop)
         assertEquals(dropEvent, decodedDrop)
     }
+
+    @Test
+    fun testRoundTripExpressiveNodesAndSurfaceTokensSerialization() {
+        val tree = uiTree {
+            scaffold(id = "expr_scaffold") {
+                topBar {
+                    row(id = "top_row") {
+                        buttonGroup(id = "status_group", selectionMode = false) {
+                            item(key = "cubari", label = "Cubari", color = SemanticColor.SUCCESS_CONTAINER)
+                            item(key = "aruba", label = "Aruba", color = SemanticColor.WARNING_CONTAINER)
+                            item(key = "mangadex", label = "MangaDex", color = SemanticColor.ERROR_CONTAINER, selected = true)
+                        }
+                        splitButton(
+                            id = "publish_split",
+                            label = "Push",
+                            primaryAction = "push_all",
+                            iconName = "publish",
+                            isTonal = true,
+                            menuTooltip = "More publish actions"
+                        ) {
+                            item(key = "cubari_only", label = "Push to Cubari", iconName = "upload")
+                            item(key = "remove", label = "Remove", isDestructive = true, startsSection = true)
+                        }
+                    }
+                }
+                content {
+                    card(
+                        id = "tonal_card",
+                        title = "Workspace",
+                        surfaceRole = SemanticColor.SURFACE_CONTAINER_LOW,
+                        outlined = true
+                    ) {
+                        button(
+                            id = "tonal_btn",
+                            label = "Save",
+                            action = "save",
+                            isPrimary = false,
+                            isTonal = true,
+                            iconName = "save"
+                        )
+                    }
+                }
+                floatingPanel(id = "compact_bar", anchor = FloatingAnchor.BOTTOM_CENTER, isCollapsible = false, compact = true) {
+                    button(id = "quick_act", label = "Approve", isTonal = true)
+                }
+            }
+        }
+
+        val encoded = json.encodeToString(tree)
+        val decoded = json.decodeFromString<UiNodeTree>(encoded)
+        val scaffold = assertIs<ScaffoldNode>(decoded.root)
+        val topRow = assertIs<RowNode>(scaffold.topBar)
+
+        val group = assertIs<ButtonGroupNode>(topRow.children[0])
+        assertEquals(false, group.selectionMode)
+        assertEquals(3, group.items.size)
+        assertEquals(SemanticColor.SUCCESS_CONTAINER, group.items[0].color)
+        assertEquals(SemanticColor.ERROR_CONTAINER, group.items[2].color)
+
+        val split = assertIs<SplitButtonNode>(topRow.children[1])
+        assertEquals("push_all", split.primaryAction)
+        assertTrue(split.isTonal)
+        assertEquals(2, split.menuItems.size)
+        assertTrue(split.menuItems[1].isDestructive)
+        assertTrue(split.menuItems[1].startsSection)
+
+        val card = assertIs<CardNode>(scaffold.content)
+        assertEquals(SemanticColor.SURFACE_CONTAINER_LOW, card.surfaceRole)
+        assertTrue(card.outlined)
+        val tonalBtn = assertIs<ButtonNode>(card.children[0])
+        assertTrue(tonalBtn.isTonal)
+        assertEquals("save", tonalBtn.iconName)
+
+        assertTrue(scaffold.floatingPanels[0].compact)
+    }
 }
 

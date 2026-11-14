@@ -79,6 +79,7 @@ import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.PointerIcon
@@ -221,33 +222,22 @@ fun BoardNodeRenderer(
     }
 
     val primaryColor = MaterialTheme.colorScheme.primary
-    val secondaryColor = MaterialTheme.colorScheme.secondary
     val tertiaryColor = MaterialTheme.colorScheme.tertiary
     val errorColor = MaterialTheme.colorScheme.error
     val outlineVariant = MaterialTheme.colorScheme.outlineVariant
     val surfaceColor = MaterialTheme.colorScheme.surfaceContainerLowest
-    val onSurfaceColor = MaterialTheme.colorScheme.onSurface
-    val outlineColor = MaterialTheme.colorScheme.outline
     val highlightColor = ToolkitTheme.colors.warning
-    val infoColor = ToolkitTheme.colors.info
-    val successColor = ToolkitTheme.colors.success
-    val warningColor = ToolkitTheme.colors.warning
 
-    val resolveColor: (SemanticColor) -> Color = { color ->
+    val semanticColorMap = SemanticColor.entries.associateWith { color ->
         when (color) {
-            SemanticColor.PRIMARY -> primaryColor
-            SemanticColor.SECONDARY -> secondaryColor
-            SemanticColor.TERTIARY -> tertiaryColor
-            SemanticColor.ERROR -> errorColor
             SemanticColor.SURFACE -> surfaceColor
-            SemanticColor.ON_SURFACE -> onSurfaceColor
-            SemanticColor.OUTLINE -> outlineColor
             SemanticColor.ACCENT -> tertiaryColor
             SemanticColor.HIGHLIGHT -> highlightColor
-            SemanticColor.INFO -> infoColor
-            SemanticColor.SUCCESS -> successColor
-            SemanticColor.WARNING -> warningColor
+            else -> color.toComposeColor()
         }
+    }
+    val resolveColor: (SemanticColor) -> Color = { color ->
+        semanticColorMap.getValue(color)
     }
 
     val hasFixedAspect = node.modifier.aspectRatio != null && node.modifier.aspectRatio!! > 0f
@@ -2119,20 +2109,44 @@ private fun perpendicularDistance(
 }
 
 /**
+ * Map [SemanticColor] to a solid Material 3 `(container, content)` color pair.
+ */
+@Composable
+fun SemanticColor.toContainerPair(): Pair<Color, Color> {
+    val scheme = MaterialTheme.colorScheme
+    val toolkitColors = ToolkitTheme.colors
+    val statusContainerTint = 0.22f
+    return when (this) {
+        SemanticColor.PRIMARY -> scheme.primary to scheme.onPrimary
+        SemanticColor.SECONDARY -> scheme.secondary to scheme.onSecondary
+        SemanticColor.TERTIARY -> scheme.tertiary to scheme.onTertiary
+        SemanticColor.ERROR -> scheme.error to scheme.onError
+        SemanticColor.SURFACE -> scheme.surface to scheme.onSurface
+        SemanticColor.SURFACE_CONTAINER_LOWEST -> scheme.surfaceContainerLowest to scheme.onSurface
+        SemanticColor.SURFACE_CONTAINER_LOW -> scheme.surfaceContainerLow to scheme.onSurface
+        SemanticColor.SURFACE_CONTAINER -> scheme.surfaceContainer to scheme.onSurface
+        SemanticColor.SURFACE_CONTAINER_HIGH -> scheme.surfaceContainerHigh to scheme.onSurface
+        SemanticColor.SURFACE_CONTAINER_HIGHEST -> scheme.surfaceContainerHighest to scheme.onSurface
+        SemanticColor.ON_SURFACE -> scheme.onSurface to scheme.surface
+        SemanticColor.ON_SURFACE_VARIANT -> scheme.onSurfaceVariant to scheme.surface
+        SemanticColor.PRIMARY_CONTAINER -> scheme.primaryContainer to scheme.onPrimaryContainer
+        SemanticColor.SECONDARY_CONTAINER -> scheme.secondaryContainer to scheme.onSecondaryContainer
+        SemanticColor.TERTIARY_CONTAINER -> scheme.tertiaryContainer to scheme.onTertiaryContainer
+        SemanticColor.ERROR_CONTAINER -> scheme.errorContainer to scheme.onErrorContainer
+        SemanticColor.OUTLINE -> scheme.outline to scheme.surface
+        SemanticColor.ACCENT -> scheme.primary to scheme.onPrimary
+        SemanticColor.HIGHLIGHT -> toolkitColors.warningContainer to scheme.onSurface
+        SemanticColor.INFO -> toolkitColors.info to scheme.onPrimary
+        SemanticColor.INFO_CONTAINER -> lerp(scheme.surfaceContainerHigh, toolkitColors.info, statusContainerTint) to scheme.onSurface
+        SemanticColor.SUCCESS -> toolkitColors.success to scheme.onPrimary
+        SemanticColor.SUCCESS_CONTAINER -> lerp(scheme.surfaceContainerHigh, toolkitColors.success, statusContainerTint) to scheme.onSurface
+        SemanticColor.WARNING -> toolkitColors.warning to scheme.onPrimary
+        SemanticColor.WARNING_CONTAINER -> lerp(scheme.surfaceContainerHigh, toolkitColors.warning, statusContainerTint) to scheme.onSurface
+    }
+}
+
+/**
  * Map [SemanticColor] to Compose Color.
  */
 @Composable
-fun SemanticColor.toComposeColor(): Color = when (this) {
-    SemanticColor.PRIMARY -> MaterialTheme.colorScheme.primary
-    SemanticColor.SECONDARY -> MaterialTheme.colorScheme.secondary
-    SemanticColor.TERTIARY -> MaterialTheme.colorScheme.tertiary
-    SemanticColor.ERROR -> MaterialTheme.colorScheme.error
-    SemanticColor.SURFACE -> MaterialTheme.colorScheme.surface
-    SemanticColor.ON_SURFACE -> MaterialTheme.colorScheme.onSurface
-    SemanticColor.OUTLINE -> MaterialTheme.colorScheme.outline
-    SemanticColor.ACCENT -> MaterialTheme.colorScheme.primary
-    SemanticColor.HIGHLIGHT -> ToolkitTheme.colors.warningContainer
-    SemanticColor.INFO -> ToolkitTheme.colors.info
-    SemanticColor.SUCCESS -> ToolkitTheme.colors.success
-    SemanticColor.WARNING -> ToolkitTheme.colors.warning
-}
+fun SemanticColor.toComposeColor(): Color = toContainerPair().first

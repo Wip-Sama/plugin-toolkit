@@ -66,11 +66,13 @@ data class BoxNode(
 
 @Serializable
 @SerialName("card")
-data class CardNode(
+data class CardNode @JvmOverloads constructor(
     override val id: String,
     val title: String? = null,
     val children: List<UiNode> = emptyList(),
-    override val modifier: UiModifier = UiModifier.None
+    override val modifier: UiModifier = UiModifier.None,
+    val surfaceRole: SemanticColor? = null,
+    val outlined: Boolean = false
 ) : UiNode
 
 @Serializable
@@ -122,14 +124,15 @@ data class ScaffoldNode(
  */
 @Serializable
 @SerialName("floating_panel")
-data class FloatingPanelNode(
+data class FloatingPanelNode @JvmOverloads constructor(
     override val id: String,
     val anchor: FloatingAnchor = FloatingAnchor.TOP_END,
     val title: String? = null,
     val children: List<UiNode> = emptyList(),
     val isCollapsible: Boolean = true,
     val isCollapsed: Boolean = false,
-    override val modifier: UiModifier = UiModifier.None
+    override val modifier: UiModifier = UiModifier.None,
+    val compact: Boolean = false
 ) : UiNode
 
 /**
@@ -161,12 +164,75 @@ data class TextNode(
 
 @Serializable
 @SerialName("button")
-data class ButtonNode(
+data class ButtonNode @JvmOverloads constructor(
     override val id: String,
     val label: String,
     val action: String? = null,
     val isPrimary: Boolean = true,
     val isDestructive: Boolean = false,
+    override val modifier: UiModifier = UiModifier.None,
+    val isTonal: Boolean = false,
+    val iconName: String? = null
+) : UiNode
+
+/**
+ * Single connected pill item inside a Material 3 Expressive [ButtonGroupNode].
+ *
+ * Emits [UiEvent.Click] on the parent [ButtonGroupNode.id] with `action = item.action ?: item.key`.
+ */
+@Serializable
+data class ButtonGroupItem @JvmOverloads constructor(
+    val key: String,
+    val label: String,
+    val action: String? = null,
+    val iconName: String? = null,
+    val selected: Boolean = false,
+    val color: SemanticColor? = null,
+    val enabled: Boolean = true,
+    val tooltip: String? = null
+)
+
+/**
+ * Connected Material 3 Expressive pill group for navigation strips, mode switchers,
+ * compact action clusters, or color-coded integration state groups without dot clutter.
+ */
+@Serializable
+@SerialName("button_group")
+data class ButtonGroupNode @JvmOverloads constructor(
+    override val id: String,
+    val items: List<ButtonGroupItem> = emptyList(),
+    val selectionMode: Boolean = true,
+    override val modifier: UiModifier = UiModifier.None
+) : UiNode
+
+/**
+ * Contextual popup menu item inside a [SplitButtonNode] anchored dropdown menu.
+ */
+@Serializable
+data class ActionMenuItem @JvmOverloads constructor(
+    val key: String,
+    val label: String,
+    val action: String? = null,
+    val iconName: String? = null,
+    val isDestructive: Boolean = false,
+    val enabled: Boolean = true,
+    val startsSection: Boolean = false
+)
+
+/**
+ * Material 3 Expressive Split Button combining a primary pill action with an expandable
+ * connected chevron trigger opening a contextual popup menu of related actions.
+ */
+@Serializable
+@SerialName("split_button")
+data class SplitButtonNode @JvmOverloads constructor(
+    override val id: String,
+    val label: String,
+    val primaryAction: String,
+    val iconName: String? = null,
+    val isTonal: Boolean = false,
+    val menuItems: List<ActionMenuItem> = emptyList(),
+    val menuTooltip: String? = null,
     override val modifier: UiModifier = UiModifier.None
 ) : UiNode
 
@@ -520,6 +586,8 @@ object UiNodeSerializer : KSerializer<UiNode> {
             is SidebarNode -> "sidebar"
             is TextNode -> "text"
             is ButtonNode -> "button"
+            is ButtonGroupNode -> "button_group"
+            is SplitButtonNode -> "split_button"
             is TextInputNode -> "text_input"
             is ToggleNode -> "toggle"
             is SliderNode -> "slider"
@@ -556,6 +624,8 @@ object UiNodeSerializer : KSerializer<UiNode> {
             is SidebarNode -> jsonEncoder.json.encodeToJsonElement(SidebarNode.serializer(), value)
             is TextNode -> jsonEncoder.json.encodeToJsonElement(TextNode.serializer(), value)
             is ButtonNode -> jsonEncoder.json.encodeToJsonElement(ButtonNode.serializer(), value)
+            is ButtonGroupNode -> jsonEncoder.json.encodeToJsonElement(ButtonGroupNode.serializer(), value)
+            is SplitButtonNode -> jsonEncoder.json.encodeToJsonElement(SplitButtonNode.serializer(), value)
             is TextInputNode -> jsonEncoder.json.encodeToJsonElement(TextInputNode.serializer(), value)
             is ToggleNode -> jsonEncoder.json.encodeToJsonElement(ToggleNode.serializer(), value)
             is SliderNode -> jsonEncoder.json.encodeToJsonElement(SliderNode.serializer(), value)
@@ -604,6 +674,8 @@ object UiNodeSerializer : KSerializer<UiNode> {
             "sidebar" -> SidebarNode.serializer()
             "text" -> TextNode.serializer()
             "button" -> ButtonNode.serializer()
+            "button_group" -> ButtonGroupNode.serializer()
+            "split_button" -> SplitButtonNode.serializer()
             "text_input" -> TextInputNode.serializer()
             "toggle" -> ToggleNode.serializer()
             "slider" -> SliderNode.serializer()

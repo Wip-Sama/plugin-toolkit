@@ -3,6 +3,7 @@ package org.wip.plugintoolkit.features.plugin.sdui
 import org.wip.plugintoolkit.api.sdui.BoardLayer
 import org.wip.plugintoolkit.api.sdui.BoardNode
 import org.wip.plugintoolkit.api.sdui.BoxNode
+import org.wip.plugintoolkit.api.sdui.ButtonGroupNode
 import org.wip.plugintoolkit.api.sdui.CardNode
 import org.wip.plugintoolkit.api.sdui.ColumnNode
 import org.wip.plugintoolkit.api.sdui.DialogNode
@@ -17,6 +18,7 @@ import org.wip.plugintoolkit.api.sdui.ScrollableColumnNode
 import org.wip.plugintoolkit.api.sdui.ScrollableRowNode
 import org.wip.plugintoolkit.api.sdui.SidebarNode
 import org.wip.plugintoolkit.api.sdui.SliderNode
+import org.wip.plugintoolkit.api.sdui.SplitButtonNode
 import org.wip.plugintoolkit.api.sdui.SplitPaneNode
 import org.wip.plugintoolkit.api.sdui.TabsNode
 import org.wip.plugintoolkit.api.sdui.UiNode
@@ -213,6 +215,26 @@ object UiAstSanitizer {
                     val safeP = if (p == null || p.isNaN() || p.isInfinite()) null else p.coerceIn(0f, 1f)
                     val safeSp = if (sp == null || sp.isNaN() || sp.isInfinite()) null else sp.coerceIn(0f, 1f)
                     return node.copy(progress = safeP, secondaryProgress = safeSp)
+                }
+            }
+
+            if (node is ButtonGroupNode) {
+                if (node.items.any { it.key.isBlank() || it.label.isBlank() }) {
+                    return ErrorBoundaryNode(
+                        id = node.id,
+                        errorMessage = "Invalid ButtonGroupNode '${node.id}': item keys and labels must not be blank",
+                        failedNodeType = "ButtonGroupNode"
+                    )
+                }
+            }
+
+            if (node is SplitButtonNode) {
+                if (node.primaryAction.isBlank() || node.menuItems.any { it.key.isBlank() || it.label.isBlank() }) {
+                    return ErrorBoundaryNode(
+                        id = node.id,
+                        errorMessage = "Invalid SplitButtonNode '${node.id}': primaryAction and menu item keys/labels must not be blank",
+                        failedNodeType = "SplitButtonNode"
+                    )
                 }
             }
 

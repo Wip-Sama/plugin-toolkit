@@ -893,5 +893,20 @@ private fun renderBoardCompositorTree(
                 color = SemanticColor.ON_SURFACE
             )
         }
+
+        floatingPanel(
+            id = "quickStatusPill",
+            anchor = FloatingAnchor.BOTTOM_START,
+            isCollapsible = false,
+            compact = true
+        ) {
+            button(
+                id = "quickApproveBtn",
+                label = if (state.pageApproved) "QA Approved" else "Mark QA",
+                action = "increment_counter",
+                isTonal = true,
+                iconName = if (state.pageApproved) "check_circle" else "edit"
+            )
+        }
     }
 }

@@ -121,6 +121,7 @@ import org.wip.plugintoolkit.api.sdui.AlignmentRole
 import org.wip.plugintoolkit.api.sdui.BadgeNode
 import org.wip.plugintoolkit.api.sdui.BoardNode
 import org.wip.plugintoolkit.api.sdui.BoxNode
+import org.wip.plugintoolkit.api.sdui.ButtonGroupNode
 import org.wip.plugintoolkit.api.sdui.ButtonNode
 import org.wip.plugintoolkit.api.sdui.CardNode
 import org.wip.plugintoolkit.api.sdui.CheckboxNode
@@ -151,6 +152,7 @@ import org.wip.plugintoolkit.api.sdui.SidebarNode
 import org.wip.plugintoolkit.api.sdui.SliderNode
 import org.wip.plugintoolkit.api.sdui.SpacerNode
 import org.wip.plugintoolkit.api.sdui.SpacingSize
+import org.wip.plugintoolkit.api.sdui.SplitButtonNode
 import org.wip.plugintoolkit.api.sdui.SplitPaneNode
 import org.wip.plugintoolkit.api.sdui.TabsNode
 import org.wip.plugintoolkit.api.sdui.TextInputNode
@@ -439,15 +441,23 @@ fun RenderUiNode(
         }
 
         is CardNode -> {
+            val (containerColor, contentColor) = node.surfaceRole?.toContainerPair()
+                ?: (MaterialTheme.colorScheme.surfaceContainer to MaterialTheme.colorScheme.onSurface)
+            val cardBorder = if (node.outlined) {
+                BorderStroke(
+                    ToolkitTheme.dimensions.borderUnselected,
+                    MaterialTheme.colorScheme.outlineVariant
+                )
+            } else {
+                null
+            }
             Card(
                 modifier = appliedModifier,
                 colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainer
+                    containerColor = containerColor,
+                    contentColor = contentColor
                 ),
-                border = BorderStroke(
-                    ToolkitTheme.dimensions.borderUnselected,
-                    MaterialTheme.colorScheme.outlineVariant.copy(alpha = ToolkitTheme.opacity.divider)
-                ),
+                border = cardBorder,
                 shape = ToolkitTheme.shapes.large
             ) {
                 Column(
@@ -460,7 +470,7 @@ fun RenderUiNode(
                         Text(
                             text = titleText,
                             style = ToolkitTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurface
+                            color = contentColor
                         )
                     }
                     RenderColumnChildren(children = node.children, onEvent = onEvent, allowWeight = false)
@@ -512,57 +522,69 @@ fun RenderUiNode(
                 )
                 .then(if (node.modifier.enabled) Modifier.pointerHoverIcon(PointerIcon.Hand) else Modifier)
 
-            if (node.isPrimary) {
-                Button(
-                    onClick = { onEvent(UiEvent.Click(node.id, node.action)) },
-                    enabled = node.modifier.enabled,
-                    shape = ToolkitTheme.shapes.pill,
-                    contentPadding = buttonPadding,
-                    modifier = buttonModifier,
-                    colors = if (node.isDestructive) {
-                        ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                    } else {
-                        ButtonDefaults.buttonColors()
+            when {
+                node.isTonal && !node.isDestructive -> {
+                    FilledTonalButton(
+                        onClick = { onEvent(UiEvent.Click(node.id, node.action)) },
+                        enabled = node.modifier.enabled,
+                        shape = ToolkitTheme.shapes.pill,
+                        contentPadding = buttonPadding,
+                        modifier = buttonModifier
+                    ) {
+                        RenderButtonLabel(label = node.label, iconName = node.iconName)
                     }
-                ) {
-                    Text(
-                        text = node.label,
-                        style = ToolkitTheme.typography.labelLarge,
-                        maxLines = 1,
-                        softWrap = false,
-                        overflow = TextOverflow.Ellipsis
-                    )
                 }
-            } else {
-                OutlinedButton(
-                    onClick = { onEvent(UiEvent.Click(node.id, node.action)) },
-                    enabled = node.modifier.enabled,
-                    shape = ToolkitTheme.shapes.pill,
-                    contentPadding = buttonPadding,
-                    border = BorderStroke(
-                        ToolkitTheme.dimensions.borderUnselected,
-                        if (node.isDestructive) {
-                            MaterialTheme.colorScheme.error.copy(alpha = ToolkitTheme.opacity.borderLow)
+
+                node.isPrimary -> {
+                    Button(
+                        onClick = { onEvent(UiEvent.Click(node.id, node.action)) },
+                        enabled = node.modifier.enabled,
+                        shape = ToolkitTheme.shapes.pill,
+                        contentPadding = buttonPadding,
+                        modifier = buttonModifier,
+                        colors = if (node.isDestructive) {
+                            ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
                         } else {
-                            MaterialTheme.colorScheme.outlineVariant
+                            ButtonDefaults.buttonColors()
                         }
-                    ),
-                    modifier = buttonModifier,
-                    colors = if (node.isDestructive) {
-                        ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
-                    } else {
-                        ButtonDefaults.outlinedButtonColors()
+                    ) {
+                        RenderButtonLabel(label = node.label, iconName = node.iconName)
                     }
-                ) {
-                    Text(
-                        text = node.label,
-                        style = ToolkitTheme.typography.labelLarge,
-                        maxLines = 1,
-                        softWrap = false,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                }
+
+                else -> {
+                    OutlinedButton(
+                        onClick = { onEvent(UiEvent.Click(node.id, node.action)) },
+                        enabled = node.modifier.enabled,
+                        shape = ToolkitTheme.shapes.pill,
+                        contentPadding = buttonPadding,
+                        border = BorderStroke(
+                            ToolkitTheme.dimensions.borderUnselected,
+                            if (node.isDestructive) {
+                                MaterialTheme.colorScheme.error.copy(alpha = ToolkitTheme.opacity.borderLow)
+                            } else {
+                                MaterialTheme.colorScheme.outlineVariant
+                            }
+                        ),
+                        modifier = buttonModifier,
+                        colors = if (node.isDestructive) {
+                            ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                        } else {
+                            ButtonDefaults.outlinedButtonColors()
+                        }
+                    ) {
+                        RenderButtonLabel(label = node.label, iconName = node.iconName)
+                    }
                 }
             }
+        }
+
+        is ButtonGroupNode -> {
+            RenderButtonGroupNode(node = node, onEvent = onEvent, modifier = appliedModifier)
+        }
+
+        is SplitButtonNode -> {
+            RenderSplitButtonNode(node = node, onEvent = onEvent, modifier = appliedModifier)
         }
 
         is TextInputNode -> {
@@ -2096,10 +2118,6 @@ private fun RenderScaffold(
     modifier: Modifier = Modifier
 ) {
     val chromeShape = ToolkitTheme.shapes.large
-    val chromeBorder = BorderStroke(
-        ToolkitTheme.dimensions.borderUnselected,
-        MaterialTheme.colorScheme.outlineVariant.copy(alpha = ToolkitTheme.opacity.divider)
-    )
     val boardContent = node.content as? BoardNode
 
     Box(
@@ -2122,8 +2140,7 @@ private fun RenderScaffold(
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     shape = chromeShape,
-                    color = MaterialTheme.colorScheme.surfaceContainer,
-                    border = chromeBorder
+                    color = MaterialTheme.colorScheme.surfaceContainer
                 ) {
                     CompositionLocalProvider(
                         LocalInSingleLineHeader provides true,
@@ -2216,8 +2233,7 @@ private fun RenderScaffold(
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     shape = chromeShape,
-                    color = MaterialTheme.colorScheme.surfaceContainer,
-                    border = chromeBorder
+                    color = MaterialTheme.colorScheme.surfaceContainer
                 ) {
                     CompositionLocalProvider(
                         LocalInSingleLineHeader provides true,
@@ -2242,13 +2258,13 @@ private fun RenderFloatingPanel(
     modifier: Modifier = Modifier
 ) {
     var isCollapsed by remember(node.id, node.isCollapsed) { mutableStateOf(node.isCollapsed) }
-    val widthConstraint = if (isCollapsed) {
-        Modifier.widthIn(
+    val widthConstraint = when {
+        node.compact -> Modifier
+        isCollapsed -> Modifier.widthIn(
             min = ToolkitTheme.dimensions.menuMinWidth,
             max = ToolkitTheme.dimensions.sduiFloatingPanelMaxWidth
         )
-    } else {
-        Modifier.widthIn(
+        else -> Modifier.widthIn(
             min = ToolkitTheme.dimensions.sduiFloatingPanelMinWidth,
             max = ToolkitTheme.dimensions.sduiFloatingPanelMaxWidth
         )
@@ -2256,13 +2272,9 @@ private fun RenderFloatingPanel(
 
     Surface(
         modifier = modifier.then(widthConstraint),
-        shape = ToolkitTheme.shapes.large,
+        shape = if (node.compact) ToolkitTheme.shapes.pill else ToolkitTheme.shapes.large,
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        shadowElevation = ToolkitTheme.dimensions.elevationMedium,
-        border = BorderStroke(
-            ToolkitTheme.dimensions.borderUnselected,
-            MaterialTheme.colorScheme.outlineVariant.copy(alpha = ToolkitTheme.opacity.divider)
-        )
+        shadowElevation = ToolkitTheme.dimensions.elevationMedium
     ) {
         Column(
             modifier = Modifier.padding(
