@@ -150,6 +150,31 @@ class PluginAssetFetcherAndUiExtensionsTest {
             hostFileSystem = hostFs
         )
         assertNull(fromDeniedPath, "Denied HostFileSystem paths must fail safely with null")
+
+        val spacedDir = File(allowedDir, "dir with spaces").apply { mkdirs() }
+        val spacedFile = File(spacedDir, "cover page.png").apply { writeBytes(byteArrayOf(7, 8, 9)) }
+        val fromSpacedFileUri = resolveAssetBytes(
+            data = AssetReference.Uri(spacedFile.toURI().toString()),
+            fileSystem = null,
+            hostFileSystem = hostFs
+        )
+        assertContentEquals(byteArrayOf(7, 8, 9), fromSpacedFileUri)
+
+        val nonCanonicalAllowed = File(spacedDir, "../page.png").toURI().toString()
+        val fromNonCanonicalUri = resolveAssetBytes(
+            data = AssetReference.Uri(nonCanonicalAllowed),
+            fileSystem = null,
+            hostFileSystem = hostFs
+        )
+        assertContentEquals(byteArrayOf(42, 43, 44), fromNonCanonicalUri)
+
+        val traversalDeniedUri = File(allowedDir, "../denied/secret.png").toURI().toString()
+        val fromTraversalDenied = resolveAssetBytes(
+            data = AssetReference.Uri(traversalDeniedUri),
+            fileSystem = null,
+            hostFileSystem = hostFs
+        )
+        assertNull(fromTraversalDenied, "Path traversal outside granted HostFileSystem directory must return null")
     }
 
     @Test

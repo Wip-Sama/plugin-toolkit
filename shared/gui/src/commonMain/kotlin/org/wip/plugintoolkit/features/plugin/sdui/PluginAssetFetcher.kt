@@ -49,6 +49,36 @@ val LocalPluginAssetContext = staticCompositionLocalOf { PluginAssetContext() }
  */
 val LocalPluginImageLoader = staticCompositionLocalOf<ImageLoader?> { null }
 
+private fun hexDigitValue(ch: Char): Int = when (ch) {
+    in '0'..'9' -> ch - '0'
+    in 'a'..'f' -> ch - 'a' + 10
+    in 'A'..'F' -> ch - 'A' + 10
+    else -> -1
+}
+
+private fun decodePercentEncodedPath(path: String): String {
+    if ('%' !in path) return path
+    val inputBytes = path.encodeToByteArray()
+    val outputBytes = ByteArray(inputBytes.size)
+    var outIndex = 0
+    var i = 0
+    while (i < inputBytes.size) {
+        val b = inputBytes[i]
+        if (b == '%'.code.toByte() && i + 2 < inputBytes.size) {
+            val high = hexDigitValue(inputBytes[i + 1].toInt().toChar())
+            val low = hexDigitValue(inputBytes[i + 2].toInt().toChar())
+            if (high >= 0 && low >= 0) {
+                outputBytes[outIndex++] = ((high shl 4) or low).toByte()
+                i += 3
+                continue
+            }
+        }
+        outputBytes[outIndex++] = b
+        i++
+    }
+    return outputBytes.decodeToString(0, outIndex)
+}
+
 internal fun extractLocalFilePath(uri: String): String? {
     val trimmed = uri.trim()
     if (trimmed.startsWith("file:", ignoreCase = true)) {
@@ -61,7 +91,7 @@ internal fun extractLocalFilePath(uri: String): String? {
         if (WINDOWS_DRIVE_URI_REGEX.matches(stripped)) {
             stripped = stripped.drop(1)
         }
-        return stripped.takeIf { it.isNotBlank() }
+        return decodePercentEncodedPath(stripped).takeIf { it.isNotBlank() }
     }
     return if (ABSOLUTE_LOCAL_PATH_REGEX.matches(trimmed)) trimmed else null
 }

@@ -10,6 +10,7 @@ import kotlinx.io.readByteArray
 import kotlinx.io.readString
 import kotlinx.io.writeString
 import org.wip.plugintoolkit.api.HostFileSystem
+import java.io.File
 
 /**
  * Internal host filesystem extension enabling dynamic session-scoped grants when a user explicitly
@@ -29,15 +30,24 @@ class HostFileSystemImpl(
     )
 
     override fun grantAccess(absolutePath: String) {
-        if (absolutePath.isBlank()) return
-        val normalized = normalizePath(absolutePath)
+        val normalized = normalizePath(absolutePath) ?: return
         allowedPathsState.update { current ->
             if (current.any { normalizePath(it) == normalized }) current else current.add(normalized)
         }
     }
 
-    private fun normalizePath(pathString: String): String {
-        return Path(pathString).toString().replace('\\', '/')
+    /**
+     * Resolves [pathString] to a canonical path with forward slashes so equivalent representations
+     * (such as Windows 8.3 short paths, mixed separators, symlinks, or `.`/`..` segments) match
+     * consistently against [allowedPathsState] without allowing traversal escapes.
+     */
+    private fun normalizePath(pathString: String): String? {
+        if (pathString.isBlank()) return null
+        return try {
+            File(pathString).canonicalPath.replace('\\', '/')
+        } catch (_: Exception) {
+            null
+        }
     }
 
     private fun isPathAllowed(pathString: String): Boolean {
@@ -45,11 +55,11 @@ class HostFileSystemImpl(
         // If allowedPaths is empty, it means the capability doesn't have any allowed paths configured
         if (currentAllowed.isEmpty()) return false
 
-        val normalizedPath = normalizePath(pathString)
+        val normalizedPath = normalizePath(pathString) ?: return false
 
         // If the path is inside any of the allowedPaths, it is allowed
         return currentAllowed.any { allowed ->
-            val allowedCanonical = normalizePath(allowed)
+            val allowedCanonical = normalizePath(allowed) ?: return@any false
 
             normalizedPath == allowedCanonical || normalizedPath.startsWith(if (allowedCanonical.endsWith("/")) allowedCanonical else "$allowedCanonical/")
         }

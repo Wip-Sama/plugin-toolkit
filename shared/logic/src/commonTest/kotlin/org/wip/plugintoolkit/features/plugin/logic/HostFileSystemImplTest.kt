@@ -9,6 +9,8 @@ import java.io.File
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -123,5 +125,33 @@ class HostFileSystemImplTest {
             SystemPathSecurity.isPathAllowed(allowedDir, FileAccessMode.Unrestricted),
             "Unrestricted mode should allow user paths"
         )
+    }
+
+    @Test
+    fun testCanonicalPathNormalizationPreventsTraversalAndAllowsEquivalentPaths() = runTest {
+        val allowedFile = File(allowedDir, "sub/inside.txt").apply {
+            parentFile?.mkdirs()
+            writeText("inside")
+        }
+        val outsideDir = File(File(allowedDir).parentFile, "test_host_outside_dir").apply { mkdirs() }
+        val outsideFile = File(outsideDir, "secret.txt").apply { writeText("secret") }
+
+        try {
+            val hostFs = HostFileSystemImpl(allowedPaths = listOf(allowedDir), isDestructiveAllowed = false)
+
+            val equivalentPath = "$allowedDir/sub/../sub/inside.txt"
+            assertContentEquals("inside".toByteArray(), hostFs.readFile(equivalentPath))
+            assertContentEquals("inside".toByteArray(), hostFs.readFile(allowedFile.absolutePath.replace('\\', '/')))
+
+            val traversalEscape = "$allowedDir/../test_host_outside_dir/secret.txt"
+            assertFailsWith<SecurityException> {
+                hostFs.readFile(traversalEscape)
+            }
+            assertFailsWith<SecurityException> {
+                hostFs.readFile(outsideFile.canonicalPath)
+            }
+        } finally {
+            outsideDir.deleteRecursively()
+        }
     }
 }
