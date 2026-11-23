@@ -56,8 +56,11 @@ import org.wip.plugintoolkit.api.sdui.FloatingAnchor
 import org.wip.plugintoolkit.api.sdui.GridNode
 import org.wip.plugintoolkit.api.sdui.ImageNode
 import org.wip.plugintoolkit.api.sdui.ListItemNode
+import org.wip.plugintoolkit.api.sdui.LoadingIndicatorNode
 import org.wip.plugintoolkit.api.sdui.NormalizedPoint
 import org.wip.plugintoolkit.api.sdui.NumberInputNode
+import org.wip.plugintoolkit.api.sdui.ProgressBarNode
+import org.wip.plugintoolkit.api.sdui.ProgressBarStyle
 import org.wip.plugintoolkit.api.sdui.RadioGroupNode
 import org.wip.plugintoolkit.api.sdui.ScaffoldNode
 import org.wip.plugintoolkit.api.sdui.SearchBarNode
@@ -1115,7 +1118,7 @@ class CompleteExampleTest {
 
     @Test
     @OptIn(ExperimentalCoroutinesApi::class)
-    fun testChapterPublisherBatch1ControlsAndModifiers() = runTest {
+    fun testChapterPublisherFormAndCodeControls() = runTest {
         val plugin = CompleteExamplePlugin(CompleteExampleSettings(userId = "batch1_tester"))
         val entry = CompleteExamplePluginPluginEntry(plugin)
         val interactiveProcessor = entry.getInteractiveProcessor()?.getOrNull()
@@ -1200,6 +1203,14 @@ class CompleteExampleTest {
                 .first { it.id == "cfg_manifest_code_block" }
             assertEquals("json", codeBlock.language)
             assertTrue(codeBlock.code.contains("\"batchSize\": 12"))
+
+            val runtimeLoader = updatedNodes.filterIsInstance<LoadingIndicatorNode>()
+                .first { it.id == "cfg_runtime_loader" }
+            assertTrue(runtimeLoader.contained)
+
+            val capacityBar = updatedNodes.filterIsInstance<ProgressBarNode>()
+                .first { it.id == "cfg_queue_health_bar" }
+            assertEquals(ProgressBarStyle.WAVY, capacityBar.style)
         } finally {
             job.cancel()
         }

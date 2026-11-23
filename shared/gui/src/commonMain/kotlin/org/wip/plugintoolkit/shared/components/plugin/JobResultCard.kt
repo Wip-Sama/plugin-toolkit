@@ -1,9 +1,6 @@
 package org.wip.plugintoolkit.shared.components.plugin
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.LinearOutSlowInEasing
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -16,6 +13,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.DividerDefaults
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -39,6 +37,7 @@ import org.wip.plugintoolkit.shared.components.ToolkitCard
 /**
  * Result card displaying execution details, progress, output, and console logs for background jobs.
  */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun JobResultCard(
     job: BackgroundJob,
@@ -110,17 +109,18 @@ fun JobResultCard(
                 )
             }
 
+            val motion = MaterialTheme.motionScheme
             // Expanded Details Section
             AnimatedVisibility(
                 visible = expanded,
-                enter = fadeIn(animationSpec = tween(durationMillis = 180, delayMillis = 40, easing = LinearOutSlowInEasing)) +
+                enter = fadeIn(animationSpec = motion.fastEffectsSpec()) +
                         expandVertically(
-                            animationSpec = tween(durationMillis = 220, easing = FastOutSlowInEasing),
+                            animationSpec = motion.defaultSpatialSpec(),
                             expandFrom = Alignment.Top
                         ),
-                exit = fadeOut(animationSpec = tween(durationMillis = 150, easing = FastOutSlowInEasing)) +
+                exit = fadeOut(animationSpec = motion.fastEffectsSpec()) +
                         shrinkVertically(
-                            animationSpec = tween(durationMillis = 200, easing = FastOutSlowInEasing),
+                            animationSpec = motion.defaultSpatialSpec(),
                             shrinkTowards = Alignment.Top
                         )
             ) {

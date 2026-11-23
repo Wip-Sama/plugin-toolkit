@@ -6,7 +6,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CornerBasedShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.MaterialExpressiveTheme
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MotionScheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.Typography
@@ -151,6 +154,12 @@ data class Dimensions(
     val sduiNumberInputMinWidth: Dp = 156.dp,
     val sduiZoomDialogMinWidth: Dp = 640.dp,
     val sduiZoomDialogMinHeight: Dp = 440.dp,
+    val loadingIndicatorSmallSize: Dp = 24.dp,
+    val loadingIndicatorMediumSize: Dp = 40.dp,
+    val loadingIndicatorLargeSize: Dp = 56.dp,
+    val wavyProgressHeight: Dp = 10.dp,
+    val wavyCircularSize: Dp = 40.dp,
+    val wavyCircularSmallSize: Dp = 24.dp,
     val windowResizeBorderThickness: Dp = 6.dp,
     val windowResizeCornerSize: Dp = 14.dp,
     val flowControlsTooltipWidth: Dp = 660.dp,
@@ -288,19 +297,56 @@ data class Opacity(
     val disabledContent: Float = 0.5f
 )
 
+private fun TextStyle.emphasized(weight: FontWeight = FontWeight.Bold): TextStyle =
+    copy(fontWeight = weight)
+
+private val BaseDisplayLarge = TextStyle(fontSize = 36.sp, lineHeight = 44.sp, fontWeight = FontWeight.Bold)
+private val BaseDisplayMedium = TextStyle(fontSize = 32.sp, lineHeight = 40.sp, fontWeight = FontWeight.Bold)
+private val BaseDisplaySmall = TextStyle(fontSize = 28.sp, lineHeight = 36.sp, fontWeight = FontWeight.SemiBold)
+private val BaseHeadlineLarge = TextStyle(fontSize = 28.sp, lineHeight = 36.sp, fontWeight = FontWeight.Bold)
+private val BaseHeadlineMedium = TextStyle(fontSize = 24.sp, lineHeight = 32.sp, fontWeight = FontWeight.Bold)
+private val BaseHeadlineSmall = TextStyle(fontSize = 20.sp, lineHeight = 28.sp, fontWeight = FontWeight.SemiBold)
+private val BaseTitleLarge = TextStyle(fontSize = 18.sp, lineHeight = 24.sp, fontWeight = FontWeight.SemiBold)
+private val BaseTitleMedium = TextStyle(fontSize = 15.sp, lineHeight = 20.sp, fontWeight = FontWeight.Medium)
+private val BaseTitleSmall = TextStyle(fontSize = 13.sp, lineHeight = 18.sp, fontWeight = FontWeight.Medium)
+private val BaseBodyLarge = TextStyle(fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.Normal)
+private val BaseBodyMedium = TextStyle(fontSize = 13.sp, lineHeight = 18.sp, fontWeight = FontWeight.Normal)
+private val BaseBodySmall = TextStyle(fontSize = 12.sp, lineHeight = 16.sp, fontWeight = FontWeight.Normal)
+private val BaseLabelLarge = TextStyle(fontSize = 13.sp, lineHeight = 16.sp, fontWeight = FontWeight.Medium)
+private val BaseLabelMedium = TextStyle(fontSize = 11.sp, lineHeight = 14.sp, fontWeight = FontWeight.Medium)
+private val BaseLabelSmall = TextStyle(fontSize = 10.sp, lineHeight = 12.sp, fontWeight = FontWeight.Medium)
+
 val DesktopTypography = Typography(
-    headlineLarge = TextStyle(fontSize = 28.sp, lineHeight = 36.sp, fontWeight = FontWeight.Bold),
-    headlineMedium = TextStyle(fontSize = 24.sp, lineHeight = 32.sp, fontWeight = FontWeight.Bold),
-    headlineSmall = TextStyle(fontSize = 20.sp, lineHeight = 28.sp, fontWeight = FontWeight.SemiBold),
-    titleLarge = TextStyle(fontSize = 18.sp, lineHeight = 24.sp, fontWeight = FontWeight.SemiBold),
-    titleMedium = TextStyle(fontSize = 15.sp, lineHeight = 20.sp, fontWeight = FontWeight.Medium),
-    titleSmall = TextStyle(fontSize = 13.sp, lineHeight = 18.sp, fontWeight = FontWeight.Medium),
-    bodyLarge = TextStyle(fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.Normal),
-    bodyMedium = TextStyle(fontSize = 13.sp, lineHeight = 18.sp, fontWeight = FontWeight.Normal),
-    bodySmall = TextStyle(fontSize = 12.sp, lineHeight = 16.sp, fontWeight = FontWeight.Normal),
-    labelLarge = TextStyle(fontSize = 13.sp, lineHeight = 16.sp, fontWeight = FontWeight.Medium),
-    labelMedium = TextStyle(fontSize = 11.sp, lineHeight = 14.sp, fontWeight = FontWeight.Medium),
-    labelSmall = TextStyle(fontSize = 10.sp, lineHeight = 12.sp, fontWeight = FontWeight.Medium)
+    displayLarge = BaseDisplayLarge,
+    displayMedium = BaseDisplayMedium,
+    displaySmall = BaseDisplaySmall,
+    headlineLarge = BaseHeadlineLarge,
+    headlineMedium = BaseHeadlineMedium,
+    headlineSmall = BaseHeadlineSmall,
+    titleLarge = BaseTitleLarge,
+    titleMedium = BaseTitleMedium,
+    titleSmall = BaseTitleSmall,
+    bodyLarge = BaseBodyLarge,
+    bodyMedium = BaseBodyMedium,
+    bodySmall = BaseBodySmall,
+    labelLarge = BaseLabelLarge,
+    labelMedium = BaseLabelMedium,
+    labelSmall = BaseLabelSmall,
+    displayLargeEmphasized = BaseDisplayLarge.emphasized(FontWeight.ExtraBold),
+    displayMediumEmphasized = BaseDisplayMedium.emphasized(FontWeight.ExtraBold),
+    displaySmallEmphasized = BaseDisplaySmall.emphasized(FontWeight.Bold),
+    headlineLargeEmphasized = BaseHeadlineLarge.emphasized(FontWeight.ExtraBold),
+    headlineMediumEmphasized = BaseHeadlineMedium.emphasized(FontWeight.ExtraBold),
+    headlineSmallEmphasized = BaseHeadlineSmall.emphasized(FontWeight.Bold),
+    titleLargeEmphasized = BaseTitleLarge.emphasized(FontWeight.Bold),
+    titleMediumEmphasized = BaseTitleMedium.emphasized(FontWeight.Bold),
+    titleSmallEmphasized = BaseTitleSmall.emphasized(FontWeight.Bold),
+    bodyLargeEmphasized = BaseBodyLarge.emphasized(FontWeight.SemiBold),
+    bodyMediumEmphasized = BaseBodyMedium.emphasized(FontWeight.SemiBold),
+    bodySmallEmphasized = BaseBodySmall.emphasized(FontWeight.SemiBold),
+    labelLargeEmphasized = BaseLabelLarge.emphasized(FontWeight.Bold),
+    labelMediumEmphasized = BaseLabelMedium.emphasized(FontWeight.Bold),
+    labelSmallEmphasized = BaseLabelSmall.emphasized(FontWeight.Bold)
 )
 
 val LocalSpacing = staticCompositionLocalOf { Spacing() }
@@ -314,7 +360,10 @@ data class ToolkitShapes(
     val small: CornerBasedShape = RoundedCornerShape(8.dp),
     val medium: CornerBasedShape = RoundedCornerShape(12.dp),
     val large: CornerBasedShape = RoundedCornerShape(16.dp),
-    val extraLarge: CornerBasedShape = RoundedCornerShape(24.dp),
+    val largeIncreased: CornerBasedShape = RoundedCornerShape(20.dp),
+    val extraLarge: CornerBasedShape = RoundedCornerShape(28.dp),
+    val extraLargeIncreased: CornerBasedShape = RoundedCornerShape(32.dp),
+    val extraExtraLarge: CornerBasedShape = RoundedCornerShape(48.dp),
     val pill: CornerBasedShape = RoundedCornerShape(percent = 50),
     val startActionRow: CornerBasedShape = RoundedCornerShape(
         topStart = 16.dp, topEnd = 16.dp, bottomStart = 4.dp, bottomEnd = 4.dp
@@ -330,7 +379,10 @@ data class ToolkitShapes(
         small = small,
         medium = medium,
         large = large,
-        extraLarge = extraLarge
+        extraLarge = extraLarge,
+        largeIncreased = largeIncreased,
+        extraLargeIncreased = extraLargeIncreased,
+        extraExtraLarge = extraExtraLarge
     )
 }
 
@@ -367,6 +419,12 @@ object ToolkitTheme {
         @ReadOnlyComposable
         get() = MaterialTheme.typography
 
+    @OptIn(ExperimentalMaterial3ExpressiveApi::class)
+    val motionScheme: MotionScheme
+        @Composable
+        @ReadOnlyComposable
+        get() = MaterialTheme.motionScheme
+
     val codeFontFamily: FontFamily
         @Composable
         get() = FontFamily(
@@ -389,8 +447,13 @@ private val DarkColorScheme = ColorEngine.createStandardScheme(Color(0xFF6750A4)
 private val LightColorScheme = ColorEngine.createStandardScheme(Color(0xFF6750A4), isDark = false, isAmoled = false)
 private val AmoledColorScheme = ColorEngine.createStandardScheme(Color(0xFF6750A4), isDark = true, isAmoled = true)
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun AppTheme(appearance: AppearanceSettings, content: @Composable () -> Unit) {
+fun AppTheme(
+    appearance: AppearanceSettings,
+    motionScheme: MotionScheme = MotionScheme.expressive(),
+    content: @Composable () -> Unit
+) {
     val darkTheme =
         when (appearance.theme) {
             AppTheme.System -> isSystemInDarkTheme()
@@ -439,13 +502,28 @@ fun AppTheme(appearance: AppearanceSettings, content: @Composable () -> Unit) {
         LocalShapes provides ToolkitShapes(),
         LocalTypography provides DesktopTypography
     ) {
-        MaterialTheme(
+        MaterialExpressiveTheme(
             colorScheme = colorScheme,
-            typography = DesktopTypography,
+            motionScheme = motionScheme,
             shapes = LocalShapes.current.material,
+            typography = DesktopTypography,
             content = content
         )
     }
+}
+
+/**
+ * Overrides the ambient Material 3 [MotionScheme] to [MotionScheme.standard] for high-density
+ * utilitarian subtrees (such as sortable data tables or dense property inspectors) to prevent
+ * repetitive spring bounce.
+ */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+fun StandardMotionScope(content: @Composable () -> Unit) {
+    MaterialTheme(
+        motionScheme = MotionScheme.standard(),
+        content = content
+    )
 }
 
 @Preview

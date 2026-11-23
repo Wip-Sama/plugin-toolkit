@@ -15,6 +15,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -108,6 +109,7 @@ import plugintoolkit.composeapp.generated.resources.flow_export_image_error
 import plugintoolkit.composeapp.generated.resources.flow_export_image_save_success
 import org.wip.plugintoolkit.features.navigation.GlobalRouter
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun FlowEditorView(
     viewModel: FlowEditorViewModel,
@@ -846,10 +848,7 @@ fun FlowEditorView(
                         val targetAlpha = if (isDimmed) ToolkitTheme.opacity.disabled else 1f
                         val animatedAlpha by androidx.compose.animation.core.animateFloatAsState(
                             targetValue = targetAlpha,
-                            animationSpec = androidx.compose.animation.core.tween(
-                                durationMillis = 200,
-                                delayMillis = if (isDimmed) 500 else 0
-                            ),
+                            animationSpec = MaterialTheme.motionScheme.fastEffectsSpec(),
                             label = "NodeAlpha"
                         )
 

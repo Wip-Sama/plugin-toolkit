@@ -7,7 +7,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
-class SduiStage5Batch1SerializationTest {
+class SduiFormAndCodeSerializationTest {
 
     private val json = Json {
         encodeDefaults = false

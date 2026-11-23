@@ -1,7 +1,6 @@
 package org.wip.plugintoolkit.ui
 
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -12,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -38,6 +38,7 @@ import org.wip.plugintoolkit.ui.titlebar.TitleBarLeftOffsetSync
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.app_name
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun AppScaffold(
     settings: AppSettings,
@@ -60,7 +61,7 @@ fun AppScaffold(
     var isNavbarCollapsed by remember { mutableStateOf(initialCollapsed) }
     val layoutSidebarWidth by animateDpAsState(
         targetValue = if (isNavbarCollapsed) ToolkitTheme.dimensions.sidebarCollapsedWidth else ToolkitTheme.dimensions.sidebarExpandedWidth,
-        animationSpec = tween(durationMillis = 200)
+        animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec()
     )
 
     val useCustomTitleBar = settings.appearance.useCustomTitleBar

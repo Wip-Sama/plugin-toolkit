@@ -34,7 +34,7 @@ class MinimalPluginTest {
 
     @Test
     fun testGeneratedManifestAndPluginContextDefaults() {
-        assertEquals("4.1.0-alpha01", ApiConfig.VERSION)
+        assertEquals("4.1.0-alpha02", ApiConfig.VERSION)
         val manifest = MinimalPluginManifest.manifest
         assertEquals("org.wip.minimal", manifest.plugin.id)
         assertEquals("Minimal Example Plugin", manifest.plugin.name)

@@ -13,6 +13,7 @@ import org.wip.plugintoolkit.api.sdui.ErrorBoundaryNode
 import org.wip.plugintoolkit.api.sdui.FloatingPanelNode
 import org.wip.plugintoolkit.api.sdui.GridNode
 import org.wip.plugintoolkit.api.sdui.ListItemNode
+import org.wip.plugintoolkit.api.sdui.LoadingIndicatorNode
 import org.wip.plugintoolkit.api.sdui.NumberInputNode
 import org.wip.plugintoolkit.api.sdui.ProgressBarNode
 import org.wip.plugintoolkit.api.sdui.RadioGroupNode
@@ -272,14 +273,17 @@ object UiAstSanitizer {
             }
 
             if (node is ProgressBarNode) {
-                val p = node.progress
-                val sp = node.secondaryProgress
-                val invalidP = p != null && (p.isNaN() || p.isInfinite() || p < 0f || p > 1f)
-                val invalidSp = sp != null && (sp.isNaN() || sp.isInfinite() || sp < 0f || sp > 1f)
-                if (invalidP || invalidSp) {
-                    val safeP = if (p == null || p.isNaN() || p.isInfinite()) null else p.coerceIn(0f, 1f)
-                    val safeSp = if (sp == null || sp.isNaN() || sp.isInfinite()) null else sp.coerceIn(0f, 1f)
+                val safeP = sanitizeUnitFraction(node.progress)
+                val safeSp = sanitizeUnitFraction(node.secondaryProgress)
+                if (safeP != node.progress || safeSp != node.secondaryProgress) {
                     return node.copy(progress = safeP, secondaryProgress = safeSp)
+                }
+            }
+
+            if (node is LoadingIndicatorNode) {
+                val safeP = sanitizeUnitFraction(node.progress)
+                if (safeP != node.progress) {
+                    return node.copy(progress = safeP)
                 }
             }
 
@@ -411,6 +415,11 @@ object UiAstSanitizer {
 
         val sanitizedRoot = sanitizeNode(tree.root, depth = 1)
         return tree.copy(root = sanitizedRoot)
+    }
+
+    private fun sanitizeUnitFraction(value: Float?): Float? {
+        if (value == null) return null
+        return if (value.isNaN() || value.isInfinite()) null else value.coerceIn(0f, 1f)
     }
 }
 

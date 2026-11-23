@@ -242,7 +242,8 @@ Every DSL call inside `uiTree { ... }` builds immutable `UiNode` models with det
 | `image(...)` | `ImageNode` | `asset: AssetReference`, `id`, `contentDescription`, `contentScale: ImageScale = ImageScale.FIT`, `clickable = false`, `action = null`, `selected = false`, `badgeText = null`, `modifier`, `zoomable = false` |
 | `icon(...)` | `IconNode` | `name: String`, `id`, `tint: SemanticColor? = null`, `size: ControlSize = ControlSize.MEDIUM`, `modifier` |
 | `badge(...)` | `BadgeNode` | `text: String`, `id`, `color: SemanticColor = SemanticColor.PRIMARY`, `modifier` |
-| `progressBar(...)` | `ProgressBarNode` | `id`, `progress: Float? = null` (`null` = indeterminate), `secondaryProgress: Float? = null`, `label`, `statusText`, `isCircular = false`, `color: SemanticColor = SemanticColor.PRIMARY`, `modifier` |
+| `progressBar(...)` | `ProgressBarNode` | `id`, `progress: Float? = null` (`null` = indeterminate), `secondaryProgress: Float? = null`, `label`, `statusText`, `isCircular = false`, `color: SemanticColor = SemanticColor.PRIMARY`, `modifier`, `style: ProgressBarStyle = ProgressBarStyle.STANDARD` (`WAVY`, `MORPHING_INDICATOR`, `CONTAINED_INDICATOR`) |
+| `loadingIndicator(...)` | `LoadingIndicatorNode` | `label`, `id`, `contained = false`, `progress: Float? = null`, `color: SemanticColor = SemanticColor.PRIMARY`, `size: ControlSize = ControlSize.MEDIUM`, `modifier` |
 | `alertBanner(...)` | `AlertBannerNode` | `message`, `id`, `title`, `severity: SemanticColor = SemanticColor.INFO`, `iconName`, `actionLabel`, `modifier` |
 | `emptyState(...)` | `EmptyStateNode` | `title`, `id`, `description`, `iconName = "info"`, `actionLabel`, `modifier` |
 

@@ -4,7 +4,6 @@ import org.wip.plugintoolkit.core.model.resolve
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -24,6 +23,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -55,7 +55,7 @@ import org.wip.plugintoolkit.shared.components.verticalFadingEdges
 import org.wip.plugintoolkit.ui.titlebar.WindowDraggableArea
 import org.wip.plugintoolkit.ui.titlebar.nonDraggableTitleBar
 
-@OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
+@OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun <T> NavigationSidebar(
     title: LocalizedString,
@@ -77,9 +77,10 @@ fun <T> NavigationSidebar(
     // If navbar is collapsed, it can temporarily expand on hover
     val isActuallyExpanded = !canCollapse || !isNavbarCollapsed || isHovered
 
+    val motion = MaterialTheme.motionScheme
     val sidebarWidth by animateDpAsState(
         targetValue = if (isActuallyExpanded) ToolkitTheme.dimensions.sidebarExpandedWidth else ToolkitTheme.dimensions.sidebarCollapsedWidth,
-        animationSpec = tween(durationMillis = 200)
+        animationSpec = motion.defaultSpatialSpec()
     )
 
     Surface(
@@ -120,8 +121,8 @@ fun <T> NavigationSidebar(
                     val titleContent = @Composable {
                         AnimatedVisibility(
                             visible = isActuallyExpanded && resolvedTitle.isNotBlank(),
-                            enter = fadeIn(tween(150)) + expandHorizontally(tween(200)),
-                            exit = fadeOut(tween(100)) + shrinkHorizontally(tween(200))
+                            enter = fadeIn(motion.fastEffectsSpec()) + expandHorizontally(motion.defaultSpatialSpec()),
+                            exit = fadeOut(motion.fastEffectsSpec()) + shrinkHorizontally(motion.defaultSpatialSpec())
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 if (canCollapse) {

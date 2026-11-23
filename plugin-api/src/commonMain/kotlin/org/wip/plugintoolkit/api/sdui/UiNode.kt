@@ -412,9 +412,24 @@ data class IconButtonNode(
     override val modifier: UiModifier = UiModifier.None
 ) : UiNode
 
+/**
+ * Visual style preset for [ProgressBarNode].
+ */
+@Serializable
+enum class ProgressBarStyle {
+    STANDARD,
+    WAVY,
+    MORPHING_INDICATOR,
+    CONTAINED_INDICATOR
+}
+
+/**
+ * Progress indicator node supporting standard linear/circular bars, M3 Expressive wavy tracks,
+ * and morphing polygon loading indicators.
+ */
 @Serializable
 @SerialName("progress_bar")
-data class ProgressBarNode(
+data class ProgressBarNode @JvmOverloads constructor(
     override val id: String,
     val progress: Float? = null,
     val secondaryProgress: Float? = null,
@@ -422,6 +437,23 @@ data class ProgressBarNode(
     val statusText: String? = null,
     val isCircular: Boolean = false,
     val color: SemanticColor = SemanticColor.PRIMARY,
+    override val modifier: UiModifier = UiModifier.None,
+    val style: ProgressBarStyle = ProgressBarStyle.STANDARD
+) : UiNode
+
+/**
+ * Standalone Material 3 Expressive morphing [LoadingIndicatorNode] for indeterminate or
+ * bounded loading states.
+ */
+@Serializable
+@SerialName("loading_indicator")
+data class LoadingIndicatorNode @JvmOverloads constructor(
+    override val id: String,
+    val label: String? = null,
+    val contained: Boolean = false,
+    val progress: Float? = null,
+    val color: SemanticColor = SemanticColor.PRIMARY,
+    val size: ControlSize = ControlSize.MEDIUM,
     override val modifier: UiModifier = UiModifier.None
 ) : UiNode
 
@@ -701,6 +733,7 @@ object UiNodeSerializer : KSerializer<UiNode> {
             is IconNode -> "icon"
             is IconButtonNode -> "icon_button"
             is ProgressBarNode -> "progress_bar"
+            is LoadingIndicatorNode -> "loading_indicator"
             is TabsNode -> "tabs"
             is ListItemNode -> "list_item"
             is CheckboxNode -> "checkbox"
@@ -761,6 +794,7 @@ object UiNodeSerializer : KSerializer<UiNode> {
             is SearchBarNode -> jsonEncoder.json.encodeToJsonElement(SearchBarNode.serializer(), value)
             is AccordionNode -> jsonEncoder.json.encodeToJsonElement(AccordionNode.serializer(), value)
             is CodeBlockNode -> jsonEncoder.json.encodeToJsonElement(CodeBlockNode.serializer(), value)
+            is LoadingIndicatorNode -> jsonEncoder.json.encodeToJsonElement(LoadingIndicatorNode.serializer(), value)
             is BoardNode -> jsonEncoder.json.encodeToJsonElement(BoardNode.serializer(), value)
             is ErrorBoundaryNode -> jsonEncoder.json.encodeToJsonElement(ErrorBoundaryNode.serializer(), value)
             is UnknownNode -> jsonEncoder.json.encodeToJsonElement(UnknownNodeCustomSerializer, value)
@@ -799,6 +833,7 @@ object UiNodeSerializer : KSerializer<UiNode> {
             "icon" -> IconNode.serializer()
             "icon_button" -> IconButtonNode.serializer()
             "progress_bar" -> ProgressBarNode.serializer()
+            "loading_indicator" -> LoadingIndicatorNode.serializer()
             "tabs" -> TabsNode.serializer()
             "list_item" -> ListItemNode.serializer()
             "checkbox" -> CheckboxNode.serializer()

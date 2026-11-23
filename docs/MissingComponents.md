@@ -7,15 +7,15 @@ This document summarizes the UI components, Material 3 Expressive primitives, an
 
 ---
 
-## Current Baseline (Verified in Codebase — App `4.1.0-alpha01`)
+## Current Baseline (Verified in Codebase — App `4.1.0-alpha02`)
 
 - **Compose / Material 3 Versions** (`gradle/libs.versions.toml`): `compose-multiplatform = "1.12.0"`, `material3 = "1.12.0-alpha03"`.
-- **SDUI `UiNode` Catalog** (`plugin-api/.../sdui/UiNode.kt`): 41 `UiNode` types (39 author-facing + `UnknownNode` and `ErrorBoundaryNode`):
+- **SDUI `UiNode` Catalog** (`plugin-api/.../sdui/UiNode.kt`): 42 `UiNode` types (40 author-facing + `UnknownNode` and `ErrorBoundaryNode`):
   - **Layout & Shell:** `ColumnNode`, `RowNode`, `BoxNode`, `CardNode`, `ScrollableColumnNode`, `ScrollableRowNode`, `GridNode`, `SplitPaneNode`, `ScaffoldNode`, `SidebarNode`, `FloatingPanelNode`, `TabsNode`, `AccordionNode`, `DialogNode`, `SpacerNode`, `DividerNode`.
   - **Controls & Inputs:** `ButtonNode`, `ButtonGroupNode`, `SplitButtonNode`, `IconButtonNode`, `TextInputNode` (with `isSecret`), `NumberInputNode`, `SearchBarNode`, `RadioGroupNode`, `ToggleNode`, `CheckboxNode`, `DropdownNode`, `SliderNode`, `ChipGroupNode`, `ListItemNode`.
-  - **Display, Media & Canvas:** `TextNode` (`selectable`, `maxLines`, `overflowEllipsis`), `CodeBlockNode`, `ImageNode` (`zoomable`), `IconNode`, `BadgeNode`, `ProgressBarNode`, `AlertBannerNode`, `EmptyStateNode`, `BoardNode`.
+  - **Display, Media & Canvas:** `TextNode` (`selectable`, `maxLines`, `overflowEllipsis`), `CodeBlockNode`, `ImageNode` (`zoomable`), `IconNode`, `BadgeNode`, `ProgressBarNode` (`ProgressBarStyle`), `LoadingIndicatorNode`, `AlertBannerNode`, `EmptyStateNode`, `BoardNode`.
   - **Universal Modifiers (`UiModifier`):** `ShapeRole` (`cornerRadius`), `tooltip`, `contextMenu` (`ActionMenuItem`).
-- **Host Shared Components** (`shared/gui/.../shared/components/`): `ToolkitButtonGroup`, `ToolkitCard`, `ToolkitChip`, `ToolkitTextField`, `ToolkitDropdownMenu`, `ExpressiveMenu`, `UnscaledExpressiveMenu`, `SelectedButtonGroup`, `SectionHeader`, `ToastHost`, `Tooltip` (`Modifier.tooltip`), `ZoomControls`, `NavigationSidebar` / `SidebarContainer`, `PlatformVerticalScrollbar` / `PlatformHorizontalScrollbar`, and parameter input widgets (`ColorInput`, `EnumDropdownInput`, `FileInput`, `PrimitiveInputs`).
+- **Host Theme & Shared Components** (`shared/gui/...`): `MaterialExpressiveTheme`, `MotionScheme.expressive()` + `StandardMotionScope`, 8-step `Shapes`, dual Baseline/`*Emphasized` `DesktopTypography`, `NormalizedMorphShape`, `ToolkitSplitButton` (`SplitButtonLayout`), `ToolkitConnectedToggleGroup`, `ToolkitLoadingIndicator`, `ToolkitLinearProgressIndicator`, `ToolkitCircularProgressIndicator`, `ToolkitButtonGroup`, `ToolkitCard`, `ToolkitChip`, `ToolkitTextField`, `ToolkitDropdownMenu`, `ExpressiveMenu`, `UnscaledExpressiveMenu`, `SelectedButtonGroup`, `SectionHeader`, `ToastHost`, `Tooltip`, `ZoomControls`, `NavigationSidebar` / `SidebarContainer`, `PlatformVerticalScrollbar` / `PlatformHorizontalScrollbar`, `PlatformContextMenuArea`, and parameter input widgets (`ColorInput`, `EnumDropdownInput`, `FileInput`, `PrimitiveInputs`).
 
 ---
 
@@ -63,7 +63,7 @@ This document summarizes the UI components, Material 3 Expressive primitives, an
 | :--- | :--- | :--- | :--- |
 | **Floating Toolbar** | `FloatingToolbarNode` | Canvas/editor tools must currently use `FloatingPanelNode` + `RowNode` instead of M3 Expressive `HorizontalFloatingToolbar` / `VerticalFloatingToolbar`. | `orientation` (horizontal/vertical), `vibrant: Boolean`, `expanded: Boolean`, optional attached FAB action. |
 | **Floating Action Button & FAB Menu** | `FabNode` / `FabMenuNode` | No FAB or `FloatingActionButtonMenu` node for primary workspace creation + 3–6 sub-actions. | Standard/small/extended FAB, or `ToggleFloatingActionButton` expanding `ActionMenuItem`s. |
-| **Expressive Loading & Wavy Progress** | `LoadingIndicatorNode` / `ProgressBarNode` variant | `ProgressBarNode` renders standard `LinearProgressIndicator` / `CircularProgressIndicator`; no M3 Expressive `LoadingIndicator`, `ContainedLoadingIndicator`, or wavy progress indicators. | `style` (`STANDARD`, `WAVY`, `MORPHING_INDICATOR`, `CONTAINED_INDICATOR`). |
+| **Expressive Loading & Wavy Progress** *(Implemented — Batch 2)* | `LoadingIndicatorNode` / `ProgressBarNode.style` | Implemented (`ProgressBarStyle.STANDARD`/`WAVY`/`MORPHING_INDICATOR`/`CONTAINED_INDICATOR` and standalone `LoadingIndicatorNode`). | `style` (`STANDARD`, `WAVY`, `MORPHING_INDICATOR`, `CONTAINED_INDICATOR`). |
 | **Image Comparison / Diff Slider** | `ImageCompareNode` | Image-processing plugins (upscaling, translation, cleaning) have no before/after split-handle viewer. | `beforeAsset`, `afterAsset`, `splitPosition`, synchronized zoom/pan. |
 | **Audio / Video Preview** | `MediaPlayerNode` | Only static `ImageNode` is supported; no audio/video playback node for multimedia plugins. | `asset: AssetReference`, play/pause, scrub bar, duration display. |
 
@@ -87,11 +87,11 @@ Auditing `shared/gui` against the project's `m3-*` skill suite (`m3-desktop-expr
 
 | Missing / Legacy Gap | Target API / Token | Current State in `shared/gui` |
 | :--- | :--- | :--- |
-| **`MaterialExpressiveTheme` wrapper** | `MaterialExpressiveTheme(colorScheme, motionScheme, shapes, typography)` | `AppTheme` in `core/theme/Theme.kt` calls standard `MaterialTheme(...)`. |
-| **`MotionScheme` physics engine** | `MotionScheme.expressive()` / `MotionScheme.standard()`, `*SpatialSpec()`, `*EffectsSpec()` | No `MotionScheme` configured; animations rely on ad-hoc specs (`AnimationScaling.kt`). |
-| **8-step Expressive `Shapes` scale** | `Shapes` with `largeIncreased`, `extraLargeIncreased`, `extraExtraLarge` | `ToolkitShapes.material` only sets the 5 legacy M3 shape tiers (`extraSmall`..`extraLarge`). |
-| **Dual Typography scale** | Baseline + Emphasized typography styles (`*Emphasized`) | `DesktopTypography` defines a single baseline 12-style scale. |
-| **`MaterialShapes` morphing** | 35 `RoundedPolygon` shapes & `Morph` transitions | Not used anywhere in `shared/gui`. |
+| **`MaterialExpressiveTheme` wrapper** *(Implemented — Batch 2)* | `MaterialExpressiveTheme(colorScheme, motionScheme, shapes, typography)` | `AppTheme` calls `MaterialExpressiveTheme` with `MotionScheme.expressive()` + `StandardMotionScope`. |
+| **`MotionScheme` physics engine** *(Implemented — Batch 2)* | `MotionScheme.expressive()` / `MotionScheme.standard()`, `*SpatialSpec()`, `*EffectsSpec()` | Spring motion wired into `AppScaffold`, `NavigationSidebar`, `SidebarItem`, `ToolkitCard`, `SettingsItem`, `NodeInputSection`, `NodeOutputSection`, `JobResultCard`, `FlowEditorView`, and SDUI controls. |
+| **8-step Expressive `Shapes` scale** *(Implemented — Batch 2)* | `Shapes` with `largeIncreased`, `extraLargeIncreased`, `extraExtraLarge` | `ToolkitShapes` defines and passes all 8 corner steps (`4.dp`–`48.dp`) into `MaterialTheme.shapes`. |
+| **Dual Typography scale** *(Implemented — Batch 2)* | Baseline + Emphasized typography styles (`*Emphasized`) | `DesktopTypography` defines all 30 baseline and emphasized `TextStyle`s. |
+| **`MaterialShapes` morphing** *(Implemented — Batch 2)* | 35 `RoundedPolygon` shapes & `Morph` transitions | `NormalizedMorphShape` and `rememberMorphShape` implemented in `core/theme/NormalizedMorphShape.kt`. |
 
 ### 2.2 Adaptive Layout & Navigation Scaffolds
 
@@ -108,11 +108,11 @@ Auditing `shared/gui` against the project's `m3-*` skill suite (`m3-desktop-expr
 | Missing Component | Target M3 Expressive API | Current State in `shared/gui` |
 | :--- | :--- | :--- |
 | **Floating Canvas / Editor Toolbars** | `HorizontalFloatingToolbar` & `VerticalFloatingToolbar` (+ `VibrantFloatingActionButton`) | Not present in `shared/gui` (useful for Flow Editor, BoardNode, and preview panes). |
-| **Native M3 Split Button** | `SplitButtonLayout` (`LeadingButton` / `TrailingButton`) | `SduiExpressiveControls.kt` manually composes `ToolkitButtonGroup` + `ToolkitDropdownMenu`; no shared `ToolkitSplitButton` or `SplitButtonLayout` wrapper exists for host screens. |
+| **Native M3 Split Button** *(Implemented — Batch 2)* | `SplitButtonLayout` (`LeadingButton` / `TrailingButton`) | Added `ToolkitSplitButton` using `SplitButtonLayout`, `SplitButtonDefaults`, spring chevron rotation, and `ToolkitDropdownMenu`. |
 | **FAB & Expandable FAB Menu** | `FloatingActionButtonMenu`, `ToggleFloatingActionButton`, `SmallExtendedFloatingActionButton` | Not present in `shared/components`. |
-| **Morphing Loading Indicator** | `LoadingIndicator` & `ContainedLoadingIndicator` | Screens and SDUI still use standard `CircularProgressIndicator` for indeterminate loading. |
-| **Wavy Progress Indicators** | `LinearWavyProgressIndicator` & `CircularWavyProgressIndicator` | Screens, `ToastHost`, and SDUI still use straight `LinearProgressIndicator` / `CircularProgressIndicator`. |
-| **Overflow-Capable ButtonGroup & Connected `ToggleButton`** | `ButtonGroup` (`overflowIndicator`) & `ToggleButton` (`ButtonGroupDefaults.connected*ButtonShapes()`) | `ToolkitButtonGroup` is a custom `Row` wrapper without overflow collapse or M3 `15%` press/expand width morphing. |
+| **Morphing Loading Indicator** *(Implemented — Batch 2)* | `LoadingIndicator` & `ContainedLoadingIndicator` | Added `ToolkitLoadingIndicator` + SDUI `LoadingIndicatorNode` (`CheckForUpdatesControl`, `DynamicUiRenderer`). |
+| **Wavy Progress Indicators** *(Implemented — Batch 2)* | `LinearWavyProgressIndicator` & `CircularWavyProgressIndicator` | Added `ToolkitLinearProgressIndicator` / `ToolkitCircularProgressIndicator` + SDUI `ProgressBarStyle.WAVY` (`JobExecutionInfoSection`, `JobResultCardComponents`). |
+| **Overflow-Capable ButtonGroup & Connected `ToggleButton`** *(Implemented — Batch 2)* | `ButtonGroup` (`overflowIndicator`) & `ToggleButton` (`ButtonGroupDefaults.connected*ButtonShapes()`) | Added `ToolkitConnectedToggleGroup` with M3 `ToggleButton` and `ButtonGroupDefaults.connected*ButtonShapes()`; `ButtonGroup` overflow remains for Batch 5/6. |
 
 ### 2.4 Missing Reusable Desktop Components in `shared/components`
 

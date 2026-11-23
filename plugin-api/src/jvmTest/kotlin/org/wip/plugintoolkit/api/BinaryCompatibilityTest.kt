@@ -180,7 +180,7 @@ class BinaryCompatibilityTest {
     }
 
     @Test
-    fun testBatch1SduiLegacyConstructorsExistInJvmBytecode() {
+    fun testSduiModifiersAndTextImageLegacyConstructorsExistInJvmBytecode() {
         val modifierConstructor = org.wip.plugintoolkit.api.sdui.UiModifier::class.java.getConstructor(
             org.wip.plugintoolkit.api.sdui.SpacingSize::class.java,
             Float::class.javaObjectType,
@@ -235,6 +235,40 @@ class BinaryCompatibilityTest {
             Boolean::class.javaPrimitiveType,
             String::class.java
         )
-        assertNotNull(imageConstructor, "9-arg legacy constructor for ImageNode must exist")
+        val imageNodeConstructor = imageConstructor.newInstance(
+            "img1",
+            org.wip.plugintoolkit.api.sdui.AssetReference.Relative("cover.png"),
+            "Cover",
+            org.wip.plugintoolkit.api.sdui.UiModifier.None,
+            org.wip.plugintoolkit.api.sdui.ImageScale.FIT,
+            false,
+            null,
+            false,
+            null
+        )
+        assertEquals(false, imageNodeConstructor.zoomable)
+
+        val progressConstructor = org.wip.plugintoolkit.api.sdui.ProgressBarNode::class.java.getConstructor(
+            String::class.java,
+            Float::class.javaObjectType,
+            Float::class.javaObjectType,
+            String::class.java,
+            String::class.java,
+            Boolean::class.javaPrimitiveType,
+            org.wip.plugintoolkit.api.sdui.SemanticColor::class.java,
+            org.wip.plugintoolkit.api.sdui.UiModifier::class.java
+        )
+        assertNotNull(progressConstructor, "8-arg legacy constructor for ProgressBarNode must exist")
+        val progressNode = progressConstructor.newInstance(
+            "p1",
+            0.5f,
+            null,
+            "Syncing",
+            null,
+            false,
+            org.wip.plugintoolkit.api.sdui.SemanticColor.PRIMARY,
+            org.wip.plugintoolkit.api.sdui.UiModifier.None
+        )
+        assertEquals(org.wip.plugintoolkit.api.sdui.ProgressBarStyle.STANDARD, progressNode.style)
     }
 }

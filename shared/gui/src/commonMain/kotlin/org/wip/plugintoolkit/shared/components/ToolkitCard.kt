@@ -1,8 +1,6 @@
 package org.wip.plugintoolkit.shared.components
 
 import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
@@ -13,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CardElevation
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -35,6 +34,7 @@ import plugintoolkit.composeapp.generated.resources.preview_glasscard_title
  * Uses semantic container colors (surfaceContainer), expressive shapes,
  * and subtle tonal elevation instead of non-native glassmorphism.
  */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun ToolkitCard(
     modifier: Modifier = Modifier,
@@ -50,7 +50,7 @@ fun ToolkitCard(
     content: @Composable ColumnScope.() -> Unit
 ) {
     val cardModifier = if (animateContentSize) {
-        modifier.clip(shape).animateContentSize(animationSpec = tween(durationMillis = 200, easing = FastOutSlowInEasing))
+        modifier.clip(shape).animateContentSize(animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec())
     } else {
         modifier.clip(shape)
     }

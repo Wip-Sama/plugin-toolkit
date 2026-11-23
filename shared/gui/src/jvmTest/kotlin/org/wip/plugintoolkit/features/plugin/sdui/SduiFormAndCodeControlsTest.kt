@@ -50,7 +50,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 @OptIn(ExperimentalTestApi::class)
-class SduiBatch1ControlsTest {
+class SduiFormAndCodeControlsTest {
 
     @get:Rule
     val composeTestRule = createComposeRule()

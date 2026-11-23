@@ -2,6 +2,10 @@
 
 All notable changes to the Plugin API will be documented in this file.
 
+## 4.1.0-alpha02
+- Added `ProgressBarStyle` (`STANDARD`, `WAVY`, `MORPHING_INDICATOR`, `CONTAINED_INDICATOR`) on `ProgressBarNode` with `@JvmOverloads`.
+- Added `LoadingIndicatorNode` and `UiContainerBuilder.loadingIndicator(...)` DSL builder.
+
 ## 4.1.0-alpha01
 - Added `ShapeRole` and universal `UiModifier` properties (`tooltip`, `contextMenu`, `cornerRadius`) with `@JvmOverloads` and fluent helpers.
 - Extended `TextNode` (`selectable`, `maxLines`, `overflowEllipsis`) and `ImageNode` (`zoomable`) with backward-compatible defaults.

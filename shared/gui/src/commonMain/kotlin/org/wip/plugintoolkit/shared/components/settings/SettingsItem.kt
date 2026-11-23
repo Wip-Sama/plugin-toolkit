@@ -4,7 +4,6 @@ import org.wip.plugintoolkit.core.model.resolve
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
@@ -24,6 +23,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
@@ -49,6 +49,7 @@ import org.wip.plugintoolkit.shared.components.GroupOrientation
 import org.wip.plugintoolkit.shared.components.rememberGroupedShape
 import plugintoolkit.composeapp.generated.resources.*
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun SettingsItem(
     title: String,
@@ -64,6 +65,7 @@ fun SettingsItem(
     val isHovered by interactionSource.collectIsHoveredAsState()
     val isPressed by interactionSource.collectIsPressedAsState()
 
+    val motion = MaterialTheme.motionScheme
     val backgroundColor by animateColorAsState(
         targetValue = when {
             !enabled -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = ToolkitTheme.opacity.disabled * ToolkitTheme.opacity.settingsItemDefault)
@@ -71,7 +73,7 @@ fun SettingsItem(
             isHovered -> MaterialTheme.colorScheme.primary.copy(alpha = ToolkitTheme.opacity.settingsItemHover)
             else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = ToolkitTheme.opacity.settingsItemDefault)
         },
-        animationSpec = tween(200)
+        animationSpec = motion.fastEffectsSpec()
     )
 
     val searchQuery = LocalSettingsSearchQuery.current
@@ -84,7 +86,9 @@ fun SettingsItem(
     }
 
     AnimatedVisibility(
-        visible = matchesQuery, enter = fadeIn(animationSpec = tween(300)), exit = fadeOut(animationSpec = tween(300))
+        visible = matchesQuery,
+        enter = fadeIn(animationSpec = motion.fastEffectsSpec()),
+        exit = fadeOut(animationSpec = motion.fastEffectsSpec())
     ) {
         Row(
             modifier = Modifier

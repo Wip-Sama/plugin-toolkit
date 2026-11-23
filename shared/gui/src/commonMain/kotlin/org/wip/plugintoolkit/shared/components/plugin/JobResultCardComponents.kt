@@ -32,8 +32,8 @@ import androidx.compose.material.icons.filled.UnfoldMore
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import org.wip.plugintoolkit.shared.components.ToolkitLinearProgressIndicator
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -211,26 +211,13 @@ internal fun JobResultProgressSection(
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
         // Main Progress Indicator
-        if (progress.mainDisplayMode == ProgressDisplayMode.INDETERMINATE) {
-            LinearProgressIndicator(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(ToolkitTheme.dimensions.heightSmall)
-                    .clip(MaterialTheme.shapes.small),
-                color = MaterialTheme.colorScheme.primary,
-                trackColor = MaterialTheme.colorScheme.surfaceVariant
-            )
-        } else {
-            LinearProgressIndicator(
-                progress = { progress.mainProgress },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(ToolkitTheme.dimensions.heightSmall)
-                    .clip(MaterialTheme.shapes.small),
-                color = MaterialTheme.colorScheme.primary,
-                trackColor = MaterialTheme.colorScheme.surfaceVariant
-            )
-        }
+        ToolkitLinearProgressIndicator(
+            progress = if (progress.mainDisplayMode == ProgressDisplayMode.INDETERMINATE) null else progress.mainProgress,
+            wavy = true,
+            modifier = Modifier.fillMaxWidth(),
+            color = MaterialTheme.colorScheme.primary,
+            trackColor = MaterialTheme.colorScheme.surfaceVariant
+        )
         Spacer(modifier = Modifier.height(ToolkitTheme.spacing.extraSmall))
 
         val mainPct = (progress.mainProgress * 100).toInt().coerceIn(0, 100)
@@ -318,21 +305,20 @@ internal fun JobResultProgressSection(
             }
             Spacer(modifier = Modifier.height(ToolkitTheme.spacing.extraSmall))
             if (progress.secondaryDisplayMode == ProgressDisplayMode.INDETERMINATE || (secProgress == null && !secMessage.isNullOrBlank())) {
-                LinearProgressIndicator(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(ToolkitTheme.dimensions.capabilityProgressBarHeight)
-                        .clip(MaterialTheme.shapes.extraSmall),
+                ToolkitLinearProgressIndicator(
+                    progress = null,
+                    wavy = true,
+                    modifier = Modifier.fillMaxWidth(),
                     color = MaterialTheme.colorScheme.tertiary,
                     trackColor = MaterialTheme.colorScheme.surfaceVariant
                 )
             } else if (secProgress != null) {
-                LinearProgressIndicator(
-                    progress = { secProgress },
+                ToolkitLinearProgressIndicator(
+                    progress = secProgress,
+                    wavy = false,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(ToolkitTheme.dimensions.capabilityProgressBarHeight)
-                        .clip(MaterialTheme.shapes.extraSmall),
+                        .height(ToolkitTheme.dimensions.capabilityProgressBarHeight),
                     color = MaterialTheme.colorScheme.tertiary,
                     trackColor = MaterialTheme.colorScheme.surfaceVariant
                 )
@@ -383,21 +369,18 @@ internal fun JobResultProgressSection(
             }
             Spacer(modifier = Modifier.height(ToolkitTheme.spacing.extraSmall))
             if (detailed?.displayMode == ProgressDisplayMode.INDETERMINATE) {
-                LinearProgressIndicator(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(ToolkitTheme.dimensions.capabilityProgressBarHeight)
-                        .clip(MaterialTheme.shapes.extraSmall),
+                ToolkitLinearProgressIndicator(
+                    progress = null,
+                    wavy = true,
+                    modifier = Modifier.fillMaxWidth(),
                     color = MaterialTheme.colorScheme.secondary,
                     trackColor = MaterialTheme.colorScheme.surfaceVariant
                 )
             } else {
-                LinearProgressIndicator(
-                    progress = { subProg },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(ToolkitTheme.dimensions.capabilityProgressBarHeight)
-                        .clip(MaterialTheme.shapes.extraSmall),
+                ToolkitLinearProgressIndicator(
+                    progress = subProg,
+                    wavy = true,
+                    modifier = Modifier.fillMaxWidth(),
                     color = MaterialTheme.colorScheme.secondary,
                     trackColor = MaterialTheme.colorScheme.surfaceVariant
                 )
@@ -414,12 +397,12 @@ internal fun JobResultProgressSection(
                     )
                 }
                 if (subSecProgress != null) {
-                    LinearProgressIndicator(
-                        progress = { subSecProgress },
+                    ToolkitLinearProgressIndicator(
+                        progress = subSecProgress,
+                        wavy = false,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(ToolkitTheme.dimensions.capabilityProgressBarHeight)
-                            .clip(MaterialTheme.shapes.extraSmall),
+                            .height(ToolkitTheme.dimensions.capabilityProgressBarHeight),
                         color = MaterialTheme.colorScheme.tertiary,
                         trackColor = MaterialTheme.colorScheme.surfaceVariant
                     )

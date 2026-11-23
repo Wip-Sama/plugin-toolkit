@@ -32,6 +32,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material3.Badge
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -249,6 +250,7 @@ private fun ToastItem(
     }
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun QueueControl(
     count: Int,
@@ -256,7 +258,11 @@ private fun QueueControl(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
-    val alpha by animateFloatAsState(if (isHovered) 1f else 0.4f)
+    val alpha by animateFloatAsState(
+        targetValue = if (isHovered) 1f else 0.4f,
+        animationSpec = MaterialTheme.motionScheme.fastEffectsSpec(),
+        label = "queueControlHoverAlpha"
+    )
 
     Surface(
         onClick = onClearAll,

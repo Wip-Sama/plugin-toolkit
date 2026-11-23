@@ -20,9 +20,9 @@ import androidx.compose.material.icons.filled.StopCircle
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import org.wip.plugintoolkit.shared.components.ToolkitLinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -396,12 +396,10 @@ private fun CapabilityBreakdownCard(
             )
         }
         Spacer(modifier = Modifier.height(ToolkitTheme.spacing.extraSmall))
-        LinearProgressIndicator(
-            progress = { fraction },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(ToolkitTheme.dimensions.capabilityProgressBarHeight)
-                .clip(MaterialTheme.shapes.extraSmall),
+        ToolkitLinearProgressIndicator(
+            progress = fraction,
+            wavy = true,
+            modifier = Modifier.fillMaxWidth(),
             color = MaterialTheme.colorScheme.primary,
             trackColor = MaterialTheme.colorScheme.surfaceVariant
         )

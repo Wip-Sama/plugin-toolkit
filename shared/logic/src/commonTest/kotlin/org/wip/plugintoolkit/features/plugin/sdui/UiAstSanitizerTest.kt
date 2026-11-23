@@ -14,6 +14,7 @@ import org.wip.plugintoolkit.api.sdui.ColumnNode
 import org.wip.plugintoolkit.api.sdui.ErrorBoundaryNode
 import org.wip.plugintoolkit.api.sdui.FloatingAnchor
 import org.wip.plugintoolkit.api.sdui.FloatingPanelNode
+import org.wip.plugintoolkit.api.sdui.LoadingIndicatorNode
 import org.wip.plugintoolkit.api.sdui.NormalizedPoint
 import org.wip.plugintoolkit.api.sdui.NormalizedSize
 import org.wip.plugintoolkit.api.sdui.NumberInputNode
@@ -427,7 +428,7 @@ class UiAstSanitizerTest {
     }
 
     @Test
-    fun testBatch1NodesAndModifiersSanitizedCorrectly() {
+    fun testFormCodeAndModifierSanitization() {
         val tree = UiNodeTree(
             root = ColumnNode(
                 id = "b1_root",
@@ -473,6 +474,23 @@ class UiAstSanitizerTest {
         assertTrue(assertIs<ErrorBoundaryNode>(root.children[4]).errorMessage.contains("CodeBlockNode"))
         val acc = assertIs<AccordionNode>(root.children[5])
         assertTrue(assertIs<ErrorBoundaryNode>(acc.children.single()).errorMessage.contains("Duplicate node ID collision"))
+    }
+
+    @Test
+    fun testLoadingIndicatorProgressFractionClampedOrCleared() {
+        val tree = UiNodeTree(
+            root = ColumnNode(
+                id = "loading_col",
+                children = listOf(
+                    LoadingIndicatorNode(id = "l_over", progress = 1.8f),
+                    LoadingIndicatorNode(id = "l_nan", progress = Float.NaN)
+                )
+            )
+        )
+        val sanitized = tree.sanitize()
+        val root = assertIs<ColumnNode>(sanitized.root)
+        assertEquals(1.0f, assertIs<LoadingIndicatorNode>(root.children[0]).progress)
+        assertEquals(null, assertIs<LoadingIndicatorNode>(root.children[1]).progress)
     }
 }
 

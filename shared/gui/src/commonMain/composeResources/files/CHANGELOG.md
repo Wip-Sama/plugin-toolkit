@@ -1,3 +1,11 @@
+Version: 4.1.0-alpha02
+Date: 23-11-2026
+Added:
+	- Upgraded host AppTheme to MaterialExpressiveTheme with MotionScheme.expressive() (and StandardMotionScope override), 8-step Shapes, and Dual Baseline/Emphasized Desktop Typography
+	- Replaced duration-based tween animations with MotionScheme spring tokens across navigation sidebar, scaffold, cards, settings items, flow port sections, and job cards
+	- Added NormalizedMorphShape, ToolkitSplitButton (SplitButtonLayout), ToolkitConnectedToggleGroup, ToolkitLoadingIndicator (morphing LoadingIndicator / ContainedLoadingIndicator), and ToolkitLinearProgressIndicator / ToolkitCircularProgressIndicator (wavy indicators)
+	- Added SDUI ProgressBarStyle (STANDARD, WAVY, MORPHING_INDICATOR, CONTAINED_INDICATOR) and LoadingIndicatorNode
+------------------------------------------------------------------------
 Version: 4.1.0-alpha01
 Date: 23-11-2026
 Added:

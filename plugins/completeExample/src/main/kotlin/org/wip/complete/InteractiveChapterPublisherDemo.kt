@@ -22,6 +22,7 @@ import org.wip.plugintoolkit.api.sdui.CapabilityJobStatus
 import org.wip.plugintoolkit.api.sdui.ChipItem
 import org.wip.plugintoolkit.api.sdui.ControlSize
 import org.wip.plugintoolkit.api.sdui.ImageScale
+import org.wip.plugintoolkit.api.sdui.ProgressBarStyle
 import org.wip.plugintoolkit.api.sdui.SemanticColor
 import org.wip.plugintoolkit.api.sdui.ShapeRole
 import org.wip.plugintoolkit.api.sdui.SpacingSize
@@ -2014,7 +2015,8 @@ private fun UiContainerBuilder.renderJobCardContent(
             id = "${prefix}_primary_bar",
             progress = primary.fraction,
             label = job.capabilityName,
-            statusText = primary.fraction?.let { "${(it * 100f).toInt()}%" } ?: primary.message
+            statusText = primary.fraction?.let { "${(it * 100f).toInt()}%" } ?: primary.message,
+            style = ProgressBarStyle.WAVY
         )
     }
 
@@ -2135,6 +2137,20 @@ private fun UiContainerBuilder.renderSettingsTab(
                     showLineNumbers = true,
                     showCopyButton = true,
                     maxHeightDp = 200
+                )
+                loadingIndicator(
+                    id = "cfg_runtime_loader",
+                    label = "Live config watcher active",
+                    contained = true,
+                    color = SemanticColor.PRIMARY,
+                    size = ControlSize.SMALL
+                )
+                progressBar(
+                    id = "cfg_queue_health_bar",
+                    progress = (state.batchSize / 20f).coerceIn(0.05f, 1f),
+                    label = "Batch capacity utilization",
+                    statusText = "${state.batchSize}/20",
+                    style = ProgressBarStyle.WAVY
                 )
             }
             text(

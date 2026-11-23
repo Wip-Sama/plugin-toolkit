@@ -4,7 +4,6 @@ import org.wip.plugintoolkit.core.model.resolve
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -21,6 +20,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.shared.components.tooltip
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun <T> SidebarItem(
     element: SidebarElement<out T>,
@@ -74,10 +75,11 @@ fun <T> SidebarItem(
     val targetBottomStart =
         if (position == SidebarItemPosition.End || position == SidebarItemPosition.StandAlone) radiusLarge else radiusExtraSmall
 
-    val topStart by animateDpAsState(targetTopStart, animationSpec = tween(300))
-    val topEnd by animateDpAsState(targetTopStart, animationSpec = tween(300))
-    val bottomStart by animateDpAsState(targetBottomStart, animationSpec = tween(300))
-    val bottomEnd by animateDpAsState(targetBottomStart, animationSpec = tween(300))
+    val motion = MaterialTheme.motionScheme
+    val topStart by animateDpAsState(targetTopStart, animationSpec = motion.fastSpatialSpec())
+    val topEnd by animateDpAsState(targetTopStart, animationSpec = motion.fastSpatialSpec())
+    val bottomStart by animateDpAsState(targetBottomStart, animationSpec = motion.fastSpatialSpec())
+    val bottomEnd by animateDpAsState(targetBottomStart, animationSpec = motion.fastSpatialSpec())
 
     val animatedShape = RoundedCornerShape(
         topStart = topStart,
@@ -118,8 +120,8 @@ fun <T> SidebarItem(
 
         AnimatedVisibility(
             visible = isExpanded,
-            enter = fadeIn(tween(150)) + expandHorizontally(tween(200)),
-            exit = fadeOut(tween(100)) + shrinkHorizontally(tween(200)),
+            enter = fadeIn(motion.fastEffectsSpec()) + expandHorizontally(motion.defaultSpatialSpec()),
+            exit = fadeOut(motion.fastEffectsSpec()) + shrinkHorizontally(motion.defaultSpatialSpec()),
             modifier = Modifier.weight(1f)
         ) {
             Row(

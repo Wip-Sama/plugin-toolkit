@@ -146,8 +146,10 @@ import org.wip.plugintoolkit.api.sdui.IconNode
 import org.wip.plugintoolkit.api.sdui.ImageNode
 import org.wip.plugintoolkit.api.sdui.ImageScale
 import org.wip.plugintoolkit.api.sdui.ListItemNode
+import org.wip.plugintoolkit.api.sdui.LoadingIndicatorNode
 import org.wip.plugintoolkit.api.sdui.NumberInputNode
 import org.wip.plugintoolkit.api.sdui.ProgressBarNode
+import org.wip.plugintoolkit.api.sdui.ProgressBarStyle
 import org.wip.plugintoolkit.api.sdui.RadioGroupNode
 import org.wip.plugintoolkit.api.sdui.RowNode
 import org.wip.plugintoolkit.api.sdui.ScaffoldNode
@@ -178,12 +180,16 @@ import org.wip.plugintoolkit.core.utils.PlatformContextMenuItem
 import org.wip.plugintoolkit.core.utils.PlatformHorizontalScrollbar
 import org.wip.plugintoolkit.core.utils.PlatformUtils
 import org.wip.plugintoolkit.core.utils.PlatformVerticalScrollbar
+import org.wip.plugintoolkit.shared.components.ToolkitCircularProgressIndicator
+import org.wip.plugintoolkit.shared.components.ToolkitLinearProgressIndicator
+import org.wip.plugintoolkit.shared.components.ToolkitLoadingIndicator
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.sdui_cancel
 import plugintoolkit.composeapp.generated.resources.sdui_confirm
 import plugintoolkit.composeapp.generated.resources.sdui_error_boundary_title
 import plugintoolkit.composeapp.generated.resources.sdui_hide_secret
 import plugintoolkit.composeapp.generated.resources.sdui_image_zoom_open
+import plugintoolkit.composeapp.generated.resources.sdui_loading_default
 import plugintoolkit.composeapp.generated.resources.sdui_resize_pane
 import plugintoolkit.composeapp.generated.resources.sdui_show_secret
 import plugintoolkit.composeapp.generated.resources.sdui_toggle_panel
@@ -798,6 +804,10 @@ fun RenderUiNode(
             RenderProgressBar(node = node, modifier = appliedModifier)
         }
 
+        is LoadingIndicatorNode -> {
+            RenderLoadingIndicator(node = node, modifier = appliedModifier)
+        }
+
         is TabsNode -> {
             RenderTabs(node = node, onEvent = onEvent, modifier = appliedModifier)
         }
@@ -1178,47 +1188,117 @@ private fun RenderProgressBar(
                 }
             }
         }
-        if (node.isCircular) {
-            val progressVal = node.progress
-            if (progressVal != null) {
-                CircularProgressIndicator(
-                    progress = { progressVal.coerceIn(0f, 1f) },
-                    modifier = Modifier.size(ToolkitTheme.dimensions.iconMedium),
+        val trackColor = progressColor.copy(alpha = ToolkitTheme.opacity.borderLow)
+        when (node.style) {
+            ProgressBarStyle.MORPHING_INDICATOR, ProgressBarStyle.CONTAINED_INDICATOR -> {
+                ToolkitLoadingIndicator(
+                    contained = node.style == ProgressBarStyle.CONTAINED_INDICATOR,
+                    progress = node.progress,
                     color = progressColor,
-                    trackColor = progressColor.copy(alpha = ToolkitTheme.opacity.borderLow),
-                    strokeWidth = ToolkitTheme.dimensions.progressIndicatorStroke
-                )
-            } else {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(ToolkitTheme.dimensions.iconMedium),
-                    color = progressColor,
-                    strokeWidth = ToolkitTheme.dimensions.progressIndicatorStroke
+                    modifier = Modifier.size(ToolkitTheme.dimensions.loadingIndicatorMediumSize)
                 )
             }
-        } else {
-            val progressVal = node.progress
-            if (progressVal != null) {
-                LinearProgressIndicator(
-                    progress = { progressVal.coerceIn(0f, 1f) },
-                    modifier = Modifier.fillMaxWidth().height(ToolkitTheme.dimensions.capabilityProgressBarHeight),
-                    color = progressColor,
-                    trackColor = progressColor.copy(alpha = ToolkitTheme.opacity.borderLow)
-                )
-            } else {
-                LinearProgressIndicator(
-                    modifier = Modifier.fillMaxWidth().height(ToolkitTheme.dimensions.capabilityProgressBarHeight),
-                    color = progressColor,
-                    trackColor = progressColor.copy(alpha = ToolkitTheme.opacity.borderLow)
-                )
+
+            ProgressBarStyle.WAVY -> {
+                if (node.isCircular) {
+                    ToolkitCircularProgressIndicator(
+                        progress = node.progress,
+                        wavy = true,
+                        color = progressColor,
+                        trackColor = trackColor
+                    )
+                } else {
+                    ToolkitLinearProgressIndicator(
+                        progress = node.progress,
+                        wavy = true,
+                        color = progressColor,
+                        trackColor = trackColor,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
             }
-            node.secondaryProgress?.let { secProgress ->
-                LinearProgressIndicator(
-                    progress = { secProgress.coerceIn(0f, 1f) },
-                    modifier = Modifier.fillMaxWidth().height(ToolkitTheme.dimensions.progressIndicatorStroke),
-                    color = MaterialTheme.colorScheme.tertiary,
-                    trackColor = MaterialTheme.colorScheme.tertiary.copy(alpha = ToolkitTheme.opacity.subtleHighlight)
-                )
+
+            ProgressBarStyle.STANDARD -> {
+                if (node.isCircular) {
+                    val progressVal = node.progress
+                    if (progressVal != null) {
+                        CircularProgressIndicator(
+                            progress = { progressVal.coerceIn(0f, 1f) },
+                            modifier = Modifier.size(ToolkitTheme.dimensions.iconMedium),
+                            color = progressColor,
+                            trackColor = trackColor,
+                            strokeWidth = ToolkitTheme.dimensions.progressIndicatorStroke
+                        )
+                    } else {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(ToolkitTheme.dimensions.iconMedium),
+                            color = progressColor,
+                            strokeWidth = ToolkitTheme.dimensions.progressIndicatorStroke
+                        )
+                    }
+                } else {
+                    val progressVal = node.progress
+                    if (progressVal != null) {
+                        LinearProgressIndicator(
+                            progress = { progressVal.coerceIn(0f, 1f) },
+                            modifier = Modifier.fillMaxWidth().height(ToolkitTheme.dimensions.capabilityProgressBarHeight),
+                            color = progressColor,
+                            trackColor = trackColor
+                        )
+                    } else {
+                        LinearProgressIndicator(
+                            modifier = Modifier.fillMaxWidth().height(ToolkitTheme.dimensions.capabilityProgressBarHeight),
+                            color = progressColor,
+                            trackColor = trackColor
+                        )
+                    }
+                    node.secondaryProgress?.let { secProgress ->
+                        LinearProgressIndicator(
+                            progress = { secProgress.coerceIn(0f, 1f) },
+                            modifier = Modifier.fillMaxWidth().height(ToolkitTheme.dimensions.progressIndicatorStroke),
+                            color = MaterialTheme.colorScheme.tertiary,
+                            trackColor = MaterialTheme.colorScheme.tertiary.copy(alpha = ToolkitTheme.opacity.subtleHighlight)
+                        )
+                    }
+                }
             }
+        }
+    }
+}
+
+/**
+ * Material 3 Expressive morphing [LoadingIndicatorNode] renderer with semantic sizing and optional label.
+ */
+@Composable
+private fun RenderLoadingIndicator(
+    node: LoadingIndicatorNode,
+    modifier: Modifier = Modifier
+) {
+    val indicatorSize = when (node.size) {
+        ControlSize.SMALL -> ToolkitTheme.dimensions.loadingIndicatorSmallSize
+        ControlSize.MEDIUM -> ToolkitTheme.dimensions.loadingIndicatorMediumSize
+        ControlSize.LARGE -> ToolkitTheme.dimensions.loadingIndicatorLargeSize
+    }
+    val accessibleText = node.label?.takeIf { it.isNotBlank() } ?: stringResource(Res.string.sdui_loading_default)
+    Row(
+        modifier = modifier,
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.sm)
+    ) {
+        ToolkitLoadingIndicator(
+            contained = node.contained,
+            progress = node.progress,
+            color = node.color.toComposeColor(),
+            modifier = Modifier
+                .size(indicatorSize)
+                .semantics { contentDescription = accessibleText }
+        )
+        node.label?.takeIf { it.isNotBlank() }?.let { labelText ->
+            Text(
+                text = labelText,
+                style = ToolkitTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }

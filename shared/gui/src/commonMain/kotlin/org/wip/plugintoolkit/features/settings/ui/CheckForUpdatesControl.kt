@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -15,15 +14,15 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import org.jetbrains.compose.resources.stringResource
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.settings.model.UpdateState
 import org.wip.plugintoolkit.features.settings.viewmodel.SettingsViewModel
+import org.wip.plugintoolkit.shared.components.ToolkitLoadingIndicator
 import plugintoolkit.composeapp.generated.resources.Res
+import plugintoolkit.composeapp.generated.resources.action_refresh
 import plugintoolkit.composeapp.generated.resources.update_check_started
 import plugintoolkit.composeapp.generated.resources.update_new_version_found
-import plugintoolkit.composeapp.generated.resources.*
 
 @Composable
 fun CheckForUpdatesControl(viewModel: SettingsViewModel) {
@@ -31,9 +30,10 @@ fun CheckForUpdatesControl(viewModel: SettingsViewModel) {
 
     Row(verticalAlignment = Alignment.CenterVertically) {
         if (updateState is UpdateState.Checking) {
-            CircularProgressIndicator(
-                modifier = Modifier.size(ToolkitTheme.dimensions.iconMedium).padding(end = ToolkitTheme.spacing.small),
-                strokeWidth = ToolkitTheme.dimensions.progressIndicatorStroke
+            ToolkitLoadingIndicator(
+                modifier = Modifier
+                    .padding(end = ToolkitTheme.spacing.small)
+                    .size(ToolkitTheme.dimensions.loadingIndicatorSmallSize)
             )
             Text(
                 text = stringResource(Res.string.update_check_started),

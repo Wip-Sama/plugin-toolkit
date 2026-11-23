@@ -670,6 +670,7 @@ abstract class UiContainerBuilder {
         )
     }
 
+    @JvmOverloads
     fun progressBar(
         id: String = generateNodeId("progress"),
         progress: Float? = null,
@@ -678,7 +679,8 @@ abstract class UiContainerBuilder {
         statusText: String? = null,
         isCircular: Boolean = false,
         color: SemanticColor = SemanticColor.PRIMARY,
-        modifier: UiModifier = UiModifier.None
+        modifier: UiModifier = UiModifier.None,
+        style: ProgressBarStyle = ProgressBarStyle.STANDARD
     ) {
         add(
             ProgressBarNode(
@@ -689,6 +691,29 @@ abstract class UiContainerBuilder {
                 statusText = statusText,
                 isCircular = isCircular,
                 color = color,
+                modifier = modifier,
+                style = style
+            )
+        )
+    }
+
+    fun loadingIndicator(
+        label: String? = null,
+        id: String = generateNodeId("loading"),
+        contained: Boolean = false,
+        progress: Float? = null,
+        color: SemanticColor = SemanticColor.PRIMARY,
+        size: ControlSize = ControlSize.MEDIUM,
+        modifier: UiModifier = UiModifier.None
+    ) {
+        add(
+            LoadingIndicatorNode(
+                id = id,
+                label = label,
+                contained = contained,
+                progress = progress,
+                color = color,
+                size = size,
                 modifier = modifier
             )
         )

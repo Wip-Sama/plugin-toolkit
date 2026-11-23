@@ -1,9 +1,6 @@
 package org.wip.plugintoolkit.features.flows.ui.node
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.LinearOutSlowInEasing
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -23,6 +20,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -52,6 +50,7 @@ import org.wip.plugintoolkit.features.flows.model.ValidationError
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.node_results_section
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun NodeOutputSection(
     outputs: List<OutputPort>,
@@ -143,16 +142,17 @@ fun NodeOutputSection(
             }
         }
 
+        val motion = MaterialTheme.motionScheme
         AnimatedVisibility(
             visible = !isOutputsCollapsed,
-            enter = fadeIn(animationSpec = tween(durationMillis = 180, delayMillis = 30, easing = LinearOutSlowInEasing)) +
+            enter = fadeIn(animationSpec = motion.fastEffectsSpec()) +
                     expandVertically(
-                        animationSpec = tween(durationMillis = 220, easing = FastOutSlowInEasing),
+                        animationSpec = motion.defaultSpatialSpec(),
                         expandFrom = Alignment.Top
                     ),
-            exit = fadeOut(animationSpec = tween(durationMillis = 140, easing = FastOutSlowInEasing)) +
+            exit = fadeOut(animationSpec = motion.fastEffectsSpec()) +
                    shrinkVertically(
-                       animationSpec = tween(durationMillis = 200, easing = FastOutSlowInEasing),
+                       animationSpec = motion.defaultSpatialSpec(),
                        shrinkTowards = Alignment.Top
                    )
         ) {

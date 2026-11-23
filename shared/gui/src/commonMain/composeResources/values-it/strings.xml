@@ -1088,6 +1088,7 @@
     <string name="sdui_image_zoom_in">Ingrandisci</string>
     <string name="sdui_image_zoom_out">Rimpicciolisci</string>
     <string name="sdui_image_zoom_reset">Ripristina zoom</string>
+    <string name="sdui_loading_default">Caricamento</string>
     <string name="dialog_select_file">Seleziona File</string>
     <string name="dialog_select_files">Seleziona File</string>
     <string name="dialog_save_file">Salva File</string>
