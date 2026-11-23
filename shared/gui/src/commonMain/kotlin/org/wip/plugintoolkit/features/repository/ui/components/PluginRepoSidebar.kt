@@ -62,6 +62,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import androidx.compose.ui.unit.Dp
 import org.jetbrains.compose.resources.stringResource
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.core.utils.PlatformUtils
@@ -96,7 +97,8 @@ fun PluginRepoSidebar(
     onRefreshAll: () -> Unit,
     onOpenAddDialog: () -> Unit,
     onOpenLocalFolder: (String) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    fillPaneWidth: Boolean = false
 ) {
     val scope = rememberCoroutineScope()
     val clipboard = LocalClipboard.current
@@ -114,7 +116,7 @@ fun PluginRepoSidebar(
                 true
             } else false
         },
-        width = ToolkitTheme.dimensions.sidebarExpandedWidth,
+        width = if (fillPaneWidth) Dp.Unspecified else ToolkitTheme.dimensions.sidebarExpandedWidth,
         containerColor = MaterialTheme.colorScheme.surfaceContainer,
         topContent = {
             Column(

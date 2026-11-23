@@ -53,6 +53,7 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.isShiftPressed
 import androidx.compose.ui.input.pointer.onPointerEvent
+import androidx.compose.ui.unit.Dp
 import kotlinx.coroutines.delay
 import org.jetbrains.compose.resources.stringResource
 import org.wip.plugintoolkit.api.Capability
@@ -87,7 +88,8 @@ fun DirectExecutionSidebar(
     router: GlobalRouter? = null,
     onNavigateToPluginSetting: ((pluginId: String, settingKey: String) -> Unit)? = null,
     isInteractiveOnly: Boolean = false,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    fillPaneWidth: Boolean = false
 ) {
     val currentRouter = router ?: LocalGlobalRouter.current
     var pluginSearchQuery by remember { mutableStateOf("") }
@@ -109,7 +111,10 @@ fun DirectExecutionSidebar(
 
     Box(
         modifier = modifier
-            .width(ToolkitTheme.dimensions.sidebarExpandedWidth)
+            .then(
+                if (fillPaneWidth) Modifier.fillMaxWidth()
+                else Modifier.width(ToolkitTheme.dimensions.sidebarExpandedWidth)
+            )
             .fillMaxHeight()
             .background(MaterialTheme.colorScheme.surfaceContainerLow)
             .clipToBounds()

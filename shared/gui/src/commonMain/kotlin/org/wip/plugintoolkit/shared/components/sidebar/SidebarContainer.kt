@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
@@ -28,9 +29,14 @@ fun SidebarContainer(
     bodyContent: @Composable (ColumnScope.() -> Unit)? = null,
     bottomContent: @Composable (ColumnScope.() -> Unit)? = null
 ) {
+    val widthModifier = if (width == Dp.Unspecified) {
+        Modifier.fillMaxWidth()
+    } else {
+        Modifier.width(width)
+    }
     Surface(
         modifier = modifier
-            .width(width)
+            .then(widthModifier)
             .fillMaxHeight(),
         color = containerColor,
         shadowElevation = shadowElevation

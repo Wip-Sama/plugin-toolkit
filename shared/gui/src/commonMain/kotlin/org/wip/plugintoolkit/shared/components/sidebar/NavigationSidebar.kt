@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.MenuOpen
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
@@ -36,6 +37,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.onPointerEvent
@@ -51,6 +53,7 @@ import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.app_name
 import org.jetbrains.compose.resources.stringResource
 import plugintoolkit.composeapp.generated.resources.action_toggle_sidebar
+import org.wip.plugintoolkit.shared.components.ToolkitTooltipBox
 import org.wip.plugintoolkit.shared.components.verticalFadingEdges
 import org.wip.plugintoolkit.ui.titlebar.WindowDraggableArea
 import org.wip.plugintoolkit.ui.titlebar.nonDraggableTitleBar
@@ -70,6 +73,7 @@ fun <T> NavigationSidebar(
     containerColor: Color = if (isSecondary) MaterialTheme.colorScheme.surfaceContainer else MaterialTheme.colorScheme.surfaceContainerLow,
     headerContent: @Composable () -> Unit = {},
     bottomExtraContent: @Composable ColumnScope.() -> Unit = {},
+    expandedWidth: Dp = ToolkitTheme.dimensions.sidebarExpandedWidth,
     modifier: Modifier = Modifier
 ) {
     var isHovered by remember { mutableStateOf(false) }
@@ -78,14 +82,25 @@ fun <T> NavigationSidebar(
     val isActuallyExpanded = !canCollapse || !isNavbarCollapsed || isHovered
 
     val motion = MaterialTheme.motionScheme
+    val resolvedExpandedWidth = if (expandedWidth == Dp.Unspecified) {
+        ToolkitTheme.dimensions.sidebarExpandedWidth
+    } else {
+        expandedWidth
+    }
     val sidebarWidth by animateDpAsState(
-        targetValue = if (isActuallyExpanded) ToolkitTheme.dimensions.sidebarExpandedWidth else ToolkitTheme.dimensions.sidebarCollapsedWidth,
+        targetValue = if (isActuallyExpanded) resolvedExpandedWidth else ToolkitTheme.dimensions.sidebarCollapsedWidth,
         animationSpec = motion.defaultSpatialSpec()
     )
 
+    val widthModifier = if (expandedWidth == Dp.Unspecified && isActuallyExpanded) {
+        Modifier.fillMaxWidth()
+    } else {
+        Modifier.width(sidebarWidth)
+    }
+
     Surface(
         modifier = modifier
-            .width(sidebarWidth)
+            .then(widthModifier)
             .fillMaxHeight()
             .onPointerEvent(PointerEventType.Enter) { isHovered = true }
             .onPointerEvent(PointerEventType.Exit) { isHovered = false },
@@ -107,14 +122,17 @@ fun <T> NavigationSidebar(
                     horizontalArrangement = Arrangement.Start
                 ) {
                     if (canCollapse) {
-                        IconButton(
-                            onClick = onToggleNavbar,
-                            modifier = Modifier.nonDraggableTitleBar("sidebar_hamburger_button")
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Menu,
-                                contentDescription = stringResource(Res.string.action_toggle_sidebar)
-                            )
+                        val toggleDesc = stringResource(Res.string.action_toggle_sidebar)
+                        ToolkitTooltipBox(tooltip = toggleDesc) {
+                            IconButton(
+                                onClick = onToggleNavbar,
+                                modifier = Modifier.nonDraggableTitleBar("sidebar_hamburger_button")
+                            ) {
+                                Icon(
+                                    imageVector = if (isNavbarCollapsed) Icons.Default.Menu else Icons.AutoMirrored.Filled.MenuOpen,
+                                    contentDescription = toggleDesc
+                                )
+                            }
                         }
                     }
 

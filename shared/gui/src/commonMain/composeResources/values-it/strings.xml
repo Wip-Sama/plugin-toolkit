@@ -1116,6 +1116,16 @@
     <string name="sdui_pagination_page_size">%1$d / pagina</string>
     <string name="sdui_breadcrumbs_overflow">Altri percorsi</string>
     <string name="sdui_menu_open">Apri menu</string>
+    <string name="nav_back_to_list">Torna all\'elenco</string>
+    <string name="nav_more_options">Altre opzioni</string>
+    <string name="nav_collapse_rail">Comprimi navigazione</string>
+    <string name="nav_expand_rail">Espandi navigazione</string>
+    <string name="plugin_folders_toggle">Mostra o nascondi cartelle gestite</string>
+    <string name="plugin_manager_subtitle">%1$d installati</string>
+    <string name="flow_manager_subtitle">%1$d flussi disponibili</string>
+    <string name="flow_summary_pane_title">Riepilogo Spazio di Lavoro</string>
+    <string name="flow_summary_ready_count">Pronti: %1$d</string>
+    <string name="flow_summary_issues_count">Richiede Attenzione: %1$d</string>
     <string name="dialog_select_file">Seleziona File</string>
     <string name="dialog_select_files">Seleziona File</string>
     <string name="dialog_save_file">Salva File</string>

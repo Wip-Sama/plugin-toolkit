@@ -1,5 +1,11 @@
 package org.wip.plugintoolkit.features.repository.ui.components
 
+import androidx.compose.material3.AppBarRow
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import org.wip.plugintoolkit.shared.components.AdaptiveAppBarOverflowButton
+import org.wip.plugintoolkit.shared.components.AdaptivePaneHeader
+import org.wip.plugintoolkit.shared.components.adaptiveOuterHorizontalPadding
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -75,7 +81,7 @@ import plugintoolkit.composeapp.generated.resources.repo_tab_flows
 import plugintoolkit.composeapp.generated.resources.repo_tab_plugins
 import plugintoolkit.composeapp.generated.resources.plugin_repo_multiple_warning
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun PluginRepoDetails(
     currentRepo: ExtensionRepo,
@@ -118,96 +124,65 @@ fun PluginRepoDetails(
     ) {
         // Repository Context Header Card
         Surface(
-            color = MaterialTheme.colorScheme.surfaceVariant,
+            color = MaterialTheme.colorScheme.surfaceContainer,
             shape = ToolkitTheme.shapes.large,
-            tonalElevation = ToolkitTheme.dimensions.borderUnselected,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = ToolkitTheme.spacing.large)
+                .padding(horizontal = adaptiveOuterHorizontalPadding())
         ) {
             Column(
-                modifier = Modifier.padding(ToolkitTheme.spacing.large),
+                modifier = Modifier.padding(bottom = ToolkitTheme.spacing.large),
                 verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.medium)
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(
-                        modifier = Modifier.weight(1f),
-                        horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = currentRepo.name,
-                            style = MaterialTheme.typography.headlineSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        val activeConflicts = conflicts.filter { (_, repos) -> repos.any { it.url == currentRepo.url } }
-                        if (activeConflicts.isNotEmpty()) {
-                            Icon(
-                                Icons.Default.Warning,
-                                contentDescription = null,
-                                modifier = Modifier
-                                    .size(ToolkitTheme.dimensions.iconSmall)
-                                    .tooltip(Res.string.plugin_repo_multiple_warning),
-                            )
-                        }
-                    }
-
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
+                val activeConflicts = conflicts.filter { (_, repos) -> repos.any { it.url == currentRepo.url } }
+                AdaptivePaneHeader(
+                    title = currentRepo.name,
+                    subtitle = if (activeConflicts.isNotEmpty()) {
+                        stringResource(Res.string.plugin_repo_multiple_warning)
+                    } else null,
+                    actions = {
                         key(currentRepo.url, currentRepo.isLocal) {
-                            ToolkitButtonGroup {
-                                item { shape, modifierSpec ->
-                                    Button(
-                                        onClick = { onRefreshRepo(currentRepo) },
-                                        enabled = !isRefreshing,
-                                        colors = ButtonDefaults.filledTonalButtonColors(),
-                                        shape = shape,
-                                        modifier = modifierSpec.tooltip(Res.string.action_refresh)
-                                    ) {
+                            val refreshLabel = stringResource(Res.string.action_refresh)
+                            val openFolderLabel = stringResource(Res.string.plugin_open_folder)
+                            AppBarRow(
+                                maxItemCount = 2,
+                                overflowIndicator = { menuState ->
+                                    AdaptiveAppBarOverflowButton(menuState = menuState)
+                                }
+                            ) {
+                                clickableItem(
+                                    onClick = { onRefreshRepo(currentRepo) },
+                                    enabled = !isRefreshing,
+                                    icon = {
                                         Icon(
                                             Icons.Default.Refresh,
-                                            contentDescription = null,
+                                            contentDescription = refreshLabel,
                                             modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
                                         )
-                                        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
-                                        Text(
-                                            stringResource(Res.string.action_refresh),
-                                            maxLines = 1,
-                                            softWrap = false
-                                        )
-                                    }
-                                }
-
-                                item(visible = currentRepo.isLocal) { shape, modifierSpec ->
-                                    Button(
+                                    },
+                                    label = refreshLabel
+                                )
+                                if (currentRepo.isLocal) {
+                                    clickableItem(
                                         onClick = { onOpenLocalFolder(currentRepo.url) },
-                                        modifier = modifierSpec.tooltip(Res.string.plugin_open_folder),
-                                        shape = shape,
-                                    ) {
-                                        Icon(
-                                            Icons.Default.FolderOpen,
-                                            contentDescription = stringResource(Res.string.repo_action_open_folder),
-                                            modifier = Modifier.size(ToolkitTheme.dimensions.iconMediumSmall)
-                                        )
-                                        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
-                                        Text(
-                                            stringResource(Res.string.plugin_open_folder),
-                                            maxLines = 1,
-                                            softWrap = false
-                                        )
-                                    }
+                                        icon = {
+                                            Icon(
+                                                Icons.Default.FolderOpen,
+                                                contentDescription = openFolderLabel,
+                                                modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
+                                            )
+                                        },
+                                        label = openFolderLabel
+                                    )
                                 }
                             }
                         }
                     }
-                }
+                )
+                Column(
+                    modifier = Modifier.padding(horizontal = ToolkitTheme.spacing.large),
+                    verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.medium)
+                ) {
 
                 // URI Box
                 Surface(
@@ -284,6 +259,7 @@ fun PluginRepoDetails(
 //                        }
 //                    }
 //                }
+                }
             }
         }
 

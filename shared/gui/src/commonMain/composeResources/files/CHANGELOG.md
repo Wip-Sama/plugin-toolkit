@@ -1,3 +1,10 @@
+Version: 4.1.0-alpha05
+Date: 23-11-2026
+Added:
+	- Added Compose Material 3 Adaptive dependencies (`adaptive`, `adaptive-layout`, `adaptive-navigation`, `material3-adaptive-navigation-suite`)
+	- Migrated AppScaffold and NavigationSidebar to WindowSizeClass-driven adaptive navigation (`NavigationSuiteScaffold` with `WideNavigationRailCollapsed` / `WideNavigationRailExpanded` / `ShortNavigationBarCompact`) with `24.dp` margins and `TooltipBox` toggle
+	- Adopted Material 3 adaptive multi-pane scaffolds (`NavigableListDetailPaneScaffold` / `NavigableSupportingPaneScaffold`), `VerticalDragHandle` + `rememberPaneExpansionState`, `24.dp` partition spacers, `680.dp` form/prose max width, and `AppBarRow` / `TopAppBar(subtitle = ...)` across SettingsScreen, PluginManagerView, PluginRepoView, InteractiveToolsScreen, and FlowManagerView
+------------------------------------------------------------------------
 Version: 4.1.0-alpha04
 Date: 23-11-2026
 Added:

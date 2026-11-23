@@ -1,5 +1,17 @@
 package org.wip.plugintoolkit.features.plugin.ui
 
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
+import androidx.compose.material3.adaptive.layout.AnimatedPane
+import androidx.compose.material3.adaptive.layout.ListDetailPaneScaffold
+import androidx.compose.material3.adaptive.layout.ListDetailPaneScaffoldRole
+import androidx.compose.material3.adaptive.navigation.rememberListDetailPaneScaffoldNavigator
+import org.wip.plugintoolkit.shared.components.AdaptiveBackNavigationButton
+import org.wip.plugintoolkit.shared.components.DesktopPaneDragHandle
+import org.wip.plugintoolkit.shared.components.adaptiveOuterHorizontalPadding
+import org.wip.plugintoolkit.shared.components.rememberAdaptivePaneScaffoldDirective
+import org.wip.plugintoolkit.shared.components.rememberFixedListPaneExpansionState
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
@@ -107,6 +119,7 @@ import kotlin.time.Duration.Companion.milliseconds
  * Provides a dedicated workspace separate from automated capabilities and visual flows,
  * offering a live bidirectional GUI viewport with session lifecycle management.
  */
+@OptIn(ExperimentalMaterial3AdaptiveApi::class)
 @Composable
 fun InteractiveToolsScreen(
     initialPluginId: String? = null,
@@ -150,46 +163,89 @@ fun InteractiveToolsScreen(
         }
     }
 
-    Row(
+    val scope = rememberCoroutineScope()
+    val directive = rememberAdaptivePaneScaffoldDirective()
+    val navigator = rememberListDetailPaneScaffoldNavigator<String>(
+        scaffoldDirective = directive
+    )
+    val paneExpansionState = rememberFixedListPaneExpansionState(
+        initialWidth = ToolkitTheme.dimensions.adaptiveCompactListPaneWidth
+    )
+
+    ListDetailPaneScaffold(
+        directive = navigator.scaffoldDirective,
+        value = navigator.scaffoldValue,
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-    ) {
-        DirectExecutionSidebar(
-            loadedPlugins = loadedPlugins,
-            selectedPluginId = selectedPluginId,
-            onPluginSelected = { pluginId ->
-                selectedPluginId = pluginId
-                val matching = tools.find { it.plugin.getManifest().getOrNull()?.plugin?.id == pluginId }
-                if (matching != null && selectedTool == null) {
-                    viewModel.selectTool(matching)
+            .padding(
+                horizontal = adaptiveOuterHorizontalPadding(),
+                vertical = ToolkitTheme.spacing.medium
+            ),
+        paneExpansionState = paneExpansionState,
+        paneExpansionDragHandle = { state ->
+            DesktopPaneDragHandle(paneExpansionState = state)
+        },
+        listPane = {
+            AnimatedPane(
+                modifier = Modifier.preferredWidth(ToolkitTheme.dimensions.adaptiveCompactListPaneWidth)
+            ) {
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    shape = ToolkitTheme.shapes.large,
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    DirectExecutionSidebar(
+                        loadedPlugins = loadedPlugins,
+                        selectedPluginId = selectedPluginId,
+                        onPluginSelected = { pluginId ->
+                            selectedPluginId = pluginId
+                            val matching = tools.find { it.plugin.getManifest().getOrNull()?.plugin?.id == pluginId }
+                            if (matching != null && selectedTool == null) {
+                                viewModel.selectTool(matching)
+                                scope.launch {
+                                    navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, pluginId)
+                                }
+                            }
+                        },
+                        onBackToPlugins = {
+                            selectedPluginId = null
+                        },
+                        selectedCapability = if (selectedTool?.plugin?.getManifest()?.getOrNull()?.plugin?.id == selectedPluginId) {
+                            selectedTool?.capability
+                        } else null,
+                        onCapabilitySelected = { capability ->
+                            val matching = tools.find {
+                                it.plugin.getManifest().getOrNull()?.plugin?.id == selectedPluginId &&
+                                    it.capability.name == capability.name
+                            }
+                            if (matching != null) {
+                                viewModel.selectTool(matching)
+                                scope.launch {
+                                    navigator.navigateTo(
+                                        ListDetailPaneScaffoldRole.Detail,
+                                        "${selectedPluginId ?: ""}:${capability.name}"
+                                    )
+                                }
+                            }
+                        },
+                        isInteractiveOnly = true,
+                        fillPaneWidth = true
+                    )
                 }
-            },
-            onBackToPlugins = {
-                selectedPluginId = null
-            },
-            selectedCapability = if (selectedTool?.plugin?.getManifest()?.getOrNull()?.plugin?.id == selectedPluginId) {
-                selectedTool?.capability
-            } else null,
-            onCapabilitySelected = { capability ->
-                val matching = tools.find {
-                    it.plugin.getManifest().getOrNull()?.plugin?.id == selectedPluginId &&
-                        it.capability.name == capability.name
-                }
-                if (matching != null) {
-                    viewModel.selectTool(matching)
-                }
-            },
-            isInteractiveOnly = true
-        )
-
-        // Right Pane: Full Interactive Workspace (covers the whole section)
-        Box(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxHeight()
-                .clipToBounds()
-        ) {
+            }
+        },
+        detailPane = {
+            AnimatedPane {
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceContainerLowest,
+                    shape = ToolkitTheme.shapes.large,
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clipToBounds()
+                    ) {
             val currentTool = selectedTool
             if (currentTool == null) {
                 if (tools.isEmpty()) {
@@ -228,7 +284,8 @@ fun InteractiveToolsScreen(
                     ) {
                         Card(
                             modifier = Modifier
-                                .width(400.dp)
+                                .fillMaxWidth()
+                                .widthIn(max = ToolkitTheme.dimensions.adaptiveListPaneWidth)
                                 .border(
                                     width = ToolkitTheme.dimensions.borderThin,
                                     color = MaterialTheme.colorScheme.outlineVariant,
@@ -276,8 +333,23 @@ fun InteractiveToolsScreen(
                     }
                 }
             }
+
+                if (navigator.canNavigateBack()) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .padding(ToolkitTheme.spacing.small)
+                    ) {
+                        AdaptiveBackNavigationButton(
+                            onClick = { scope.launch { navigator.navigateBack() } }
+                        )
+                    }
+                }
+            }
         }
     }
+        }
+    )
 }
 
 private const val SPATIAL_SPRING_STIFFNESS = 900f

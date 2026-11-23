@@ -23,19 +23,38 @@ import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.AppBarRow
 import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
+import androidx.compose.material3.adaptive.layout.AnimatedPane
+import androidx.compose.material3.adaptive.layout.ListDetailPaneScaffold
+import androidx.compose.material3.adaptive.layout.ListDetailPaneScaffoldRole
+import androidx.compose.material3.adaptive.navigation.rememberListDetailPaneScaffoldNavigator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.unit.Dp
+import kotlinx.coroutines.launch
+import org.wip.plugintoolkit.shared.components.AdaptiveAppBarOverflowButton
+import org.wip.plugintoolkit.shared.components.AdaptiveBackNavigationButton
+import org.wip.plugintoolkit.shared.components.AdaptiveConstrainedContent
+import org.wip.plugintoolkit.shared.components.AdaptivePaneHeader
+import org.wip.plugintoolkit.shared.components.DesktopPaneDragHandle
+import org.wip.plugintoolkit.shared.components.adaptiveOuterHorizontalPadding
+import org.wip.plugintoolkit.shared.components.rememberAdaptivePaneScaffoldDirective
+import org.wip.plugintoolkit.shared.components.rememberFixedListPaneExpansionState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -155,6 +174,11 @@ val SettingNavConfig = SavedStateConfiguration {
     }
 }
 
+@OptIn(
+    ExperimentalMaterial3Api::class,
+    ExperimentalMaterial3AdaptiveApi::class,
+    ExperimentalMaterial3ExpressiveApi::class
+)
 @Composable
 fun SettingsScreen(
     modifier: Modifier = Modifier,
@@ -222,106 +246,158 @@ fun SettingsScreen(
         )
     )
 
-    Row(
+    val scope = rememberCoroutineScope()
+    val directive = rememberAdaptivePaneScaffoldDirective()
+    val navigator = rememberListDetailPaneScaffoldNavigator<SettingNavKey>(scaffoldDirective = directive)
+    val paneExpansionState = rememberFixedListPaneExpansionState(
+        initialWidth = ToolkitTheme.dimensions.adaptiveListPaneWidth
+    )
+
+    ListDetailPaneScaffold(
+        directive = navigator.scaffoldDirective,
+        value = navigator.scaffoldValue,
         modifier = modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
+            .padding(
+                horizontal = adaptiveOuterHorizontalPadding(),
+                vertical = ToolkitTheme.spacing.medium
+            )
             .onPreviewKeyEvent { event ->
                 if (event.isCtrlPressed && event.key == Key.F && event.type == KeyEventType.KeyDown) {
                     searchFocusRequester.requestFocus()
                     true
                 } else false
-            }
-    ) {
-        // ── Left: internal settings sidebar ─────────────────────────────────
-        NavigationSidebar(
-            title = Res.string.settings.localized,
-            bodySections = listOf(applicationSection),
-            bottomSections = listOf(aboutSection),
-            currentScreen = currentKey,
-            onScreenSelected = { route ->
-                if (backStack.lastOrNull() != route) {
-                    backStack.add(route)
-                }
             },
-            isNavbarCollapsed = false,
-            onToggleNavbar = {},
-            canCollapse = false,
-            headerContent = {
-                org.wip.plugintoolkit.shared.components.ToolkitTextField(
-                    value = searchQuery,
-                    onValueChange = { searchViewModel.searchQuery = it },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = ToolkitTheme.spacing.medium)
-                        .focusRequester(searchFocusRequester),
-                    placeholder = { Text(stringResource(Res.string.settings_search_placeholder)) },
-                    leadingIcon = {
-                        Icon(
-                            Icons.Default.Search,
-                            contentDescription = stringResource(Res.string.settings_search_placeholder)
-                        )
-                    },
-                    singleLine = true
-                )
-            })
-
-        // ── Right: detail panel ──────────────────────────────────────────────
-        Column(
-            modifier = Modifier.weight(1f).fillMaxHeight().padding(ToolkitTheme.spacing.large)
-        ) {
-            val titleText = when (currentKey) {
-                SettingNavKey.Appearance -> stringResource(Res.string.setting_appearance)
-                SettingNavKey.SystemSettings -> stringResource(Res.string.section_system)
-                SettingNavKey.Shortcuts -> stringResource(Res.string.shortcuts_title)
-                SettingNavKey.NotificationHistory -> stringResource(Res.string.nav_notification_history)
-                SettingNavKey.PluginRepo -> stringResource(Res.string.section_plugins_repositories)
-                SettingNavKey.PluginManager -> stringResource(Res.string.section_plugins_manager)
-                SettingNavKey.About -> stringResource(Res.string.section_about)
-                SettingNavKey.BroadSearch -> stringResource(Res.string.settings)
-                else -> "Error"
-            }
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+        paneExpansionState = paneExpansionState,
+        paneExpansionDragHandle = { state ->
+            DesktopPaneDragHandle(paneExpansionState = state)
+        },
+        listPane = {
+            AnimatedPane(
+                modifier = Modifier.preferredWidth(ToolkitTheme.dimensions.adaptiveListPaneWidth)
             ) {
-                Text(
-                    text = titleText,
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-
-                if (currentKey == SettingNavKey.Shortcuts) {
-                    val resetTitle = stringResource(Res.string.shortcuts_reset_all)
-                    val resetMsg = stringResource(Res.string.shortcuts_reset_all_confirm)
-                    val hasCustomBindings = settings.shortcuts.customBindings.isNotEmpty() ||
-                        settings.shortcuts.customRelativePriorities.isNotEmpty()
-
-                    OutlinedButton(
-                        onClick = {
-                            dialogService.showConfirmation(
-                                title = resetTitle,
-                                message = resetMsg,
-                                onConfirm = { shortcutManager.resetAllToDefaults() }
-                            )
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    shape = ToolkitTheme.shapes.large,
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    NavigationSidebar(
+                        title = Res.string.settings.localized,
+                        bodySections = listOf(applicationSection),
+                        bottomSections = listOf(aboutSection),
+                        currentScreen = currentKey,
+                        onScreenSelected = { route ->
+                            if (backStack.lastOrNull() != route) {
+                                backStack.add(route)
+                            }
+                            if (route is SettingNavKey) {
+                                scope.launch {
+                                    navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, route)
+                                }
+                            }
                         },
-                        enabled = hasCustomBindings
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Restore,
-                            contentDescription = null,
-                            modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
-                        )
-                        Spacer(Modifier.width(ToolkitTheme.spacing.extraSmall))
-                        Text(resetTitle)
-                    }
+                        isNavbarCollapsed = false,
+                        onToggleNavbar = {},
+                        canCollapse = false,
+                        expandedWidth = Dp.Unspecified,
+                        headerContent = {
+                            org.wip.plugintoolkit.shared.components.ToolkitTextField(
+                                value = searchQuery,
+                                onValueChange = { searchViewModel.searchQuery = it },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(bottom = ToolkitTheme.spacing.medium)
+                                    .focusRequester(searchFocusRequester),
+                                placeholder = { Text(stringResource(Res.string.settings_search_placeholder)) },
+                                leadingIcon = {
+                                    Icon(
+                                        Icons.Default.Search,
+                                        contentDescription = stringResource(Res.string.settings_search_placeholder)
+                                    )
+                                },
+                                singleLine = true
+                            )
+                        }
+                    )
                 }
             }
-            Spacer(modifier = Modifier.height(ToolkitTheme.spacing.medium))
+        },
+        detailPane = {
+            AnimatedPane {
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceContainerLowest,
+                    shape = ToolkitTheme.shapes.large,
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(bottom = ToolkitTheme.spacing.large)
+                    ) {
+                        val titleText = when (currentKey) {
+                            SettingNavKey.Appearance -> stringResource(Res.string.setting_appearance)
+                            SettingNavKey.SystemSettings -> stringResource(Res.string.section_system)
+                            SettingNavKey.Shortcuts -> stringResource(Res.string.shortcuts_title)
+                            SettingNavKey.NotificationHistory -> stringResource(Res.string.nav_notification_history)
+                            SettingNavKey.PluginRepo -> stringResource(Res.string.section_plugins_repositories)
+                            SettingNavKey.PluginManager -> stringResource(Res.string.section_plugins_manager)
+                            SettingNavKey.About -> stringResource(Res.string.section_about)
+                            SettingNavKey.BroadSearch -> stringResource(Res.string.settings)
+                            else -> "Error"
+                        }
 
-            CompositionLocalProvider(
+                        AdaptivePaneHeader(
+                            title = titleText,
+                            navigationIcon = if (navigator.canNavigateBack()) {
+                                {
+                                    AdaptiveBackNavigationButton(
+                                        onClick = { scope.launch { navigator.navigateBack() } }
+                                    )
+                                }
+                            } else null,
+                            actions = {
+                                if (currentKey == SettingNavKey.Shortcuts) {
+                                    val resetTitle = stringResource(Res.string.shortcuts_reset_all)
+                                    val resetMsg = stringResource(Res.string.shortcuts_reset_all_confirm)
+                                    val hasCustomBindings = settings.shortcuts.customBindings.isNotEmpty() ||
+                                        settings.shortcuts.customRelativePriorities.isNotEmpty()
+                                    AppBarRow(
+                                        maxItemCount = 1,
+                                        overflowIndicator = { menuState ->
+                                            AdaptiveAppBarOverflowButton(menuState = menuState)
+                                        }
+                                    ) {
+                                        clickableItem(
+                                            onClick = {
+                                                dialogService.showConfirmation(
+                                                    title = resetTitle,
+                                                    message = resetMsg,
+                                                    onConfirm = { shortcutManager.resetAllToDefaults() }
+                                                )
+                                            },
+                                            enabled = hasCustomBindings,
+                                            icon = {
+                                                Icon(
+                                                    imageVector = Icons.Default.Restore,
+                                                    contentDescription = resetTitle,
+                                                    modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
+                                                )
+                                            },
+                                            label = resetTitle
+                                        )
+                                    }
+                                }
+                            }
+                        )
+                        Spacer(modifier = Modifier.height(ToolkitTheme.spacing.medium))
+
+                        AdaptiveConstrainedContent(
+                            maxWidth = ToolkitTheme.dimensions.sduiFormMaxWidth,
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(horizontal = adaptiveOuterHorizontalPadding())
+                        ) {
+                            CompositionLocalProvider(
                 LocalSettingsSearchQuery provides searchQuery,
                 LocalSettingsRegistry provides allDefinitions,
                 LocalSettingsResolvedStrings provides resolvedStrings
@@ -412,6 +488,9 @@ fun SettingsScreen(
                                         if (backStack.lastOrNull() != targetKey) {
                                             backStack.add(targetKey)
                                         }
+                                        scope.launch {
+                                            navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, targetKey)
+                                        }
                                     })
                             }
 
@@ -419,9 +498,13 @@ fun SettingsScreen(
                         }
                     }
                 }
+                        }
+                        }
+                    }
+                }
             }
         }
-    }
+    )
 }
 
 

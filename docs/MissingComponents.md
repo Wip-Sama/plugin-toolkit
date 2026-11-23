@@ -7,9 +7,9 @@ This document summarizes the UI components, Material 3 Expressive primitives, an
 
 ---
 
-## Current Baseline (Verified in Codebase — App `4.1.0-alpha04`)
+## Current Baseline (Verified in Codebase — App `4.1.0-alpha05`)
 
-- **Compose / Material 3 Versions** (`gradle/libs.versions.toml`): `compose-multiplatform = "1.12.0"`, `material3 = "1.12.0-alpha03"`.
+- **Compose / Material 3 Versions** (`gradle/libs.versions.toml`): `compose-multiplatform = "1.12.0"`, `material3 = "1.12.0-alpha03"`, `compose-adaptive = "1.3.0"`.
 - **SDUI `UiNode` Catalog** (`plugin-api/.../sdui/UiNode.kt`): 55 `UiNode` types (53 author-facing + `UnknownNode` and `ErrorBoundaryNode`):
   - **Layout & Shell:** `ColumnNode`, `RowNode`, `FlowRowNode`, `BoxNode`, `CardNode`, `ScrollableColumnNode` (with `scrollToIndex`/`scrollToEdge`/`scrollRevision`), `ScrollableRowNode`, `GridNode` (with scroll anchoring), `SplitPaneNode`, `ScaffoldNode`, `SidebarNode`, `FloatingPanelNode`, `TabsNode`, `AccordionNode`, `DialogNode`, `SpacerNode`, `DividerNode`.
   - **Controls & Inputs:** `ButtonNode`, `ButtonGroupNode`, `SplitButtonNode`, `IconButtonNode`, `MenuNode`, `TextInputNode` (with `isSecret`), `NumberInputNode`, `SearchBarNode`, `RadioGroupNode`, `ToggleNode`, `CheckboxNode`, `DropdownNode`, `MultiSelectDropdownNode`, `SliderNode`, `RangeSliderNode`, `FilePickerNode`, `ColorPickerNode`, `ChipGroupNode`, `ListItemNode`, `BreadcrumbsNode`, `PaginationNode`, `StepperNode`.
@@ -97,11 +97,11 @@ Auditing `shared/gui` against the project's `m3-*` skill suite (`m3-desktop-expr
 
 | Missing Component | Target M3 / Adaptive API | Current State in `shared/gui` |
 | :--- | :--- | :--- |
-| **Adaptive Root Navigation** | `NavigationSuiteScaffold` + `WindowSizeClass` (`currentWindowAdaptiveInfo()`) | Uses custom `NavigationSidebar` / `SidebarContainer` instead of `NavigationSuiteScaffold` driven by `WindowSizeClass` breakpoints. |
-| **Expandable M3 Expressive Rail** | `WideNavigationRail` + `WideNavigationRailItem` + `rememberWideNavigationRailState` | Custom `NavigationSidebar` implementation in `shared/components/sidebar/`. |
-| **Canonical Multi-Pane Scaffolds** | `NavigableListDetailPaneScaffold` / `NavigableSupportingPaneScaffold` + `VerticalDragHandle` + `rememberPaneExpansionState` | Multi-pane views are built manually per feature instead of adaptive `ThreePaneScaffold`s with 24dp partition spacers. |
-| **Overflow-Aware Pane Toolbars** | `AppBarRow` / `AppBarColumn` + `AppBarOverflowIndicator` | Action rows do not automatically collapse into overflow menus on narrow desktop windows. |
-| **Flexible Pane App Bars** | `TopAppBar(subtitle = ...)` / `MediumFlexibleTopAppBar` | Missing M3 Expressive pane-scoped app bars with subtitle & scroll behavior. |
+| **Adaptive Root Navigation** *(Implemented — Batch 5)* | `NavigationSuiteScaffoldLayout` + `WindowSizeClass` (`currentWindowAdaptiveInfo()`) | `AppScaffold` switches between `WideNavigationRail` (`>= 600.dp`) and `ShortNavigationBarCompact` (`< 600.dp`) using `WindowSizeClass` breakpoints. |
+| **Expandable M3 Expressive Rail** *(Implemented — Batch 5)* | `WideNavigationRail` + `WideNavigationRailItem` + `rememberWideNavigationRailState` | `AppScaffold` renders M3 `WideNavigationRail` with `ToolkitTooltipBox` expand/collapse toggle, item tooltips when collapsed, and synced custom title bar offsets. |
+| **Canonical Multi-Pane Scaffolds** *(Implemented — Batch 5)* | `ListDetailPaneScaffold` / `SupportingPaneScaffold` + `VerticalDragHandle` + `rememberPaneExpansionState` | `SettingsScreen`, `PluginRepoView`, `InteractiveToolsScreen`, `PluginManagerView`, and `FlowManagerView` migrated via `AdaptivePaneLayouts` (`24.dp` partition spacing, `surfaceContainerLow` vs `surfaceContainerLowest`, `680.dp` max prose measure). |
+| **Overflow-Aware Pane Toolbars** *(Implemented — Batch 5)* | `AppBarRow` + `AdaptiveAppBarOverflowButton` | `PluginManagerView`, `FlowManagerView`, `SettingsScreen`, and `PluginRepoDetails` use M3 `AppBarRow` with overflow menu indicator. |
+| **Flexible Pane App Bars** *(Implemented — Batch 5)* | `TopAppBar(subtitle = ...)` (`AdaptivePaneHeader`) | Pane headers across refactored multi-pane views use M3 `TopAppBar` (with subtitle support and zeroed pane insets). |
 
 ### 2.3 Missing Material 3 Expressive Controls in `shared/components`
 
@@ -134,8 +134,8 @@ Auditing `shared/gui` against the project's `m3-*` skill suite (`m3-desktop-expr
    - **SDUI:** `TableNode`, `AccordionNode`, `RadioGroupNode`, `SearchBarNode`, `NumberInputNode`, `CodeBlockNode`, `UiModifier.tooltip`, and `UiModifier.contextMenu`.
    - **Host:** Upgrade `AppTheme` to `MaterialExpressiveTheme` (`MotionScheme` + 8-step `Shapes`), add `ToolkitSplitButton` / `SplitButtonLayout`, `LoadingIndicator` / `WavyProgressIndicator`, `HorizontalFloatingToolbar` (for Flow Editor & `BoardNode`), and shared `ToolkitSearchBar` / `ToolkitDataTable`.
 2. **Medium Priority (Workflows & Ergonomics)**
-   - **SDUI:** `TreeViewNode`, `FlowRowNode`, `MultiSelectDropdownNode`, `FilePickerNode`, `ColorPickerNode`, `BreadcrumbsNode`, `PaginationNode`, `RangeSliderNode`, `MarkdownTextNode`.
-   - **Host:** Adopt `WideNavigationRail` + `NavigationSuiteScaffold` (`WindowSizeClass`), `NavigableListDetailPaneScaffold` / `SupportingPaneScaffold`, `AppBarRow` overflow toolbars, and `ContextMenuArea` wrappers.
+   - **SDUI:** *(Implemented — Batches 3–4)* `TreeViewNode`, `FlowRowNode`, `MultiSelectDropdownNode`, `FilePickerNode`, `ColorPickerNode`, `BreadcrumbsNode`, `PaginationNode`, `RangeSliderNode`, `MarkdownTextNode`.
+   - **Host:** *(Implemented — Batch 5)* Adopt `WideNavigationRail` + `NavigationSuiteScaffoldLayout` (`WindowSizeClass`), `ListDetailPaneScaffold` / `SupportingPaneScaffold`, `AppBarRow` overflow toolbars, and `ContextMenuArea` wrappers.
 3. **Low Priority / Specialized**
    - **SDUI:** `DatePickerNode` / `TimePickerNode`, `StepperNode`, `SideSheetNode`, `ImageCompareNode`, `MediaPlayerNode`, `FloatingToolbarNode`, `FabMenuNode`.
    - **Host:** `FloatingActionButtonMenu`, `MaterialShapes` morphing accents (e.g. badges/avatars/empty states).

@@ -1,5 +1,28 @@
 package org.wip.plugintoolkit.features.plugin.ui
 
+import androidx.compose.material3.AppBarRow
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
+import androidx.compose.material3.adaptive.layout.AnimatedPane
+import androidx.compose.material3.adaptive.layout.SupportingPaneScaffold
+import androidx.compose.material3.adaptive.layout.SupportingPaneScaffoldRole
+import androidx.compose.material3.adaptive.navigation.rememberSupportingPaneScaffoldNavigator
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
+import org.wip.plugintoolkit.shared.components.AdaptiveAppBarOverflowButton
+import org.wip.plugintoolkit.shared.components.AdaptiveBackNavigationButton
+import org.wip.plugintoolkit.shared.components.AdaptiveConstrainedContent
+import org.wip.plugintoolkit.shared.components.AdaptivePaneHeader
+import org.wip.plugintoolkit.shared.components.DesktopPaneDragHandle
+import org.wip.plugintoolkit.shared.components.adaptiveOuterHorizontalPadding
+import org.wip.plugintoolkit.shared.components.rememberAdaptivePaneScaffoldDirective
+import org.wip.plugintoolkit.shared.components.rememberSupportingPaneExpansionState
+import plugintoolkit.composeapp.generated.resources.plugin_folders_toggle
+import plugintoolkit.composeapp.generated.resources.plugin_manager_subtitle
+import plugintoolkit.composeapp.generated.resources.plugin_manager_title
+
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -144,6 +167,11 @@ import plugintoolkit.composeapp.generated.resources.plugin_version_pkg_format
 import plugintoolkit.composeapp.generated.resources.plugin_newer_version_in_other_repo
 import plugintoolkit.composeapp.generated.resources.plugin_switch_repo_action
 
+@OptIn(
+    ExperimentalMaterial3Api::class,
+    ExperimentalMaterial3AdaptiveApi::class,
+    ExperimentalMaterial3ExpressiveApi::class
+)
 @Composable
 fun PluginManagerView(
     viewModel: PluginManagerViewModel = koinInject(),
@@ -241,126 +269,133 @@ fun PluginManagerView(
         runCatching { searchFocusRequester.requestFocus() }
     }
 
-    Column(modifier = modifier
-        .fillMaxSize()
-        .padding(ToolkitTheme.spacing.extraLarge)
-        .onPreviewKeyEvent { event ->
-            if (event.isCtrlPressed && event.key == Key.F && event.type == KeyEventType.KeyDown) {
-                searchFocusRequester.requestFocus()
-                true
-            } else false
-        }
-    ) {
+    val scope = rememberCoroutineScope()
+    val baseDirective = rememberAdaptivePaneScaffoldDirective()
+    var showFoldersPane by remember { mutableStateOf(true) }
+    val directive = remember(baseDirective, showFoldersPane) {
+        if (showFoldersPane) baseDirective else baseDirective.copy(maxHorizontalPartitions = 1)
+    }
+    val navigator = rememberSupportingPaneScaffoldNavigator<Unit>(scaffoldDirective = directive)
+    val paneExpansionState = rememberSupportingPaneExpansionState(
+        initialWidth = ToolkitTheme.dimensions.adaptiveSupportingPaneWidth
+    )
+
+    SupportingPaneScaffold(
+        directive = navigator.scaffoldDirective,
+        value = navigator.scaffoldValue,
+        modifier = modifier
+            .fillMaxSize()
+            .padding(
+                horizontal = adaptiveOuterHorizontalPadding(),
+                vertical = ToolkitTheme.spacing.medium
+            ),
+        paneExpansionState = paneExpansionState,
+        paneExpansionDragHandle = { state ->
+            DesktopPaneDragHandle(paneExpansionState = state)
+        },
+        mainPane = {
+            AnimatedPane {
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceContainerLowest,
+                    shape = ToolkitTheme.shapes.large,
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(
+                                horizontal = adaptiveOuterHorizontalPadding(),
+                                vertical = ToolkitTheme.spacing.medium
+                            )
+                            .onPreviewKeyEvent { event ->
+                                if (event.isCtrlPressed && event.key == Key.F && event.type == KeyEventType.KeyDown) {
+                                    searchFocusRequester.requestFocus()
+                                    true
+                                } else false
+                            }
+                    ) {
         if (!isReady) {
             Box(
                 modifier = Modifier.fillMaxWidth().height(ToolkitTheme.spacing.extraSmall),
                 contentAlignment = Alignment.Center
             ) {
-                androidx.compose.material3.LinearProgressIndicator(
+                LinearProgressIndicator(
                     modifier = Modifier.fillMaxWidth(),
                     color = MaterialTheme.colorScheme.primary
                 )
             }
         }
-        // Toolbar with responsive compact collapsing
-        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-            val isCompact = maxWidth < ToolkitTheme.dimensions.breakpointWideToolbar
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                ToolkitButtonGroup {
-                    item { shape, modifierSpec ->
-                        FilledTonalButton(
-                            onClick = { viewModel.refreshList() },
-                            enabled = isReady,
-                            shape = shape,
-                            modifier = modifierSpec.tooltip(Res.string.plugin_refresh_list_tooltip)
-                        ) {
-                            Icon(Icons.Default.Refresh, contentDescription = null)
-                            if (!isCompact) {
-                                Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
-                                Text(stringResource(Res.string.plugin_refresh_list), maxLines = 1, softWrap = false)
-                            }
-                        }
+        val foldersTooltip = stringResource(Res.string.plugin_folders_toggle)
+        val refreshListLabel = stringResource(Res.string.plugin_refresh_list)
+        val rescanLabel = stringResource(Res.string.plugin_rescan)
+        val reloadAllLabel = stringResource(Res.string.plugin_reload_all)
+        val refreshLocksLabel = stringResource(Res.string.plugin_action_refresh_all_locks)
+        val installRemoteLabel = stringResource(Res.string.plugin_install_remote)
+        val installLocalLabel = stringResource(Res.string.plugin_install_local)
+        AdaptivePaneHeader(
+            title = stringResource(Res.string.plugin_manager_title),
+            subtitle = stringResource(Res.string.plugin_manager_subtitle, plugins.distinctBy { it.pkg }.size),
+            actions = {
+                AppBarRow(
+                    maxItemCount = 3,
+                    overflowIndicator = { menuState ->
+                        AdaptiveAppBarOverflowButton(menuState = menuState)
                     }
-                    item { shape, modifierSpec ->
-                        FilledTonalButton(
-                            onClick = { viewModel.rescan() },
-                            enabled = isReady,
-                            shape = shape,
-                            modifier = modifierSpec.tooltip(Res.string.plugin_rescan_tooltip)
-                        ) {
-                            Icon(Icons.Default.Folder, contentDescription = null)
-                            if (!isCompact) {
-                                Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
-                                Text(stringResource(Res.string.plugin_rescan), maxLines = 1, softWrap = false)
+                ) {
+                    clickableItem(
+                        onClick = { viewModel.openRemoteInstall() },
+                        enabled = isReady,
+                        icon = { Icon(Icons.Default.Add, contentDescription = installRemoteLabel) },
+                        label = installRemoteLabel
+                    )
+                    clickableItem(
+                        onClick = { viewModel.installLocal() },
+                        enabled = isReady,
+                        icon = { Icon(Icons.Default.Folder, contentDescription = installLocalLabel) },
+                        label = installLocalLabel
+                    )
+                    toggleableItem(
+                        checked = showFoldersPane,
+                        onCheckedChange = { checked ->
+                            showFoldersPane = checked
+                            scope.launch {
+                                if (checked) {
+                                    navigator.navigateTo(SupportingPaneScaffoldRole.Supporting)
+                                } else if (navigator.canNavigateBack()) {
+                                    navigator.navigateBack()
+                                }
                             }
-                        }
-                    }
-                    item { shape, modifierSpec ->
-                        FilledTonalButton(
-                            onClick = { viewModel.reloadAll() },
-                            enabled = isReady,
-                            shape = shape,
-                            modifier = modifierSpec.tooltip(Res.string.plugin_reload_all_tooltip)
-                        ) {
-                            Icon(Icons.Default.Replay, contentDescription = null)
-                            if (!isCompact) {
-                                Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
-                                Text(stringResource(Res.string.plugin_reload_all), maxLines = 1, softWrap = false)
-                            }
-                        }
-                    }
-                    item { shape, modifierSpec ->
-                        FilledTonalButton(
-                            onClick = { viewModel.refreshAllLocks() },
-                            enabled = isReady,
-                            shape = shape,
-                            modifier = modifierSpec.tooltip(Res.string.plugin_refresh_all_locks_tooltip)
-                        ) {
-                            Icon(Icons.Default.Lock, contentDescription = null)
-                            if (!isCompact) {
-                                Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
-                                Text(stringResource(Res.string.plugin_action_refresh_all_locks), maxLines = 1, softWrap = false)
-                            }
-                        }
-                    }
-                }
-
-                ToolkitButtonGroup {
-                    item { shape, modifierSpec ->
-                        Button(
-                            onClick = { viewModel.openRemoteInstall() },
-                            enabled = isReady,
-                            shape = shape,
-                            modifier = modifierSpec.tooltip(Res.string.plugin_install_remote_tooltip)
-                        ) {
-                            Icon(Icons.Default.Add, contentDescription = null)
-                            if (!isCompact) {
-                                Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
-                                Text(stringResource(Res.string.plugin_install_remote), maxLines = 1, softWrap = false)
-                            }
-                        }
-                    }
-                    item { shape, modifierSpec ->
-                        Button(
-                            onClick = { viewModel.installLocal() },
-                            enabled = isReady,
-                            shape = shape,
-                            modifier = modifierSpec.tooltip(Res.string.plugin_install_local_tooltip)
-                        ) {
-                            Icon(Icons.Default.Add, contentDescription = null)
-                            if (!isCompact) {
-                                Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
-                                Text(stringResource(Res.string.plugin_install_local), maxLines = 1, softWrap = false)
-                            }
-                        }
-                    }
+                        },
+                        icon = { Icon(Icons.Default.Folder, contentDescription = foldersTooltip) },
+                        label = foldersTooltip
+                    )
+                    clickableItem(
+                        onClick = { viewModel.refreshList() },
+                        enabled = isReady,
+                        icon = { Icon(Icons.Default.Refresh, contentDescription = refreshListLabel) },
+                        label = refreshListLabel
+                    )
+                    clickableItem(
+                        onClick = { viewModel.rescan() },
+                        enabled = isReady,
+                        icon = { Icon(Icons.Default.Folder, contentDescription = rescanLabel) },
+                        label = rescanLabel
+                    )
+                    clickableItem(
+                        onClick = { viewModel.reloadAll() },
+                        enabled = isReady,
+                        icon = { Icon(Icons.Default.Replay, contentDescription = reloadAllLabel) },
+                        label = reloadAllLabel
+                    )
+                    clickableItem(
+                        onClick = { viewModel.refreshAllLocks() },
+                        enabled = isReady,
+                        icon = { Icon(Icons.Default.Lock, contentDescription = refreshLocksLabel) },
+                        label = refreshLocksLabel
+                    )
                 }
             }
-        }
+        )
 
         Spacer(modifier = Modifier.height(ToolkitTheme.spacing.medium))
 
@@ -486,60 +521,88 @@ fun PluginManagerView(
                 }
             }
         }
+                    }
+                }
+            }
+        },
+        supportingPane = {
+            AnimatedPane(
+                modifier = Modifier.preferredWidth(ToolkitTheme.dimensions.adaptiveSupportingPaneWidth)
+            ) {
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    shape = ToolkitTheme.shapes.large,
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(ToolkitTheme.spacing.medium)
+                    ) {
+                        if (navigator.canNavigateBack()) {
+                            AdaptiveBackNavigationButton(
+                                onClick = {
+                                    showFoldersPane = false
+                                    scope.launch { navigator.navigateBack() }
+                                }
+                            )
+                        }
+                        // Managed Folders Section
+                        SettingsGroup(
+                            title = stringResource(Res.string.plugin_managed_folders),
+                            collapsible = false
+                        ) {
+                            val folders = viewModel.managedFolders.collectAsState().value
+                            val defaultFolder = viewModel.defaultPluginFolder
+                            val totalItems = folders.size + 1
 
-        // Managed Folders Section
-        SettingsGroup(
-            title = stringResource(Res.string.plugin_managed_folders),
-            collapsible = true,
-            initialExpanded = false
-        ) {
-            val folders = viewModel.managedFolders.collectAsState().value
-            val defaultFolder = viewModel.defaultPluginFolder
-            val totalItems = folders.size + 1
-
-            folders.forEachIndexed { index, folder ->
-                val isDefault = folder == defaultFolder
-                SettingsItem(
-                    title = folder,
-                    subtitle = if (isDefault) stringResource(Res.string.plugin_default_folder_label) else null,
-                    icon = Icons.Default.Folder,
-                    shape = getGroupedShape(index, totalItems),
-                    control = {
-                        if (isDefault) {
-                            Surface(
-                                color = MaterialTheme.colorScheme.primaryContainer,
-                                shape = MaterialTheme.shapes.extraSmall,
-                                modifier = Modifier.padding(end = ToolkitTheme.spacing.small)
-                            ) {
-                                Text(
-                                    stringResource(Res.string.plugin_default_tag),
-                                    modifier = Modifier.padding(
-                                        horizontal = ToolkitTheme.spacing.extraSmall + ToolkitTheme.dimensions.buttonGroupGap,
-                                        vertical = ToolkitTheme.spacing.extraSmall / 2
-                                    ),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                    fontWeight = FontWeight.Bold
+                            folders.forEachIndexed { index, folder ->
+                                val isDefault = folder == defaultFolder
+                                SettingsItem(
+                                    title = folder,
+                                    subtitle = if (isDefault) stringResource(Res.string.plugin_default_folder_label) else null,
+                                    icon = Icons.Default.Folder,
+                                    shape = getGroupedShape(index, totalItems),
+                                    control = {
+                                        if (isDefault) {
+                                            Surface(
+                                                color = MaterialTheme.colorScheme.primaryContainer,
+                                                shape = MaterialTheme.shapes.extraSmall,
+                                                modifier = Modifier.padding(end = ToolkitTheme.spacing.small)
+                                            ) {
+                                                Text(
+                                                    stringResource(Res.string.plugin_default_tag),
+                                                    modifier = Modifier.padding(
+                                                        horizontal = ToolkitTheme.spacing.extraSmall + ToolkitTheme.dimensions.buttonGroupGap,
+                                                        vertical = ToolkitTheme.spacing.extraSmall / 2
+                                                    ),
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                            }
+                                        } else {
+                                            IconButton(onClick = { viewModel.removeManagedFolder(folder) }) {
+                                                Icon(
+                                                    Icons.Default.Delete,
+                                                    contentDescription = stringResource(Res.string.action_remove),
+                                                    tint = MaterialTheme.colorScheme.error
+                                                )
+                                            }
+                                        }
+                                    }
                                 )
                             }
-                        } else {
-                            IconButton(onClick = { viewModel.removeManagedFolder(folder) }) {
-                                Icon(
-                                    Icons.Default.Delete,
-                                    contentDescription = stringResource(Res.string.action_remove),
-                                    tint = MaterialTheme.colorScheme.error
-                                )
-                            }
+                            SettingsItem(
+                                title = stringResource(Res.string.plugin_add_folder),
+                                icon = Icons.Default.CreateNewFolder,
+                                onClick = { viewModel.addManagedFolder() },
+                                shape = getGroupedShape(folders.size, totalItems)
+                            )
                         }
                     }
-                )
+                }
             }
-            SettingsItem(
-                title = stringResource(Res.string.plugin_add_folder),
-                icon = Icons.Default.CreateNewFolder,
-                onClick = { viewModel.addManagedFolder() },
-                shape = getGroupedShape(folders.size, totalItems)
-            )
         }
-    }
+    )
 }
