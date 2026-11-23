@@ -193,6 +193,7 @@ Every DSL call inside `uiTree { ... }` builds immutable `UiNode` models with det
 | :--- | :--- | :--- |
 | `column(...) { ... }` | `ColumnNode` | `id`, `spacing: SpacingSize = SpacingSize.NONE`, `modifier`, `reorderable: Boolean = false` |
 | `row(...) { ... }` | `RowNode` | `id`, `spacing: SpacingSize = SpacingSize.NONE`, `modifier` |
+| `flowRow(...) { ... }` | `FlowRowNode` | `id`, `horizontalSpacing: SpacingSize = SpacingSize.SMALL`, `verticalSpacing: SpacingSize = SpacingSize.SMALL`, `maxItemsInEachRow: Int? = null`, `modifier` |
 | `box(...) { ... }` | `BoxNode` | `id`, `modifier` |
 | `card(...) { ... }` | `CardNode` | `id`, `title: String? = null`, `surfaceRole: SemanticColor? = null` (solid M3 tonal fill), `outlined: Boolean = false`, `modifier` |
 | `scrollableColumn(...) { ... }` | `ScrollableColumnNode` | `id`, `spacing: SpacingSize = SpacingSize.NONE`, `modifier`, `reorderable: Boolean = false` |
@@ -226,7 +227,9 @@ Every DSL call inside `uiTree { ... }` builds immutable `UiNode` models with det
 | `toggle(...)` | `ToggleNode` | `id`, `checked: Boolean`, `label`, `modifier` -> `UiEvent.ToggleChanged(nodeId, checked)` |
 | `checkbox(...)` | `CheckboxNode` | `checked: Boolean`, `id`, `label`, `modifier` -> `UiEvent.ToggleChanged(nodeId, checked)` |
 | `dropdown(...)` | `DropdownNode` | `id`, `selectedKey: String`, `options: Map<String, String>`, `label`, `modifier` -> `UiEvent.OptionSelected(nodeId, selectedKey)` |
+| `multiSelectDropdown(...)` | `MultiSelectDropdownNode` | `options: Map<String, String>`, `id`, `selectedKeys: Set<String> = emptySet()`, `label`, `placeholder`, `searchable = true`, `showSelectAll = true`, `modifier` -> `UiEvent.MultiOptionSelected(nodeId, selectedKeys)` |
 | `slider(...)` | `SliderNode` | `id`, `value: Double`, `min = 0.0`, `max = 1.0`, `steps = 0`, `label`, `modifier` -> `UiEvent.ValueChanged(nodeId, value)` |
+| `rangeSlider(...)` | `RangeSliderNode` | `startValue: Double`, `endValue: Double`, `id`, `min = 0.0`, `max = 1.0`, `steps = 0`, `label`, `unitSuffix`, `modifier` -> `UiEvent.RangeChanged(nodeId, startValue, endValue)` |
 | `chipGroup(...)` | `ChipGroupNode` | `chips: List<ChipItem>`, `id`, `selectedKeys: Set<String> = emptySet()`, `multiSelect = false`, `modifier` -> `UiEvent.ChipSelected(nodeId, chipKey, isSelected)` |
 | `listItem(...)` | `ListItemNode` | `title`, `id`, `subtitle`, `leadingIcon`, `leadingAsset: AssetReference?`, `badgeText`, `badgeColor`, `selected = false`, `selectable = false`, `action: String? = null`, `modifier`, `trailingBlock` |
 
@@ -238,7 +241,10 @@ Every DSL call inside `uiTree { ... }` builds immutable `UiNode` models with det
 | DSL Builder | Node Class | Key Parameters |
 | :--- | :--- | :--- |
 | `text(...)` | `TextNode` | `text`, `id`, `role: TypographyRole = TypographyRole.BODY_MEDIUM`, `color: SemanticColor? = null`, `modifier`, `selectable = false`, `maxLines = null`, `overflowEllipsis = false` |
+| `markdownText(...)` | `MarkdownTextNode` | `markdown`, `id`, `selectable = true`, `maxLines = null`, `linkAction: String? = null`, `modifier` -> `UiEvent.Click` on links |
 | `codeBlock(...)` | `CodeBlockNode` | `code`, `id`, `language`, `title`, `showLineNumbers = true`, `wrapLines = false`, `showCopyButton = true`, `maxHeightDp`, `modifier` |
+| `table(...)` | `TableNode` | `columns: List<TableColumn>`, `rows: List<TableRow>` (or `TableBuilder`), `id`, `selectedRowKeys`, `sortColumnKey`, `sortAscending`, `emptyText`, `maxHeightDp`, `action`, `modifier` -> `UiEvent.TableSorted` / `UiEvent.Click` |
+| `keyValueList(...)` | `KeyValueListNode` | `entries: List<KeyValueEntry>` (or `KeyValueListBuilder`), `id`, `title`, `showDividers = true`, `modifier` |
 | `image(...)` | `ImageNode` | `asset: AssetReference`, `id`, `contentDescription`, `contentScale: ImageScale = ImageScale.FIT`, `clickable = false`, `action = null`, `selected = false`, `badgeText = null`, `modifier`, `zoomable = false` |
 | `icon(...)` | `IconNode` | `name: String`, `id`, `tint: SemanticColor? = null`, `size: ControlSize = ControlSize.MEDIUM`, `modifier` |
 | `badge(...)` | `BadgeNode` | `text: String`, `id`, `color: SemanticColor = SemanticColor.PRIMARY`, `modifier` |

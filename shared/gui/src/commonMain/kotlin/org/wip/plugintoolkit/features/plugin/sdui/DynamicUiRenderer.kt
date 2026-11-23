@@ -140,17 +140,22 @@ import org.wip.plugintoolkit.api.sdui.EmptyStateNode
 import org.wip.plugintoolkit.api.sdui.ErrorBoundaryNode
 import org.wip.plugintoolkit.api.sdui.FloatingAnchor
 import org.wip.plugintoolkit.api.sdui.FloatingPanelNode
+import org.wip.plugintoolkit.api.sdui.FlowRowNode
 import org.wip.plugintoolkit.api.sdui.GridNode
 import org.wip.plugintoolkit.api.sdui.IconButtonNode
 import org.wip.plugintoolkit.api.sdui.IconNode
 import org.wip.plugintoolkit.api.sdui.ImageNode
 import org.wip.plugintoolkit.api.sdui.ImageScale
+import org.wip.plugintoolkit.api.sdui.KeyValueListNode
 import org.wip.plugintoolkit.api.sdui.ListItemNode
 import org.wip.plugintoolkit.api.sdui.LoadingIndicatorNode
+import org.wip.plugintoolkit.api.sdui.MarkdownTextNode
+import org.wip.plugintoolkit.api.sdui.MultiSelectDropdownNode
 import org.wip.plugintoolkit.api.sdui.NumberInputNode
 import org.wip.plugintoolkit.api.sdui.ProgressBarNode
 import org.wip.plugintoolkit.api.sdui.ProgressBarStyle
 import org.wip.plugintoolkit.api.sdui.RadioGroupNode
+import org.wip.plugintoolkit.api.sdui.RangeSliderNode
 import org.wip.plugintoolkit.api.sdui.RowNode
 import org.wip.plugintoolkit.api.sdui.ScaffoldNode
 import org.wip.plugintoolkit.api.sdui.ScrollableColumnNode
@@ -165,6 +170,7 @@ import org.wip.plugintoolkit.api.sdui.SpacerNode
 import org.wip.plugintoolkit.api.sdui.SpacingSize
 import org.wip.plugintoolkit.api.sdui.SplitButtonNode
 import org.wip.plugintoolkit.api.sdui.SplitPaneNode
+import org.wip.plugintoolkit.api.sdui.TableNode
 import org.wip.plugintoolkit.api.sdui.TabsNode
 import org.wip.plugintoolkit.api.sdui.TextInputNode
 import org.wip.plugintoolkit.api.sdui.TextNode
@@ -335,6 +341,12 @@ internal fun resolveContainerSpacing(
             it is SearchBarNode ||
             it is AccordionNode ||
             it is CodeBlockNode ||
+            it is TableNode ||
+            it is KeyValueListNode ||
+            it is MarkdownTextNode ||
+            it is MultiSelectDropdownNode ||
+            it is RangeSliderNode ||
+            it is FlowRowNode ||
             it is AlertBannerNode ||
             it is SplitPaneNode ||
             it is TabsNode ||
@@ -475,6 +487,21 @@ fun RenderUiNode(
                             childModifier = childModifier.align(align.toBoxAlignment())
                         }
                         SafeUiNodeRenderer(node = child, onEvent = onEvent, modifier = childModifier)
+                    }
+                }
+            }
+        }
+
+        is FlowRowNode -> {
+            FlowRow(
+                modifier = appliedModifier,
+                horizontalArrangement = Arrangement.spacedBy(node.horizontalSpacing.toDp()),
+                verticalArrangement = Arrangement.spacedBy(node.verticalSpacing.toDp()),
+                maxItemsInEachRow = node.maxItemsInEachRow ?: Int.MAX_VALUE
+            ) {
+                node.children.forEach { child ->
+                    key(child.id) {
+                        SafeUiNodeRenderer(node = child, onEvent = onEvent)
                     }
                 }
             }
@@ -699,6 +726,14 @@ fun RenderUiNode(
             RenderDropdown(node = node, onEvent = onEvent, modifier = appliedModifier)
         }
 
+        is MultiSelectDropdownNode -> {
+            RenderMultiSelectDropdownNode(node = node, onEvent = onEvent, modifier = appliedModifier)
+        }
+
+        is RangeSliderNode -> {
+            RenderRangeSliderNode(node = node, onEvent = onEvent, modifier = appliedModifier)
+        }
+
         is RadioGroupNode -> {
             RenderRadioGroup(node = node, onEvent = onEvent, modifier = appliedModifier)
         }
@@ -717,6 +752,18 @@ fun RenderUiNode(
 
         is CodeBlockNode -> {
             RenderCodeBlock(node = node, modifier = appliedModifier)
+        }
+
+        is TableNode -> {
+            RenderTableNode(node = node, onEvent = onEvent, modifier = appliedModifier)
+        }
+
+        is KeyValueListNode -> {
+            RenderKeyValueListNode(node = node, modifier = appliedModifier)
+        }
+
+        is MarkdownTextNode -> {
+            RenderMarkdownTextNode(node = node, onEvent = onEvent, modifier = appliedModifier)
         }
 
         is ImageNode -> {
@@ -2748,6 +2795,7 @@ private fun UiNode.containsScrollableOrWeightedContent(): Boolean {
         is ColumnNode -> children.any { it.containsScrollableOrWeightedContent() }
         is BoxNode -> children.any { it.containsScrollableOrWeightedContent() }
         is RowNode -> children.any { it.containsScrollableOrWeightedContent() }
+        is FlowRowNode -> children.any { it.containsScrollableOrWeightedContent() }
         is AccordionNode -> children.any { it.containsScrollableOrWeightedContent() }
         is TabsNode -> content.containsScrollableOrWeightedContent()
         else -> false

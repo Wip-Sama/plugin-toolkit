@@ -7,15 +7,15 @@ This document summarizes the UI components, Material 3 Expressive primitives, an
 
 ---
 
-## Current Baseline (Verified in Codebase — App `4.1.0-alpha02`)
+## Current Baseline (Verified in Codebase — App `4.1.0-alpha03`)
 
 - **Compose / Material 3 Versions** (`gradle/libs.versions.toml`): `compose-multiplatform = "1.12.0"`, `material3 = "1.12.0-alpha03"`.
-- **SDUI `UiNode` Catalog** (`plugin-api/.../sdui/UiNode.kt`): 42 `UiNode` types (40 author-facing + `UnknownNode` and `ErrorBoundaryNode`):
-  - **Layout & Shell:** `ColumnNode`, `RowNode`, `BoxNode`, `CardNode`, `ScrollableColumnNode`, `ScrollableRowNode`, `GridNode`, `SplitPaneNode`, `ScaffoldNode`, `SidebarNode`, `FloatingPanelNode`, `TabsNode`, `AccordionNode`, `DialogNode`, `SpacerNode`, `DividerNode`.
-  - **Controls & Inputs:** `ButtonNode`, `ButtonGroupNode`, `SplitButtonNode`, `IconButtonNode`, `TextInputNode` (with `isSecret`), `NumberInputNode`, `SearchBarNode`, `RadioGroupNode`, `ToggleNode`, `CheckboxNode`, `DropdownNode`, `SliderNode`, `ChipGroupNode`, `ListItemNode`.
-  - **Display, Media & Canvas:** `TextNode` (`selectable`, `maxLines`, `overflowEllipsis`), `CodeBlockNode`, `ImageNode` (`zoomable`), `IconNode`, `BadgeNode`, `ProgressBarNode` (`ProgressBarStyle`), `LoadingIndicatorNode`, `AlertBannerNode`, `EmptyStateNode`, `BoardNode`.
+- **SDUI `UiNode` Catalog** (`plugin-api/.../sdui/UiNode.kt`): 48 `UiNode` types (46 author-facing + `UnknownNode` and `ErrorBoundaryNode`):
+  - **Layout & Shell:** `ColumnNode`, `RowNode`, `FlowRowNode`, `BoxNode`, `CardNode`, `ScrollableColumnNode`, `ScrollableRowNode`, `GridNode`, `SplitPaneNode`, `ScaffoldNode`, `SidebarNode`, `FloatingPanelNode`, `TabsNode`, `AccordionNode`, `DialogNode`, `SpacerNode`, `DividerNode`.
+  - **Controls & Inputs:** `ButtonNode`, `ButtonGroupNode`, `SplitButtonNode`, `IconButtonNode`, `TextInputNode` (with `isSecret`), `NumberInputNode`, `SearchBarNode`, `RadioGroupNode`, `ToggleNode`, `CheckboxNode`, `DropdownNode`, `MultiSelectDropdownNode`, `SliderNode`, `RangeSliderNode`, `ChipGroupNode`, `ListItemNode`.
+  - **Display, Media & Canvas:** `TextNode` (`selectable`, `maxLines`, `overflowEllipsis`), `MarkdownTextNode`, `CodeBlockNode`, `TableNode`, `KeyValueListNode`, `ImageNode` (`zoomable`), `IconNode`, `BadgeNode`, `ProgressBarNode` (`ProgressBarStyle`), `LoadingIndicatorNode`, `AlertBannerNode`, `EmptyStateNode`, `BoardNode`.
   - **Universal Modifiers (`UiModifier`):** `ShapeRole` (`cornerRadius`), `tooltip`, `contextMenu` (`ActionMenuItem`).
-- **Host Theme & Shared Components** (`shared/gui/...`): `MaterialExpressiveTheme`, `MotionScheme.expressive()` + `StandardMotionScope`, 8-step `Shapes`, dual Baseline/`*Emphasized` `DesktopTypography`, `NormalizedMorphShape`, `ToolkitSplitButton` (`SplitButtonLayout`), `ToolkitConnectedToggleGroup`, `ToolkitLoadingIndicator`, `ToolkitLinearProgressIndicator`, `ToolkitCircularProgressIndicator`, `ToolkitButtonGroup`, `ToolkitCard`, `ToolkitChip`, `ToolkitTextField`, `ToolkitDropdownMenu`, `ExpressiveMenu`, `UnscaledExpressiveMenu`, `SelectedButtonGroup`, `SectionHeader`, `ToastHost`, `Tooltip`, `ZoomControls`, `NavigationSidebar` / `SidebarContainer`, `PlatformVerticalScrollbar` / `PlatformHorizontalScrollbar`, `PlatformContextMenuArea`, and parameter input widgets (`ColorInput`, `EnumDropdownInput`, `FileInput`, `PrimitiveInputs`).
+- **Host Theme & Shared Components** (`shared/gui/...`): `MaterialExpressiveTheme`, `MotionScheme.expressive()` + `StandardMotionScope`, 8-step `Shapes`, dual Baseline/`*Emphasized` `DesktopTypography`, `NormalizedMorphShape`, `ToolkitSplitButton` (`SplitButtonLayout`), `ToolkitConnectedToggleGroup`, `ToolkitLoadingIndicator`, `ToolkitLinearProgressIndicator`, `ToolkitCircularProgressIndicator`, `ToolkitDataTable`, `ToolkitButtonGroup`, `ToolkitCard`, `ToolkitChip`, `ToolkitTextField`, `ToolkitDropdownMenu`, `ExpressiveMenu`, `UnscaledExpressiveMenu`, `SelectedButtonGroup`, `SectionHeader`, `ToastHost`, `Tooltip`, `ZoomControls`, `NavigationSidebar` / `SidebarContainer`, `PlatformVerticalScrollbar` / `PlatformHorizontalScrollbar`, `PlatformContextMenuArea`, and parameter input widgets (`ColorInput`, `EnumDropdownInput`, `FileInput`, `PrimitiveInputs`).
 
 ---
 
@@ -27,9 +27,9 @@ This document summarizes the UI components, Material 3 Expressive primitives, an
 | :--- | :--- | :--- | :--- |
 | **Radio Group** *(Implemented — Batch 1)* | `RadioGroupNode` | Implemented (`RadioOptionItem`, vertical/horizontal layout, subtitle, `UiEvent.OptionSelected`). | Vertical/horizontal layout, option title + subtitle/description, `UiEvent.OptionSelected`. |
 | **Numeric / Stepper Input** *(Implemented — Batch 1)* | `NumberInputNode` | Implemented (`min`, `max`, `step`, `isDecimal`, `unitSuffix`, +/- steppers, Up/Down keys, `UiEvent.ValueChanged`). | `value`, `min`, `max`, `step`, `isDecimal`, `unitSuffix`, `+/-` steppers, arrow-key stepping, `UiEvent.ValueChanged`. |
-| **Range Slider** | `RangeSliderNode` | `SliderNode` only supports a single `Double` value. | `startValue`, `endValue`, `min`, `max`, `steps`, dual-thumb dragging, `UiEvent.RangeChanged`. |
+| **Range Slider** *(Implemented — Batch 3)* | `RangeSliderNode` | Implemented (`startValue`, `endValue`, `min`, `max`, `steps`, `unitSuffix`, `UiEvent.RangeChanged`). | `startValue`, `endValue`, `min`, `max`, `steps`, dual-thumb dragging, `UiEvent.RangeChanged`. |
 | **Search Bar / Autocomplete** *(Implemented — Batch 1)* | `SearchBarNode` | Implemented (`query`, `suggestions` menu, clear button, Enter-to-submit `UiEvent.Click`, `UiEvent.TextChanged`). | `query`, `suggestions`, `placeholder`, `showClearButton`, Enter-to-submit action + `UiEvent.TextChanged`. |
-| **Multi-Select Dropdown / ComboBox** | `MultiSelectDropdownNode` | `DropdownNode` supports only a single `selectedKey: String`. Host parameter inputs have multi-select `EnumDropdownInput`, but SDUI does not. | `selectedKeys: Set<String>`, searchable filter, select-all/clear, chip summary. |
+| **Multi-Select Dropdown / ComboBox** *(Implemented — Batch 3)* | `MultiSelectDropdownNode` | Implemented (`selectedKeys: Set<String>`, filter search, Select All / Clear, `InputChip` summary, `UiEvent.MultiOptionSelected`). | `selectedKeys: Set<String>`, searchable filter, select-all/clear, chip summary. |
 | **Inline File / Directory Picker Control** | `FilePickerNode` | `UiSessionContext` exposes `pickFile` / `pickFiles` / `pickDirectory` / `saveFile`, but plugins must manually wire a `ButtonNode` + `TextInputNode` pair. | Mode (`FILE`, `FILES`, `DIRECTORY`, `SAVE`), extension filter, selected path preview, browse/clear actions. |
 | **Color Picker Control** | `ColorPickerNode` | Host has `features/colorpicker` and `ColorInput`, but SDUI only exposes `SemanticColor` enums with no user color-selection widget. | Hex/ARGB string value, optional alpha slider, swatch presets, `UiEvent.TextChanged` or `ColorChanged`. |
 | **Date / Time Picker** | `DatePickerNode` / `TimePickerNode` | No date, date-range, or time input controls for scheduling, filtering, or metadata editing. | ISO-8601 date/time string or epoch millis, min/max bounds, `24h` toggle. |
@@ -38,13 +38,13 @@ This document summarizes the UI components, Material 3 Expressive primitives, an
 
 | Missing Component | Proposed `UiNode` | What Is Missing Today | Key Capabilities Needed |
 | :--- | :--- | :--- | :--- |
-| **Data Table** | `TableNode` | Lists must be faked with `RowNode` + `ColumnNode`, lacking synchronized column widths, sorting, or sticky headers. | `columns` (title, width/weight, sortable), `rows`, `sortColumnKey`, `sortAscending`, row selection, sticky header, vertical + horizontal scrollbars. |
+| **Data Table** *(Implemented — Batch 3)* | `TableNode` | Implemented via shared `ToolkitDataTable` (`columns` weight/`widthDp`/sortable, `rows` badges, `selectedRowKeys`, sticky header, keyboard Up/Down/Enter, scrollbars, `UiEvent.TableSorted`). | `columns` (title, width/weight, sortable), `rows`, `sortColumnKey`, `sortAscending`, row selection, sticky header, vertical + horizontal scrollbars. |
 | **Hierarchical Tree View** | `TreeViewNode` | No collapsible parent/child tree component for file systems, JSON ASTs, layers, or nested categories. | `TreeNodeItem` (`key`, `label`, `iconName`, `children`, `expanded`), lazy-load / expand toggle event, selection. |
 | **Accordion / Expandable Section** *(Implemented — Batch 1)* | `AccordionNode` | Implemented (`title`, `subtitle`, `expanded`, `leadingIcon`, `badgeText`/`badgeColor`, spring expand/collapse, `UiEvent.ToggleChanged`). | `title`, `subtitle`, `expanded`, `leadingIcon`, `trailingBadge`, collapsible children, `UiEvent.ToggleChanged` or `Click`. |
 | **Code / Log Block** *(Implemented — Batch 1)* | `CodeBlockNode` | Implemented (`ToolkitTheme.codeMedium`, `language` pill, line numbers, wrap toggle, copy button, `SelectionContainer`, scrollbars). | Uses `ToolkitTheme.codeMedium`, optional `language`, `showLineNumbers`, `wrapLines`, copy-to-clipboard button, `SelectionContainer`. |
-| **Markdown / Rich Text** | `MarkdownTextNode` | `TextNode` only renders a single unformatted string and `TypographyRole`; no headings, bold/italic, inline code, lists, or clickable links. | Safe subset of Markdown (headings, emphasis, code, lists, links emitting `UiEvent.Click` or opening host-approved URLs). |
-| **Key-Value / Property List** | `KeyValueListNode` | Inspectors and job summaries repeat `RowNode(Text, Spacer, Text)` manually. | Aligned key/value rows, monospace toggle, per-row copy action, optional semantic badge. |
-| **Wrapping Flow Layout** | `FlowRowNode` | `RowNode` does not wrap overflowing items onto new lines; only `ChipGroupNode` wraps internally via `FlowRow`. | Arbitrary `List<UiNode>` children with horizontal & vertical `SpacingSize`. |
+| **Markdown / Rich Text** *(Implemented — Batch 3)* | `MarkdownTextNode` | Implemented (headings `#`–`###`, bullet/numbered lists, bold/italic/strikethrough/inline code, clickable links via `LinkAnnotation`, `SelectionContainer`). | Safe subset of Markdown (headings, emphasis, code, lists, links emitting `UiEvent.Click` or opening host-approved URLs). |
+| **Key-Value / Property List** *(Implemented — Batch 3)* | `KeyValueListNode` | Implemented (`KeyValueEntry` with aligned label/value, monospace option, semantic badges, dividers, and clipboard copy). | Aligned key/value rows, monospace toggle, per-row copy action, optional semantic badge. |
+| **Wrapping Flow Layout** *(Implemented — Batch 3)* | `FlowRowNode` | Implemented (`FlowRow` container with `horizontalSpacing`, `verticalSpacing`, and `maxItemsInEachRow`). | Arbitrary `List<UiNode>` children with horizontal & vertical `SpacingSize`. |
 
 ### 1.3 Navigation, Wayfinding & Overlays
 
@@ -118,7 +118,7 @@ Auditing `shared/gui` against the project's `m3-*` skill suite (`m3-desktop-expr
 
 | Missing Component | Purpose in Host App |
 | :--- | :--- |
-| **`ToolkitDataTable`** | Sortable, resizable, keyboard-navigable multi-column table with `VerticalScrollbar` + `HorizontalScrollbar` (for Jobs, Logs, Plugin Repositories, Capabilities). |
+| **`ToolkitDataTable`** *(Implemented — Batch 3)* | Sortable, weighted/fixed multi-column table with sticky header, keyboard Up/Down/Enter navigation, and `VerticalScrollbar` + `HorizontalScrollbar`. |
 | **`ToolkitTreeView`** | Reusable collapsible tree with keyboard arrow navigation and context menus (for Flow nodes/files, Plugin file sandboxes). |
 | **`ToolkitSearchBar`** | Standardized search field with debounce, clear icon, result count badge, and `Ctrl+F` focus binding across views. |
 | **`ToolkitAccordion` / `ExpandableSection`** | Consistent collapsible header + animated body shared across Settings, Inspector drawers, and Job cards. |

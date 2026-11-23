@@ -541,7 +541,10 @@ private suspend fun handleBoardCompositorEvent(
         is UiEvent.DialogAction,
         is UiEvent.ItemsReordered,
         is UiEvent.ShortcutTriggered,
-        is UiEvent.FilesDropped -> Unit
+        is UiEvent.FilesDropped,
+        is UiEvent.TableSorted,
+        is UiEvent.RangeChanged,
+        is UiEvent.MultiOptionSelected -> Unit
     }
 }
 

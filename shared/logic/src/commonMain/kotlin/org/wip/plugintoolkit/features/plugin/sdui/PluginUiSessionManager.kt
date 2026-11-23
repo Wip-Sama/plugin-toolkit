@@ -142,6 +142,8 @@ class PluginUiSessionHandle(
             is UiEvent.DialogAction,
             is UiEvent.ItemsReordered,
             is UiEvent.ShortcutTriggered,
+            is UiEvent.TableSorted,
+            is UiEvent.MultiOptionSelected,
             is UiEvent.Custom -> {
                 transactionalChannel.trySend(event)
             }
@@ -157,7 +159,8 @@ class PluginUiSessionHandle(
                 }
             }
             is UiEvent.TextChanged,
-            is UiEvent.ValueChanged -> {
+            is UiEvent.ValueChanged,
+            is UiEvent.RangeChanged -> {
                 continuousChannel.trySend(event)
             }
         }

@@ -1093,6 +1093,17 @@
     <string name="sdui_image_zoom_out">Zoom out</string>
     <string name="sdui_image_zoom_reset">Reset zoom</string>
     <string name="sdui_loading_default">Loading</string>
+    <string name="sdui_table_empty">No rows to display</string>
+    <string name="sdui_table_sort_ascending">Sort ascending: %1$s</string>
+    <string name="sdui_table_sort_descending">Sort descending: %1$s</string>
+    <string name="sdui_kv_copy_value">Copy value</string>
+    <string name="sdui_kv_copied">Value copied</string>
+    <string name="sdui_multi_select_placeholder">Select options...</string>
+    <string name="sdui_multi_select_filter_placeholder">Filter options...</string>
+    <string name="sdui_multi_select_all">Select all</string>
+    <string name="sdui_multi_select_clear">Clear</string>
+    <string name="sdui_multi_select_count">%1$d selected</string>
+    <string name="sdui_multi_select_no_matches">No matching options</string>
     <string name="dialog_select_file">Select File</string>
     <string name="dialog_select_files">Select Files</string>
     <string name="dialog_save_file">Save File</string>

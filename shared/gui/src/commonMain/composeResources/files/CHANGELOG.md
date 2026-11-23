@@ -1,3 +1,11 @@
+Version: 4.1.0-alpha03
+Date: 23-11-2026
+Added:
+	- Added reusable ToolkitDataTable desktop component with sortable column headers, fixed/weighted column widths, keyboard row navigation, sticky header, and bidirectional scrollbars
+	- Added Batch 3 SDUI structured data & rich control nodes: TableNode, FlowRowNode, KeyValueListNode, MarkdownTextNode, MultiSelectDropdownNode, and RangeSliderNode
+	- Added UiEvent.TableSorted, UiEvent.RangeChanged, and UiEvent.MultiOptionSelected with Pre-Composition AST sanitization
+	- Showcased structured data tables, wrapping FlowRow tags, metadata KeyValueList, Markdown release notes, MultiSelectDropdown, and RangeSlider in completeExample
+------------------------------------------------------------------------
 Version: 4.1.0-alpha02
 Date: 23-11-2026
 Added:

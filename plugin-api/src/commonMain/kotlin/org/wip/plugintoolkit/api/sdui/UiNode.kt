@@ -691,6 +691,142 @@ data class CodeBlockNode @JvmOverloads constructor(
     override val modifier: UiModifier = UiModifier.None
 ) : UiNode
 
+// ── Structured Data & Rich Controls ─────────────────────────────────────────
+
+/**
+ * Column specification for [TableNode].
+ */
+@Serializable
+data class TableColumn @JvmOverloads constructor(
+    val key: String,
+    val title: String,
+    val weight: Float = 1f,
+    val widthDp: Int? = null,
+    val sortable: Boolean = false
+)
+
+/**
+ * Row entry inside a [TableNode], keyed by [key] with cell values indexed by column key.
+ */
+@Serializable
+data class TableRow @JvmOverloads constructor(
+    val key: String,
+    val cells: Map<String, String>,
+    val badgeColumnKey: String? = null,
+    val badgeColor: SemanticColor? = null
+)
+
+/**
+ * Structured desktop data table supporting sortable columns, fixed/weighted column widths,
+ * sticky headers, row selection/click events, and bidirectional scrollbars.
+ */
+@Serializable
+@SerialName("table")
+data class TableNode @JvmOverloads constructor(
+    override val id: String,
+    val columns: List<TableColumn>,
+    val rows: List<TableRow>,
+    val selectedRowKeys: Set<String> = emptySet(),
+    val sortColumnKey: String? = null,
+    val sortAscending: Boolean = true,
+    val emptyText: String? = null,
+    val maxHeightDp: Int? = null,
+    val action: String? = null,
+    override val modifier: UiModifier = UiModifier.None
+) : UiNode
+
+/**
+ * Horizontal wrapping container that automatically flows children onto new rows
+ * when horizontal space is constrained.
+ */
+@Serializable
+@SerialName("flow_row")
+data class FlowRowNode @JvmOverloads constructor(
+    override val id: String,
+    val children: List<UiNode> = emptyList(),
+    val horizontalSpacing: SpacingSize = SpacingSize.SMALL,
+    val verticalSpacing: SpacingSize = SpacingSize.SMALL,
+    val maxItemsInEachRow: Int? = null,
+    override val modifier: UiModifier = UiModifier.None
+) : UiNode
+
+/**
+ * Label-value entry inside a [KeyValueListNode].
+ */
+@Serializable
+data class KeyValueEntry @JvmOverloads constructor(
+    val key: String,
+    val label: String,
+    val value: String,
+    val monospace: Boolean = false,
+    val copyable: Boolean = false,
+    val badgeColor: SemanticColor? = null
+)
+
+/**
+ * Aligned two-column inspector property list with optional monospace values, semantic badges,
+ * and one-click clipboard copy.
+ */
+@Serializable
+@SerialName("key_value_list")
+data class KeyValueListNode @JvmOverloads constructor(
+    override val id: String,
+    val entries: List<KeyValueEntry>,
+    val title: String? = null,
+    val showDividers: Boolean = true,
+    override val modifier: UiModifier = UiModifier.None
+) : UiNode
+
+/**
+ * Lightweight rich formatted text block supporting Markdown headings, bullet/numbered lists,
+ * bold/italic/strikethrough/inline code, and clickable links.
+ */
+@Serializable
+@SerialName("markdown_text")
+data class MarkdownTextNode @JvmOverloads constructor(
+    override val id: String,
+    val markdown: String,
+    val selectable: Boolean = true,
+    val maxLines: Int? = null,
+    val linkAction: String? = null,
+    override val modifier: UiModifier = UiModifier.None
+) : UiNode
+
+/**
+ * Multi-choice dropdown selector supporting filter search, batch select-all / clear-all,
+ * and selected item summary chips, emitting [UiEvent.MultiOptionSelected].
+ */
+@Serializable
+@SerialName("multi_select_dropdown")
+data class MultiSelectDropdownNode @JvmOverloads constructor(
+    override val id: String,
+    val selectedKeys: Set<String> = emptySet(),
+    val options: Map<String, String>,
+    val label: String? = null,
+    val placeholder: String? = null,
+    val searchable: Boolean = true,
+    val showSelectAll: Boolean = true,
+    override val modifier: UiModifier = UiModifier.None
+) : UiNode
+
+/**
+ * Dual-thumb slider control for selecting an inclusive numeric interval,
+ * emitting [UiEvent.RangeChanged].
+ */
+@Serializable
+@SerialName("range_slider")
+data class RangeSliderNode @JvmOverloads constructor(
+    override val id: String,
+    val startValue: Double,
+    val endValue: Double,
+    val min: Double = 0.0,
+    val max: Double = 1.0,
+    val steps: Int = 0,
+    val label: String? = null,
+    val unitSuffix: String? = null,
+    override val modifier: UiModifier = UiModifier.None
+) : UiNode
+
 /**
  * Error boundary node injected by the Pre-Composition AST Sanitizer when a subtree
  * violates tree constraints (e.g. max nesting depth, max node count, NaN ranges).
@@ -751,6 +887,12 @@ object UiNodeSerializer : KSerializer<UiNode> {
             is SearchBarNode -> "search_bar"
             is AccordionNode -> "accordion"
             is CodeBlockNode -> "code_block"
+            is TableNode -> "table"
+            is FlowRowNode -> "flow_row"
+            is KeyValueListNode -> "key_value_list"
+            is MarkdownTextNode -> "markdown_text"
+            is MultiSelectDropdownNode -> "multi_select_dropdown"
+            is RangeSliderNode -> "range_slider"
             is BoardNode -> "board"
             is ErrorBoundaryNode -> "error_boundary"
             is UnknownNode -> value.rawType
@@ -794,6 +936,12 @@ object UiNodeSerializer : KSerializer<UiNode> {
             is SearchBarNode -> jsonEncoder.json.encodeToJsonElement(SearchBarNode.serializer(), value)
             is AccordionNode -> jsonEncoder.json.encodeToJsonElement(AccordionNode.serializer(), value)
             is CodeBlockNode -> jsonEncoder.json.encodeToJsonElement(CodeBlockNode.serializer(), value)
+            is TableNode -> jsonEncoder.json.encodeToJsonElement(TableNode.serializer(), value)
+            is FlowRowNode -> jsonEncoder.json.encodeToJsonElement(FlowRowNode.serializer(), value)
+            is KeyValueListNode -> jsonEncoder.json.encodeToJsonElement(KeyValueListNode.serializer(), value)
+            is MarkdownTextNode -> jsonEncoder.json.encodeToJsonElement(MarkdownTextNode.serializer(), value)
+            is MultiSelectDropdownNode -> jsonEncoder.json.encodeToJsonElement(MultiSelectDropdownNode.serializer(), value)
+            is RangeSliderNode -> jsonEncoder.json.encodeToJsonElement(RangeSliderNode.serializer(), value)
             is LoadingIndicatorNode -> jsonEncoder.json.encodeToJsonElement(LoadingIndicatorNode.serializer(), value)
             is BoardNode -> jsonEncoder.json.encodeToJsonElement(BoardNode.serializer(), value)
             is ErrorBoundaryNode -> jsonEncoder.json.encodeToJsonElement(ErrorBoundaryNode.serializer(), value)
@@ -851,6 +999,12 @@ object UiNodeSerializer : KSerializer<UiNode> {
             "search_bar" -> SearchBarNode.serializer()
             "accordion" -> AccordionNode.serializer()
             "code_block" -> CodeBlockNode.serializer()
+            "table" -> TableNode.serializer()
+            "flow_row" -> FlowRowNode.serializer()
+            "key_value_list" -> KeyValueListNode.serializer()
+            "markdown_text" -> MarkdownTextNode.serializer()
+            "multi_select_dropdown" -> MultiSelectDropdownNode.serializer()
+            "range_slider" -> RangeSliderNode.serializer()
             "board" -> BoardNode.serializer()
             "error_boundary" -> ErrorBoundaryNode.serializer()
             "unknown" -> UnknownNodeCustomSerializer

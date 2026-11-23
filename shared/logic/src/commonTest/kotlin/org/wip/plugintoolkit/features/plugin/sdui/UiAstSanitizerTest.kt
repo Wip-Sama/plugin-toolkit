@@ -14,12 +14,18 @@ import org.wip.plugintoolkit.api.sdui.ColumnNode
 import org.wip.plugintoolkit.api.sdui.ErrorBoundaryNode
 import org.wip.plugintoolkit.api.sdui.FloatingAnchor
 import org.wip.plugintoolkit.api.sdui.FloatingPanelNode
+import org.wip.plugintoolkit.api.sdui.FlowRowNode
+import org.wip.plugintoolkit.api.sdui.KeyValueEntry
+import org.wip.plugintoolkit.api.sdui.KeyValueListNode
 import org.wip.plugintoolkit.api.sdui.LoadingIndicatorNode
+import org.wip.plugintoolkit.api.sdui.MarkdownTextNode
+import org.wip.plugintoolkit.api.sdui.MultiSelectDropdownNode
 import org.wip.plugintoolkit.api.sdui.NormalizedPoint
 import org.wip.plugintoolkit.api.sdui.NormalizedSize
 import org.wip.plugintoolkit.api.sdui.NumberInputNode
 import org.wip.plugintoolkit.api.sdui.RadioGroupNode
 import org.wip.plugintoolkit.api.sdui.RadioOptionItem
+import org.wip.plugintoolkit.api.sdui.RangeSliderNode
 import org.wip.plugintoolkit.api.sdui.RowNode
 import org.wip.plugintoolkit.api.sdui.ScaffoldNode
 import org.wip.plugintoolkit.api.sdui.SemanticColor
@@ -27,6 +33,9 @@ import org.wip.plugintoolkit.api.sdui.SidebarAttachPoint
 import org.wip.plugintoolkit.api.sdui.SidebarNode
 import org.wip.plugintoolkit.api.sdui.SliderNode
 import org.wip.plugintoolkit.api.sdui.SplitButtonNode
+import org.wip.plugintoolkit.api.sdui.TableColumn
+import org.wip.plugintoolkit.api.sdui.TableNode
+import org.wip.plugintoolkit.api.sdui.TableRow
 import org.wip.plugintoolkit.api.sdui.TextNode
 import org.wip.plugintoolkit.api.sdui.UiDropTarget
 import org.wip.plugintoolkit.api.sdui.UiModifier
@@ -491,6 +500,67 @@ class UiAstSanitizerTest {
         val root = assertIs<ColumnNode>(sanitized.root)
         assertEquals(1.0f, assertIs<LoadingIndicatorNode>(root.children[0]).progress)
         assertEquals(null, assertIs<LoadingIndicatorNode>(root.children[1]).progress)
+    }
+
+    @Test
+    fun testStructuredDataAndRichControlsValidationAndFlowRowRecursion() {
+        val tree = UiNodeTree(
+            root = ColumnNode(
+                id = "structured_root",
+                children = listOf(
+                    TableNode(
+                        id = "bad_table",
+                        columns = listOf(
+                            TableColumn(key = "col", title = "Col"),
+                            TableColumn(key = "col", title = "Duplicate")
+                        ),
+                        rows = listOf(TableRow(key = "r1", cells = mapOf("col" to "A")))
+                    ),
+                    KeyValueListNode(
+                        id = "bad_kv",
+                        entries = listOf(KeyValueEntry(key = "", label = "Key", value = "Value"))
+                    ),
+                    MarkdownTextNode(
+                        id = "bad_md",
+                        markdown = "Hello",
+                        maxLines = 0
+                    ),
+                    RangeSliderNode(
+                        id = "bad_range",
+                        startValue = 80.0,
+                        endValue = 20.0,
+                        min = 0.0,
+                        max = 100.0
+                    ),
+                    MultiSelectDropdownNode(
+                        id = "valid_multi",
+                        options = mapOf("a" to "Alpha", "b" to "Beta"),
+                        selectedKeys = setOf("a")
+                    ),
+                    FlowRowNode(
+                        id = "flow_parent",
+                        maxItemsInEachRow = 0,
+                        children = listOf(
+                            TextNode(id = "flow_ok", text = "Tag"),
+                            TextNode(id = "flow_ok", text = "Duplicate ID")
+                        )
+                    )
+                )
+            )
+        )
+
+        val sanitized = tree.sanitize()
+        val root = assertIs<ColumnNode>(sanitized.root)
+        assertIs<ErrorBoundaryNode>(root.children[0])
+        assertIs<ErrorBoundaryNode>(root.children[1])
+        assertIs<ErrorBoundaryNode>(root.children[2])
+        assertIs<ErrorBoundaryNode>(root.children[3])
+        assertIs<MultiSelectDropdownNode>(root.children[4])
+
+        val flow = assertIs<FlowRowNode>(root.children[5])
+        assertEquals(1, flow.maxItemsInEachRow)
+        assertIs<TextNode>(flow.children[0])
+        assertTrue(assertIs<ErrorBoundaryNode>(flow.children[1]).errorMessage.contains("Duplicate node ID collision"))
     }
 }
 

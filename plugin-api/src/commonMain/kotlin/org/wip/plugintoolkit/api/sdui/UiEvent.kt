@@ -247,6 +247,38 @@ sealed interface UiEvent {
     ) : UiEvent
 
     /**
+     * Emitted when a sortable column header in a [TableNode] is clicked.
+     */
+    @Serializable
+    @SerialName("table_sorted")
+    data class TableSorted(
+        override val nodeId: String,
+        val columnKey: String,
+        val ascending: Boolean
+    ) : UiEvent
+
+    /**
+     * Emitted when the lower or upper value of a [RangeSliderNode] changes.
+     */
+    @Serializable
+    @SerialName("range_changed")
+    data class RangeChanged(
+        override val nodeId: String,
+        val startValue: Double,
+        val endValue: Double
+    ) : UiEvent
+
+    /**
+     * Emitted when the selected option keys change inside a [MultiSelectDropdownNode].
+     */
+    @Serializable
+    @SerialName("multi_option_selected")
+    data class MultiOptionSelected(
+        override val nodeId: String,
+        val selectedKeys: Set<String>
+    ) : UiEvent
+
+    /**
      * Custom event payload for domain-specific controls.
      */
     @Serializable
@@ -288,6 +320,9 @@ object UiEventSerializer : KSerializer<UiEvent> {
             is UiEvent.ItemsReordered -> "items_reordered"
             is UiEvent.ShortcutTriggered -> "shortcut_triggered"
             is UiEvent.FilesDropped -> "files_dropped"
+            is UiEvent.TableSorted -> "table_sorted"
+            is UiEvent.RangeChanged -> "range_changed"
+            is UiEvent.MultiOptionSelected -> "multi_option_selected"
             is UiEvent.Custom -> "custom"
         }
         val element = when (value) {
@@ -311,6 +346,9 @@ object UiEventSerializer : KSerializer<UiEvent> {
             is UiEvent.ItemsReordered -> jsonEncoder.json.encodeToJsonElement(UiEvent.ItemsReordered.serializer(), value)
             is UiEvent.ShortcutTriggered -> jsonEncoder.json.encodeToJsonElement(UiEvent.ShortcutTriggered.serializer(), value)
             is UiEvent.FilesDropped -> jsonEncoder.json.encodeToJsonElement(UiEvent.FilesDropped.serializer(), value)
+            is UiEvent.TableSorted -> jsonEncoder.json.encodeToJsonElement(UiEvent.TableSorted.serializer(), value)
+            is UiEvent.RangeChanged -> jsonEncoder.json.encodeToJsonElement(UiEvent.RangeChanged.serializer(), value)
+            is UiEvent.MultiOptionSelected -> jsonEncoder.json.encodeToJsonElement(UiEvent.MultiOptionSelected.serializer(), value)
             is UiEvent.Custom -> jsonEncoder.json.encodeToJsonElement(UiEvent.Custom.serializer(), value)
         }
         if (element is JsonObject) {
@@ -346,6 +384,9 @@ object UiEventSerializer : KSerializer<UiEvent> {
             "items_reordered" -> UiEvent.ItemsReordered.serializer()
             "shortcut_triggered" -> UiEvent.ShortcutTriggered.serializer()
             "files_dropped" -> UiEvent.FilesDropped.serializer()
+            "table_sorted" -> UiEvent.TableSorted.serializer()
+            "range_changed" -> UiEvent.RangeChanged.serializer()
+            "multi_option_selected" -> UiEvent.MultiOptionSelected.serializer()
             "custom" -> UiEvent.Custom.serializer()
             else -> UiEvent.Custom.serializer()
         }

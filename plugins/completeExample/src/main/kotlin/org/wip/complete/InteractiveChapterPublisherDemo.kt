@@ -80,6 +80,12 @@ private data class ChapterPublisherState(
     val publishPriority: String = "BALANCED",
     val batchSize: Int = 4,
     val showManifestAccordion: Boolean = false,
+    val exportFormats: Set<String> = setOf("webp", "json"),
+    val chapterRangeStart: Double = 1.0,
+    val chapterRangeEnd: Double = 12.0,
+    val tableSortColumn: String = "pages",
+    val tableSortAscending: Boolean = false,
+    val selectedTableRowKey: String? = null,
     val isLoading: Boolean = true,
     val showConfirmDialog: Boolean = false,
     val pendingPushIds: List<String> = emptyList(),
@@ -938,6 +944,46 @@ internal fun runChapterPublisherSession(
                             val jobId = action.removePrefix("cancel_job:")
                             context.cancelCapabilityJob(jobId)
                         }
+                        action.startsWith("select_overview_row:") -> {
+                            val rowKey = action.removePrefix("select_overview_row:")
+                            if (rowKey.isNotBlank()) {
+                                stateFlow.update { it.copy(selectedTableRowKey = rowKey) }
+                            }
+                        }
+                        action.startsWith("open_publisher_guide:") -> {
+                            val targetUrl = action.removePrefix("open_publisher_guide:")
+                            stateFlow.update {
+                                it.copy(
+                                    bannerMessage = "Opened guide reference: $targetUrl",
+                                    bannerSeverity = SemanticColor.INFO
+                                )
+                            }
+                        }
+                    }
+                }
+                is UiEvent.TableSorted -> {
+                    if (event.nodeId == "cfg_chapters_overview_table") {
+                        stateFlow.update {
+                            it.copy(
+                                tableSortColumn = event.columnKey,
+                                tableSortAscending = event.ascending
+                            )
+                        }
+                    }
+                }
+                is UiEvent.RangeChanged -> {
+                    if (event.nodeId == "cfg_chapter_range_slider") {
+                        stateFlow.update {
+                            it.copy(
+                                chapterRangeStart = event.startValue,
+                                chapterRangeEnd = event.endValue
+                            )
+                        }
+                    }
+                }
+                is UiEvent.MultiOptionSelected -> {
+                    if (event.nodeId == "cfg_export_formats_dropdown") {
+                        stateFlow.update { it.copy(exportFormats = event.selectedKeys) }
                     }
                 }
                 is UiEvent.ShortcutTriggered -> {
@@ -2258,6 +2304,119 @@ private fun UiContainerBuilder.renderSettingsTab(
                     text = "Last endpoint check: $webhook",
                     role = TypographyRole.BODY_SMALL
                 )
+            }
+        }
+
+        card(id = "cfg_release_matrix_card", title = "Release Window, Export Formats & Chapter Matrix") {
+            multiSelectDropdown(
+                id = "cfg_export_formats_dropdown",
+                selectedKeys = state.exportFormats,
+                options = mapOf(
+                    "webp" to "WebP Images",
+                    "png" to "PNG Lossless",
+                    "json" to "Cubari JSON",
+                    "cbz" to "CBZ Archive"
+                ),
+                label = "Export Formats",
+                placeholder = "Select output formats..."
+            )
+            rangeSlider(
+                id = "cfg_chapter_range_slider",
+                startValue = state.chapterRangeStart,
+                endValue = state.chapterRangeEnd,
+                min = 1.0,
+                max = 50.0,
+                steps = 48,
+                label = "Release Chapter Window",
+                unitSuffix = "ch"
+            )
+            flowRow(
+                id = "cfg_release_tags_flow",
+                horizontalSpacing = SpacingSize.SMALL,
+                verticalSpacing = SpacingSize.EXTRA_SMALL
+            ) {
+                state.exportFormats.sorted().forEach { fmt ->
+                    badge(
+                        id = "cfg_tag_fmt_$fmt",
+                        text = fmt.uppercase(),
+                        color = SemanticColor.PRIMARY
+                    )
+                }
+                badge(
+                    id = "cfg_tag_window",
+                    text = "Ch ${state.chapterRangeStart.toInt()}..${state.chapterRangeEnd.toInt()}",
+                    color = SemanticColor.INFO
+                )
+            }
+            keyValueList(
+                id = "cfg_release_kv_list",
+                title = "Pipeline Targets",
+                showDividers = true
+            ) {
+                entry(
+                    key = "window",
+                    label = "Chapter Window",
+                    value = "${state.chapterRangeStart.toInt()} - ${state.chapterRangeEnd.toInt()}"
+                )
+                entry(
+                    key = "formats",
+                    label = "Active Formats",
+                    value = if (state.exportFormats.isEmpty()) "none" else state.exportFormats.sorted().joinToString(", "),
+                    monospace = true,
+                    copyable = true
+                )
+                entry(
+                    key = "status",
+                    label = "Matrix Readiness",
+                    value = if (state.exportFormats.isNotEmpty()) "Configured" else "Awaiting Formats",
+                    badgeColor = if (state.exportFormats.isNotEmpty()) SemanticColor.SUCCESS else SemanticColor.WARNING
+                )
+            }
+            markdownText(
+                id = "cfg_release_notes_md",
+                markdown = "### Release Checklist\n- **Verified** export window with `WebP`\n- Read [Publisher Guide](https://example.org/guide)",
+                selectable = true,
+                maxLines = 6,
+                linkAction = "open_publisher_guide"
+            )
+            val sortedChapters = when (state.tableSortColumn) {
+                "title" -> if (state.tableSortAscending) {
+                    state.chapters.sortedBy { it.title }
+                } else {
+                    state.chapters.sortedByDescending { it.title }
+                }
+                else -> if (state.tableSortAscending) {
+                    state.chapters.sortedBy { it.pages.size }
+                } else {
+                    state.chapters.sortedByDescending { it.pages.size }
+                }
+            }
+            table(
+                id = "cfg_chapters_overview_table",
+                selectedRowKeys = setOfNotNull(state.selectedTableRowKey),
+                sortColumnKey = state.tableSortColumn,
+                sortAscending = state.tableSortAscending,
+                maxHeightDp = 240,
+                action = "select_overview_row"
+            ) {
+                column(key = "chapter", title = "Chapter", weight = 0.8f)
+                column(key = "title", title = "Title", weight = 1.6f, sortable = true)
+                column(key = "pages", title = "Pages", widthDp = 96, sortable = true)
+                column(key = "status", title = "Status", widthDp = 120)
+                sortedChapters.forEach { chapter ->
+                    val (statusLabel, statusColor) = statusMeta(chapter.status)
+                    row(
+                        key = chapter.id,
+                        cells = mapOf(
+                            "chapter" to chapter.number.toString(),
+                            "title" to chapter.title,
+                            "pages" to chapter.pages.size.toString(),
+                            "status" to statusLabel
+                        ),
+                        badgeColumnKey = "status",
+                        badgeColor = statusColor
+                    )
+                }
             }
         }
     }

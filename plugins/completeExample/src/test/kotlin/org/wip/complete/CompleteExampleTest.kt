@@ -53,20 +53,26 @@ import org.wip.plugintoolkit.api.sdui.CodeBlockNode
 import org.wip.plugintoolkit.api.sdui.ColumnNode
 import org.wip.plugintoolkit.api.sdui.DialogNode
 import org.wip.plugintoolkit.api.sdui.FloatingAnchor
+import org.wip.plugintoolkit.api.sdui.FlowRowNode
 import org.wip.plugintoolkit.api.sdui.GridNode
 import org.wip.plugintoolkit.api.sdui.ImageNode
+import org.wip.plugintoolkit.api.sdui.KeyValueListNode
 import org.wip.plugintoolkit.api.sdui.ListItemNode
 import org.wip.plugintoolkit.api.sdui.LoadingIndicatorNode
+import org.wip.plugintoolkit.api.sdui.MarkdownTextNode
+import org.wip.plugintoolkit.api.sdui.MultiSelectDropdownNode
 import org.wip.plugintoolkit.api.sdui.NormalizedPoint
 import org.wip.plugintoolkit.api.sdui.NumberInputNode
 import org.wip.plugintoolkit.api.sdui.ProgressBarNode
 import org.wip.plugintoolkit.api.sdui.ProgressBarStyle
 import org.wip.plugintoolkit.api.sdui.RadioGroupNode
+import org.wip.plugintoolkit.api.sdui.RangeSliderNode
 import org.wip.plugintoolkit.api.sdui.ScaffoldNode
 import org.wip.plugintoolkit.api.sdui.SearchBarNode
 import org.wip.plugintoolkit.api.sdui.SemanticColor
 import org.wip.plugintoolkit.api.sdui.ShapeRole
 import org.wip.plugintoolkit.api.sdui.SplitPaneNode
+import org.wip.plugintoolkit.api.sdui.TableNode
 import org.wip.plugintoolkit.api.sdui.TabsNode
 import org.wip.plugintoolkit.api.sdui.TextInputNode
 import org.wip.plugintoolkit.api.sdui.TextNode
@@ -343,6 +349,7 @@ class CompleteExampleTest {
         when (node) {
             is ColumnNode -> node.children.forEach { result.addAll(collectNodes(it)) }
             is org.wip.plugintoolkit.api.sdui.RowNode -> node.children.forEach { result.addAll(collectNodes(it)) }
+            is FlowRowNode -> node.children.forEach { result.addAll(collectNodes(it)) }
             is org.wip.plugintoolkit.api.sdui.BoxNode -> node.children.forEach { result.addAll(collectNodes(it)) }
             is org.wip.plugintoolkit.api.sdui.CardNode -> node.children.forEach { result.addAll(collectNodes(it)) }
             is org.wip.plugintoolkit.api.sdui.ScrollableColumnNode -> node.children.forEach { result.addAll(collectNodes(it)) }
@@ -1211,6 +1218,39 @@ class CompleteExampleTest {
             val capacityBar = updatedNodes.filterIsInstance<ProgressBarNode>()
                 .first { it.id == "cfg_queue_health_bar" }
             assertEquals(ProgressBarStyle.WAVY, capacityBar.style)
+
+            eventsFlow.emit(UiEvent.MultiOptionSelected("cfg_export_formats_dropdown", setOf("webp", "cbz")))
+            eventsFlow.emit(UiEvent.RangeChanged("cfg_chapter_range_slider", 4.0, 22.0))
+            eventsFlow.emit(UiEvent.TableSorted("cfg_chapters_overview_table", "title", true))
+            advanceUntilIdle()
+
+            val batch3Nodes = collectNodes(emittedTrees.last().root)
+            val multiSelect = batch3Nodes.filterIsInstance<MultiSelectDropdownNode>()
+                .first { it.id == "cfg_export_formats_dropdown" }
+            assertEquals(setOf("webp", "cbz"), multiSelect.selectedKeys)
+
+            val rangeSlider = batch3Nodes.filterIsInstance<RangeSliderNode>()
+                .first { it.id == "cfg_chapter_range_slider" }
+            assertEquals(4.0, rangeSlider.startValue)
+            assertEquals(22.0, rangeSlider.endValue)
+
+            val tagsFlow = batch3Nodes.filterIsInstance<FlowRowNode>()
+                .first { it.id == "cfg_release_tags_flow" }
+            assertEquals(3, tagsFlow.children.size)
+
+            val kvList = batch3Nodes.filterIsInstance<KeyValueListNode>()
+                .first { it.id == "cfg_release_kv_list" }
+            assertEquals("4 - 22", kvList.entries.first { it.key == "window" }.value)
+
+            val markdownNode = batch3Nodes.filterIsInstance<MarkdownTextNode>()
+                .first { it.id == "cfg_release_notes_md" }
+            assertTrue(markdownNode.markdown.contains("Publisher Guide"))
+
+            val overviewTable = batch3Nodes.filterIsInstance<TableNode>()
+                .first { it.id == "cfg_chapters_overview_table" }
+            assertEquals("title", overviewTable.sortColumnKey)
+            assertTrue(overviewTable.sortAscending)
+            assertTrue(overviewTable.rows.isNotEmpty())
         } finally {
             job.cancel()
         }

@@ -11,12 +11,17 @@ import org.wip.plugintoolkit.api.sdui.ColumnNode
 import org.wip.plugintoolkit.api.sdui.DialogNode
 import org.wip.plugintoolkit.api.sdui.ErrorBoundaryNode
 import org.wip.plugintoolkit.api.sdui.FloatingPanelNode
+import org.wip.plugintoolkit.api.sdui.FlowRowNode
 import org.wip.plugintoolkit.api.sdui.GridNode
+import org.wip.plugintoolkit.api.sdui.KeyValueListNode
 import org.wip.plugintoolkit.api.sdui.ListItemNode
 import org.wip.plugintoolkit.api.sdui.LoadingIndicatorNode
+import org.wip.plugintoolkit.api.sdui.MarkdownTextNode
+import org.wip.plugintoolkit.api.sdui.MultiSelectDropdownNode
 import org.wip.plugintoolkit.api.sdui.NumberInputNode
 import org.wip.plugintoolkit.api.sdui.ProgressBarNode
 import org.wip.plugintoolkit.api.sdui.RadioGroupNode
+import org.wip.plugintoolkit.api.sdui.RangeSliderNode
 import org.wip.plugintoolkit.api.sdui.RowNode
 import org.wip.plugintoolkit.api.sdui.ScaffoldNode
 import org.wip.plugintoolkit.api.sdui.ScrollableColumnNode
@@ -25,6 +30,7 @@ import org.wip.plugintoolkit.api.sdui.SidebarNode
 import org.wip.plugintoolkit.api.sdui.SliderNode
 import org.wip.plugintoolkit.api.sdui.SplitButtonNode
 import org.wip.plugintoolkit.api.sdui.SplitPaneNode
+import org.wip.plugintoolkit.api.sdui.TableNode
 import org.wip.plugintoolkit.api.sdui.TabsNode
 import org.wip.plugintoolkit.api.sdui.TextNode
 import org.wip.plugintoolkit.api.sdui.UiNode
@@ -307,11 +313,99 @@ object UiAstSanitizer {
                 }
             }
 
+            if (node is TableNode) {
+                val maxHeight = node.maxHeightDp
+                if (maxHeight != null && maxHeight <= 0) {
+                    return ErrorBoundaryNode(
+                        id = node.id,
+                        errorMessage = "Invalid TableNode '${node.id}': maxHeightDp=$maxHeight must be > 0",
+                        failedNodeType = "TableNode"
+                    )
+                }
+                val seenColumnKeys = mutableSetOf<String>()
+                for (column in node.columns) {
+                    val invalidWidth = column.weight.isNaN() || column.weight.isInfinite() || column.weight <= 0f ||
+                        (column.widthDp != null && column.widthDp!! <= 0)
+                    if (column.key.isBlank() || column.title.isBlank() || !seenColumnKeys.add(column.key) || invalidWidth) {
+                        return ErrorBoundaryNode(
+                            id = node.id,
+                            errorMessage = "Invalid TableNode column '${column.key}' in '${node.id}': keys/titles must be non-blank/unique and dimensions positive",
+                            failedNodeType = "TableNode"
+                        )
+                    }
+                }
+                val seenRowKeys = mutableSetOf<String>()
+                for (row in node.rows) {
+                    if (row.key.isBlank() || !seenRowKeys.add(row.key)) {
+                        return ErrorBoundaryNode(
+                            id = node.id,
+                            errorMessage = "Invalid TableNode row '${row.key}' in '${node.id}': row keys must be non-blank and unique",
+                            failedNodeType = "TableNode"
+                        )
+                    }
+                }
+            }
+
+            if (node is KeyValueListNode) {
+                val seenEntryKeys = mutableSetOf<String>()
+                for (entry in node.entries) {
+                    if (entry.key.isBlank() || entry.label.isBlank() || !seenEntryKeys.add(entry.key)) {
+                        return ErrorBoundaryNode(
+                            id = node.id,
+                            errorMessage = "Invalid KeyValueListNode entry '${entry.key}' in '${node.id}': keys and labels must be non-blank and unique",
+                            failedNodeType = "KeyValueListNode"
+                        )
+                    }
+                }
+            }
+
+            if (node is MarkdownTextNode) {
+                val maxLines = node.maxLines
+                if (maxLines != null && maxLines <= 0) {
+                    return ErrorBoundaryNode(
+                        id = node.id,
+                        errorMessage = "Invalid MarkdownTextNode '${node.id}': maxLines=$maxLines must be > 0",
+                        failedNodeType = "MarkdownTextNode"
+                    )
+                }
+            }
+
+            if (node is MultiSelectDropdownNode) {
+                if (node.options.keys.any { it.isBlank() }) {
+                    return ErrorBoundaryNode(
+                        id = node.id,
+                        errorMessage = "Invalid MultiSelectDropdownNode '${node.id}': option keys must not be blank",
+                        failedNodeType = "MultiSelectDropdownNode"
+                    )
+                }
+            }
+
+            if (node is RangeSliderNode) {
+                val invalidRange = node.min.isNaN() || node.min.isInfinite() ||
+                    node.max.isNaN() || node.max.isInfinite() ||
+                    node.startValue.isNaN() || node.startValue.isInfinite() ||
+                    node.endValue.isNaN() || node.endValue.isInfinite() ||
+                    node.min >= node.max ||
+                    node.startValue > node.endValue ||
+                    node.steps < 0
+                if (invalidRange) {
+                    return ErrorBoundaryNode(
+                        id = node.id,
+                        errorMessage = "Malformed range slider on '${node.id}': min=${node.min}, max=${node.max}, start=${node.startValue}, end=${node.endValue}",
+                        failedNodeType = "RangeSliderNode"
+                    )
+                }
+            }
+
             // Recursively sanitize children for container nodes
             return when (node) {
                 is ColumnNode -> node.copy(children = node.children.map { sanitizeNode(it, depth + 1) })
                 is RowNode -> node.copy(children = node.children.map { sanitizeNode(it, depth + 1) })
                 is ScrollableRowNode -> node.copy(children = node.children.map { sanitizeNode(it, depth + 1) })
+                is FlowRowNode -> node.copy(
+                    maxItemsInEachRow = node.maxItemsInEachRow?.coerceAtLeast(1),
+                    children = node.children.map { sanitizeNode(it, depth + 1) }
+                )
                 is BoxNode -> node.copy(children = node.children.map { sanitizeNode(it, depth + 1) })
                 is CardNode -> node.copy(children = node.children.map { sanitizeNode(it, depth + 1) })
                 is ScrollableColumnNode -> node.copy(children = node.children.map { sanitizeNode(it, depth + 1) })

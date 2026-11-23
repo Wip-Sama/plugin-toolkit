@@ -2,6 +2,11 @@
 
 All notable changes to the Plugin API will be documented in this file.
 
+## 4.1.0-alpha03
+- Added `TableNode` (`TableColumn`, `TableRow`), `FlowRowNode`, `KeyValueListNode` (`KeyValueEntry`), `MarkdownTextNode`, `MultiSelectDropdownNode`, and `RangeSliderNode` with `@JvmOverloads` constructors and `UiNodeSerializer` support.
+- Added `UiEvent.TableSorted`, `UiEvent.RangeChanged`, and `UiEvent.MultiOptionSelected` with `UiEventSerializer` support.
+- Added `UiContainerBuilder` DSL builders (`table`, `flowRow`, `keyValueList`, `markdownText`, `multiSelectDropdown`, `rangeSlider`).
+
 ## 4.1.0-alpha02
 - Added `ProgressBarStyle` (`STANDARD`, `WAVY`, `MORPHING_INDICATOR`, `CONTAINED_INDICATOR`) on `ProgressBarNode` with `@JvmOverloads`.
 - Added `LoadingIndicatorNode` and `UiContainerBuilder.loadingIndicator(...)` DSL builder.

@@ -496,6 +496,32 @@ abstract class UiContainerBuilder {
         add(SliderNode(id = id, value = value, min = min, max = max, steps = steps, label = label, modifier = modifier))
     }
 
+    fun rangeSlider(
+        startValue: Double,
+        endValue: Double,
+        id: String = generateNodeId("range_slider"),
+        min: Double = 0.0,
+        max: Double = 1.0,
+        steps: Int = 0,
+        label: String? = null,
+        unitSuffix: String? = null,
+        modifier: UiModifier = UiModifier.None
+    ) {
+        add(
+            RangeSliderNode(
+                id = id,
+                startValue = startValue,
+                endValue = endValue,
+                min = min,
+                max = max,
+                steps = steps,
+                label = label,
+                unitSuffix = unitSuffix,
+                modifier = modifier
+            )
+        )
+    }
+
     fun dropdown(
         id: String = generateNodeId("dropdown"),
         selectedKey: String,
@@ -504,6 +530,30 @@ abstract class UiContainerBuilder {
         modifier: UiModifier = UiModifier.None
     ) {
         add(DropdownNode(id = id, selectedKey = selectedKey, options = options, label = label, modifier = modifier))
+    }
+
+    fun multiSelectDropdown(
+        options: Map<String, String>,
+        id: String = generateNodeId("multi_dropdown"),
+        selectedKeys: Set<String> = emptySet(),
+        label: String? = null,
+        placeholder: String? = null,
+        searchable: Boolean = true,
+        showSelectAll: Boolean = true,
+        modifier: UiModifier = UiModifier.None
+    ) {
+        add(
+            MultiSelectDropdownNode(
+                id = id,
+                selectedKeys = selectedKeys,
+                options = options,
+                label = label,
+                placeholder = placeholder,
+                searchable = searchable,
+                showSelectAll = showSelectAll,
+                modifier = modifier
+            )
+        )
     }
 
     fun radioGroup(
@@ -1050,6 +1100,137 @@ abstract class UiContainerBuilder {
         )
     }
 
+    fun markdownText(
+        markdown: String,
+        id: String = generateNodeId("markdown"),
+        selectable: Boolean = true,
+        maxLines: Int? = null,
+        linkAction: String? = null,
+        modifier: UiModifier = UiModifier.None
+    ) {
+        add(
+            MarkdownTextNode(
+                id = id,
+                markdown = markdown,
+                selectable = selectable,
+                maxLines = maxLines,
+                linkAction = linkAction,
+                modifier = modifier
+            )
+        )
+    }
+
+    fun flowRow(
+        id: String = generateNodeId("flow_row"),
+        horizontalSpacing: SpacingSize = SpacingSize.SMALL,
+        verticalSpacing: SpacingSize = SpacingSize.SMALL,
+        maxItemsInEachRow: Int? = null,
+        modifier: UiModifier = UiModifier.None,
+        block: FlowRowBuilder.() -> Unit
+    ) {
+        val builder = FlowRowBuilder(
+            id = id,
+            horizontalSpacing = horizontalSpacing,
+            verticalSpacing = verticalSpacing,
+            maxItemsInEachRow = maxItemsInEachRow,
+            modifier = modifier
+        ).apply(block)
+        add(builder.build())
+    }
+
+    fun table(
+        columns: List<TableColumn>,
+        rows: List<TableRow>,
+        id: String = generateNodeId("table"),
+        selectedRowKeys: Set<String> = emptySet(),
+        sortColumnKey: String? = null,
+        sortAscending: Boolean = true,
+        emptyText: String? = null,
+        maxHeightDp: Int? = null,
+        action: String? = null,
+        modifier: UiModifier = UiModifier.None
+    ) {
+        add(
+            TableNode(
+                id = id,
+                columns = columns,
+                rows = rows,
+                selectedRowKeys = selectedRowKeys,
+                sortColumnKey = sortColumnKey,
+                sortAscending = sortAscending,
+                emptyText = emptyText,
+                maxHeightDp = maxHeightDp,
+                action = action,
+                modifier = modifier
+            )
+        )
+    }
+
+    fun table(
+        id: String = generateNodeId("table"),
+        selectedRowKeys: Set<String> = emptySet(),
+        sortColumnKey: String? = null,
+        sortAscending: Boolean = true,
+        emptyText: String? = null,
+        maxHeightDp: Int? = null,
+        action: String? = null,
+        modifier: UiModifier = UiModifier.None,
+        block: TableBuilder.() -> Unit
+    ) {
+        val builder = TableBuilder().apply(block)
+        add(
+            TableNode(
+                id = id,
+                columns = builder.buildColumns(),
+                rows = builder.buildRows(),
+                selectedRowKeys = selectedRowKeys,
+                sortColumnKey = sortColumnKey,
+                sortAscending = sortAscending,
+                emptyText = emptyText,
+                maxHeightDp = maxHeightDp,
+                action = action,
+                modifier = modifier
+            )
+        )
+    }
+
+    fun keyValueList(
+        entries: List<KeyValueEntry>,
+        id: String = generateNodeId("kv_list"),
+        title: String? = null,
+        showDividers: Boolean = true,
+        modifier: UiModifier = UiModifier.None
+    ) {
+        add(
+            KeyValueListNode(
+                id = id,
+                entries = entries,
+                title = title,
+                showDividers = showDividers,
+                modifier = modifier
+            )
+        )
+    }
+
+    fun keyValueList(
+        id: String = generateNodeId("kv_list"),
+        title: String? = null,
+        showDividers: Boolean = true,
+        modifier: UiModifier = UiModifier.None,
+        block: KeyValueListBuilder.() -> Unit
+    ) {
+        val builder = KeyValueListBuilder().apply(block)
+        add(
+            KeyValueListNode(
+                id = id,
+                entries = builder.buildEntries(),
+                title = title,
+                showDividers = showDividers,
+                modifier = modifier
+            )
+        )
+    }
+
     internal fun buildChildren(): List<UiNode> = children.toList()
 
     companion object {
@@ -1094,6 +1275,93 @@ class ScrollableRowBuilder(
     val modifier: UiModifier
 ) : UiContainerBuilder() {
     fun build(): ScrollableRowNode = ScrollableRowNode(id = id, spacing = spacing, modifier = modifier, children = children.toList())
+}
+
+class FlowRowBuilder(
+    val id: String,
+    val horizontalSpacing: SpacingSize,
+    val verticalSpacing: SpacingSize,
+    val maxItemsInEachRow: Int?,
+    val modifier: UiModifier
+) : UiContainerBuilder() {
+    fun build(): FlowRowNode = FlowRowNode(
+        id = id,
+        children = children.toList(),
+        horizontalSpacing = horizontalSpacing,
+        verticalSpacing = verticalSpacing,
+        maxItemsInEachRow = maxItemsInEachRow,
+        modifier = modifier
+    )
+}
+
+@UiDslMarker
+class TableBuilder {
+    private val columns = mutableListOf<TableColumn>()
+    private val rows = mutableListOf<TableRow>()
+
+    fun column(
+        key: String,
+        title: String,
+        weight: Float = 1f,
+        widthDp: Int? = null,
+        sortable: Boolean = false
+    ) {
+        columns.add(
+            TableColumn(
+                key = key,
+                title = title,
+                weight = weight,
+                widthDp = widthDp,
+                sortable = sortable
+            )
+        )
+    }
+
+    fun row(
+        key: String,
+        cells: Map<String, String>,
+        badgeColumnKey: String? = null,
+        badgeColor: SemanticColor? = null
+    ) {
+        rows.add(
+            TableRow(
+                key = key,
+                cells = cells,
+                badgeColumnKey = badgeColumnKey,
+                badgeColor = badgeColor
+            )
+        )
+    }
+
+    internal fun buildColumns(): List<TableColumn> = columns.toList()
+    internal fun buildRows(): List<TableRow> = rows.toList()
+}
+
+@UiDslMarker
+class KeyValueListBuilder {
+    private val entries = mutableListOf<KeyValueEntry>()
+
+    fun entry(
+        key: String,
+        label: String,
+        value: String,
+        monospace: Boolean = false,
+        copyable: Boolean = false,
+        badgeColor: SemanticColor? = null
+    ) {
+        entries.add(
+            KeyValueEntry(
+                key = key,
+                label = label,
+                value = value,
+                monospace = monospace,
+                copyable = copyable,
+                badgeColor = badgeColor
+            )
+        )
+    }
+
+    internal fun buildEntries(): List<KeyValueEntry> = entries.toList()
 }
 
 class CardBuilder(
