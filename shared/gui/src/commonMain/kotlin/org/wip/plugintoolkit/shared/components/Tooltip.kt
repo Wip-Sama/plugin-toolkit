@@ -4,8 +4,15 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.PlainTooltip
+import androidx.compose.material3.RichTooltip
 import androidx.compose.material3.Text
+import androidx.compose.material3.TooltipAnchorPosition
+import androidx.compose.material3.TooltipBox
+import androidx.compose.material3.TooltipDefaults
+import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -43,6 +50,69 @@ import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+
+/**
+ * Standard Material 3 TooltipBox wrapper supporting plain text hints on hover and keyboard focus.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ToolkitTooltipBox(
+    tooltip: String?,
+    modifier: Modifier = Modifier,
+    position: TooltipAnchorPosition = TooltipAnchorPosition.Above,
+    content: @Composable () -> Unit
+) {
+    if (tooltip.isNullOrBlank()) {
+        content()
+        return
+    }
+    TooltipBox(
+        positionProvider = TooltipDefaults.rememberTooltipPositionProvider(position),
+        tooltip = {
+            PlainTooltip(
+                shape = ToolkitTheme.shapes.small,
+                containerColor = MaterialTheme.colorScheme.inverseSurface,
+                contentColor = MaterialTheme.colorScheme.inverseOnSurface
+            ) {
+                Text(
+                    text = tooltip,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+        },
+        state = rememberTooltipState(),
+        modifier = modifier
+    ) {
+        content()
+    }
+}
+
+/**
+ * Material 3 RichTooltip wrapper supporting custom composable tooltip bodies for inspector badges and ports.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ToolkitRichTooltipBox(
+    tooltipContent: @Composable () -> Unit,
+    modifier: Modifier = Modifier,
+    position: TooltipAnchorPosition = TooltipAnchorPosition.Above,
+    content: @Composable () -> Unit
+) {
+    TooltipBox(
+        positionProvider = TooltipDefaults.rememberTooltipPositionProvider(position),
+        tooltip = {
+            RichTooltip(
+                shape = ToolkitTheme.shapes.medium
+            ) {
+                tooltipContent()
+            }
+        },
+        state = rememberTooltipState(),
+        modifier = modifier
+    ) {
+        content()
+    }
+}
 
 /**
  * A reusable Composable wrapper that shows a custom tooltip when the content is hovered.

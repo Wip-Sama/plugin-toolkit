@@ -4,12 +4,15 @@ import org.wip.plugintoolkit.api.sdui.AccordionNode
 import org.wip.plugintoolkit.api.sdui.BoardLayer
 import org.wip.plugintoolkit.api.sdui.BoardNode
 import org.wip.plugintoolkit.api.sdui.BoxNode
+import org.wip.plugintoolkit.api.sdui.BreadcrumbsNode
 import org.wip.plugintoolkit.api.sdui.ButtonGroupNode
 import org.wip.plugintoolkit.api.sdui.CardNode
 import org.wip.plugintoolkit.api.sdui.CodeBlockNode
+import org.wip.plugintoolkit.api.sdui.ColorPickerNode
 import org.wip.plugintoolkit.api.sdui.ColumnNode
 import org.wip.plugintoolkit.api.sdui.DialogNode
 import org.wip.plugintoolkit.api.sdui.ErrorBoundaryNode
+import org.wip.plugintoolkit.api.sdui.FilePickerNode
 import org.wip.plugintoolkit.api.sdui.FloatingPanelNode
 import org.wip.plugintoolkit.api.sdui.FlowRowNode
 import org.wip.plugintoolkit.api.sdui.GridNode
@@ -17,8 +20,10 @@ import org.wip.plugintoolkit.api.sdui.KeyValueListNode
 import org.wip.plugintoolkit.api.sdui.ListItemNode
 import org.wip.plugintoolkit.api.sdui.LoadingIndicatorNode
 import org.wip.plugintoolkit.api.sdui.MarkdownTextNode
+import org.wip.plugintoolkit.api.sdui.MenuNode
 import org.wip.plugintoolkit.api.sdui.MultiSelectDropdownNode
 import org.wip.plugintoolkit.api.sdui.NumberInputNode
+import org.wip.plugintoolkit.api.sdui.PaginationNode
 import org.wip.plugintoolkit.api.sdui.ProgressBarNode
 import org.wip.plugintoolkit.api.sdui.RadioGroupNode
 import org.wip.plugintoolkit.api.sdui.RangeSliderNode
@@ -30,9 +35,12 @@ import org.wip.plugintoolkit.api.sdui.SidebarNode
 import org.wip.plugintoolkit.api.sdui.SliderNode
 import org.wip.plugintoolkit.api.sdui.SplitButtonNode
 import org.wip.plugintoolkit.api.sdui.SplitPaneNode
+import org.wip.plugintoolkit.api.sdui.StepperNode
 import org.wip.plugintoolkit.api.sdui.TableNode
 import org.wip.plugintoolkit.api.sdui.TabsNode
 import org.wip.plugintoolkit.api.sdui.TextNode
+import org.wip.plugintoolkit.api.sdui.TreeNodeItem
+import org.wip.plugintoolkit.api.sdui.TreeViewNode
 import org.wip.plugintoolkit.api.sdui.UiNode
 import org.wip.plugintoolkit.api.sdui.UiNodeTree
 
@@ -397,6 +405,102 @@ object UiAstSanitizer {
                 }
             }
 
+            if (node is TreeViewNode) {
+                val maxHeight = node.maxHeightDp
+                if (maxHeight != null && maxHeight <= 0) {
+                    return ErrorBoundaryNode(
+                        id = node.id,
+                        errorMessage = "Invalid TreeViewNode '${node.id}': maxHeightDp=$maxHeight must be > 0",
+                        failedNodeType = "TreeViewNode"
+                    )
+                }
+                val seenKeys = mutableSetOf<String>()
+                fun validateTreeItems(items: List<TreeNodeItem>): String? {
+                    for (item in items) {
+                        if (item.key.isBlank() || item.label.isBlank() || !seenKeys.add(item.key)) {
+                            return item.key
+                        }
+                        val invalidChild = validateTreeItems(item.children)
+                        if (invalidChild != null) return invalidChild
+                    }
+                    return null
+                }
+                val badKey = validateTreeItems(node.items)
+                if (badKey != null) {
+                    return ErrorBoundaryNode(
+                        id = node.id,
+                        errorMessage = "Invalid or duplicate TreeNodeItem key '$badKey' in TreeViewNode '${node.id}'",
+                        failedNodeType = "TreeViewNode"
+                    )
+                }
+            }
+
+            if (node is ColorPickerNode && node.colorHex.isBlank()) {
+                return ErrorBoundaryNode(
+                    id = node.id,
+                    errorMessage = "Invalid ColorPickerNode '${node.id}': colorHex must not be blank",
+                    failedNodeType = "ColorPickerNode"
+                )
+            }
+
+            if (node is BreadcrumbsNode) {
+                val seenCrumbKeys = mutableSetOf<String>()
+                for (item in node.items) {
+                    if (item.key.isBlank() || item.label.isBlank() || !seenCrumbKeys.add(item.key)) {
+                        return ErrorBoundaryNode(
+                            id = node.id,
+                            errorMessage = "Invalid BreadcrumbsNode item '${item.key}' in '${node.id}': keys and labels must be non-blank and unique",
+                            failedNodeType = "BreadcrumbsNode"
+                        )
+                    }
+                }
+            }
+
+            if (node is PaginationNode) {
+                val safeTotal = node.totalPages.coerceAtLeast(1)
+                val safePage = node.currentPage.coerceIn(1, safeTotal)
+                val pageSize = node.pageSize
+                if (pageSize != null && pageSize <= 0) {
+                    return ErrorBoundaryNode(
+                        id = node.id,
+                        errorMessage = "Invalid PaginationNode '${node.id}': pageSize=$pageSize must be > 0",
+                        failedNodeType = "PaginationNode"
+                    )
+                }
+                if (safeTotal != node.totalPages || safePage != node.currentPage) {
+                    return node.copy(currentPage = safePage, totalPages = safeTotal)
+                }
+            }
+
+            if (node is StepperNode) {
+                val seenStepKeys = mutableSetOf<String>()
+                for (step in node.steps) {
+                    if (step.key.isBlank() || step.label.isBlank() || !seenStepKeys.add(step.key)) {
+                        return ErrorBoundaryNode(
+                            id = node.id,
+                            errorMessage = "Invalid StepperNode step '${step.key}' in '${node.id}': keys and labels must be non-blank and unique",
+                            failedNodeType = "StepperNode"
+                        )
+                    }
+                }
+            }
+
+            if (node is MenuNode) {
+                for (item in node.items) {
+                    if (item.key.isBlank() || item.label.isBlank()) {
+                        return ErrorBoundaryNode(
+                            id = node.id,
+                            errorMessage = "Invalid MenuNode item '${item.key}' in '${node.id}': key and label must not be blank",
+                            failedNodeType = "MenuNode"
+                        )
+                    }
+                }
+            }
+
+            if (node is FilePickerNode && node.defaultFileName.isBlank()) {
+                return node.copy(defaultFileName = "export")
+            }
+
             // Recursively sanitize children for container nodes
             return when (node) {
                 is ColumnNode -> node.copy(children = node.children.map { sanitizeNode(it, depth + 1) })
@@ -408,7 +512,10 @@ object UiAstSanitizer {
                 )
                 is BoxNode -> node.copy(children = node.children.map { sanitizeNode(it, depth + 1) })
                 is CardNode -> node.copy(children = node.children.map { sanitizeNode(it, depth + 1) })
-                is ScrollableColumnNode -> node.copy(children = node.children.map { sanitizeNode(it, depth + 1) })
+                is ScrollableColumnNode -> node.copy(
+                    scrollToIndex = node.scrollToIndex?.coerceAtLeast(0),
+                    children = node.children.map { sanitizeNode(it, depth + 1) }
+                )
                 is GridNode -> {
                     val safeColumns = node.columns?.coerceIn(1, 12)
                     val safeMinWidth = if (node.minItemWidthDp.isNaN() || node.minItemWidthDp.isInfinite()) {
@@ -419,9 +526,11 @@ object UiAstSanitizer {
                     node.copy(
                         columns = safeColumns,
                         minItemWidthDp = safeMinWidth,
+                        scrollToIndex = node.scrollToIndex?.coerceAtLeast(0),
                         children = node.children.map { sanitizeNode(it, depth + 1) }
                     )
                 }
+                is BreadcrumbsNode -> node.copy(maxVisibleItems = node.maxVisibleItems.coerceAtLeast(2))
                 is TabsNode -> node.copy(content = sanitizeNode(node.content, depth + 1))
                 is ListItemNode -> node.copy(trailingContent = node.trailingContent.map { sanitizeNode(it, depth + 1) })
                 is DialogNode -> node.copy(children = node.children.map { sanitizeNode(it, depth + 1) })

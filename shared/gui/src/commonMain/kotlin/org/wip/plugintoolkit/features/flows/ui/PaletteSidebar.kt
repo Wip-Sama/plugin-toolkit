@@ -466,15 +466,8 @@ fun PaletteItem(
     val currentOnDragEnd by rememberUpdatedState(onDragEnd)
 
     // Styled beautifully as premium interactive sidebar items
-    org.wip.plugintoolkit.shared.components.TooltipArea(
-        tooltip = {
-            Text(
-                text = tooltip ?: text,
-                style = MaterialTheme.typography.bodySmall,
-                color = if (!enabled) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        },
-        delayMillis = 1000,
+    org.wip.plugintoolkit.shared.components.ToolkitTooltipBox(
+        tooltip = tooltip ?: text,
         modifier = Modifier.fillMaxWidth().alpha(if (enabled) 1f else 0.5f)
     ) {
         Surface(

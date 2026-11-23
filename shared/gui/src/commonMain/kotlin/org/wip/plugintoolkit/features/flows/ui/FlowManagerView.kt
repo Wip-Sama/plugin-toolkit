@@ -88,7 +88,7 @@ import org.wip.plugintoolkit.shared.components.ToolkitButtonGroup
 import org.wip.plugintoolkit.shared.components.ToolkitChip
 import org.wip.plugintoolkit.shared.components.ToolkitChipStyle
 import org.wip.plugintoolkit.shared.components.ToolkitTextField
-import org.wip.plugintoolkit.shared.components.tooltip
+import org.wip.plugintoolkit.shared.components.ToolkitTooltipBox
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.action_delete
 import plugintoolkit.composeapp.generated.resources.action_save
@@ -255,58 +255,61 @@ fun FlowManagerView(
                 ToolkitButtonGroup {
                     item { shape, modifierSpec ->
                         val label = stringResource(Res.string.flow_import_file)
-                        Button(
-                            onClick = { viewModel.onEvent(FlowEvent.TriggerImport) },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                                contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                            ),
-                            shape = shape,
-                            modifier = modifierSpec.tooltip(label)
-                        ) {
-                            Icon(Icons.Default.Download, contentDescription = label)
-                            if (!isCompact) {
-                                Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
-                                Text(label, maxLines = 1, softWrap = false)
+                        ToolkitTooltipBox(tooltip = label, modifier = modifierSpec) {
+                            Button(
+                                onClick = { viewModel.onEvent(FlowEvent.TriggerImport) },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                                ),
+                                shape = shape
+                            ) {
+                                Icon(Icons.Default.Download, contentDescription = label)
+                                if (!isCompact) {
+                                    Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
+                                    Text(label, maxLines = 1, softWrap = false)
+                                }
                             }
                         }
                     }
 
                     item { shape, modifierSpec ->
                         val label = stringResource(Res.string.flow_import_clipboard)
-                        Button(
-                            onClick = {
-                                val base64 = textClipboardManager.getText()?.text
-                                if (!base64.isNullOrBlank()) {
-                                    viewModel.onEvent(FlowEvent.TriggerImportFromClipboard(base64))
+                        ToolkitTooltipBox(tooltip = label, modifier = modifierSpec) {
+                            Button(
+                                onClick = {
+                                    val base64 = textClipboardManager.getText()?.text
+                                    if (!base64.isNullOrBlank()) {
+                                        viewModel.onEvent(FlowEvent.TriggerImportFromClipboard(base64))
+                                    }
+                                },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                                    contentColor = MaterialTheme.colorScheme.onTertiaryContainer
+                                ),
+                                shape = shape
+                            ) {
+                                Icon(Icons.Default.ContentCopy, contentDescription = label)
+                                if (!isCompact) {
+                                    Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
+                                    Text(label, maxLines = 1, softWrap = false)
                                 }
-                            },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-                                contentColor = MaterialTheme.colorScheme.onTertiaryContainer
-                            ),
-                            shape = shape,
-                            modifier = modifierSpec.tooltip(label)
-                        ) {
-                            Icon(Icons.Default.ContentCopy, contentDescription = label)
-                            if (!isCompact) {
-                                Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
-                                Text(label, maxLines = 1, softWrap = false)
                             }
                         }
                     }
 
                     item { shape, modifierSpec ->
                         val label = stringResource(Res.string.flow_create_new)
-                        Button(
-                            onClick = { showCreateDialog = true },
-                            shape = shape,
-                            modifier = modifierSpec.tooltip(label)
-                        ) {
-                            Icon(Icons.Default.Add, contentDescription = label)
-                            if (!isCompact) {
-                                Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
-                                Text(label, maxLines = 1, softWrap = false)
+                        ToolkitTooltipBox(tooltip = label, modifier = modifierSpec) {
+                            Button(
+                                onClick = { showCreateDialog = true },
+                                shape = shape
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = label)
+                                if (!isCompact) {
+                                    Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
+                                    Text(label, maxLines = 1, softWrap = false)
+                                }
                             }
                         }
                     }

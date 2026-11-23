@@ -125,12 +125,14 @@ import org.wip.plugintoolkit.api.sdui.AlignmentRole
 import org.wip.plugintoolkit.api.sdui.BadgeNode
 import org.wip.plugintoolkit.api.sdui.BoardNode
 import org.wip.plugintoolkit.api.sdui.BoxNode
+import org.wip.plugintoolkit.api.sdui.BreadcrumbsNode
 import org.wip.plugintoolkit.api.sdui.ButtonGroupNode
 import org.wip.plugintoolkit.api.sdui.ButtonNode
 import org.wip.plugintoolkit.api.sdui.CardNode
 import org.wip.plugintoolkit.api.sdui.CheckboxNode
 import org.wip.plugintoolkit.api.sdui.ChipGroupNode
 import org.wip.plugintoolkit.api.sdui.CodeBlockNode
+import org.wip.plugintoolkit.api.sdui.ColorPickerNode
 import org.wip.plugintoolkit.api.sdui.ColumnNode
 import org.wip.plugintoolkit.api.sdui.ControlSize
 import org.wip.plugintoolkit.api.sdui.DialogNode
@@ -138,6 +140,7 @@ import org.wip.plugintoolkit.api.sdui.DividerNode
 import org.wip.plugintoolkit.api.sdui.DropdownNode
 import org.wip.plugintoolkit.api.sdui.EmptyStateNode
 import org.wip.plugintoolkit.api.sdui.ErrorBoundaryNode
+import org.wip.plugintoolkit.api.sdui.FilePickerNode
 import org.wip.plugintoolkit.api.sdui.FloatingAnchor
 import org.wip.plugintoolkit.api.sdui.FloatingPanelNode
 import org.wip.plugintoolkit.api.sdui.FlowRowNode
@@ -150,8 +153,10 @@ import org.wip.plugintoolkit.api.sdui.KeyValueListNode
 import org.wip.plugintoolkit.api.sdui.ListItemNode
 import org.wip.plugintoolkit.api.sdui.LoadingIndicatorNode
 import org.wip.plugintoolkit.api.sdui.MarkdownTextNode
+import org.wip.plugintoolkit.api.sdui.MenuNode
 import org.wip.plugintoolkit.api.sdui.MultiSelectDropdownNode
 import org.wip.plugintoolkit.api.sdui.NumberInputNode
+import org.wip.plugintoolkit.api.sdui.PaginationNode
 import org.wip.plugintoolkit.api.sdui.ProgressBarNode
 import org.wip.plugintoolkit.api.sdui.ProgressBarStyle
 import org.wip.plugintoolkit.api.sdui.RadioGroupNode
@@ -170,11 +175,13 @@ import org.wip.plugintoolkit.api.sdui.SpacerNode
 import org.wip.plugintoolkit.api.sdui.SpacingSize
 import org.wip.plugintoolkit.api.sdui.SplitButtonNode
 import org.wip.plugintoolkit.api.sdui.SplitPaneNode
+import org.wip.plugintoolkit.api.sdui.StepperNode
 import org.wip.plugintoolkit.api.sdui.TableNode
 import org.wip.plugintoolkit.api.sdui.TabsNode
 import org.wip.plugintoolkit.api.sdui.TextInputNode
 import org.wip.plugintoolkit.api.sdui.TextNode
 import org.wip.plugintoolkit.api.sdui.ToggleNode
+import org.wip.plugintoolkit.api.sdui.TreeViewNode
 import org.wip.plugintoolkit.api.sdui.TypographyRole
 import org.wip.plugintoolkit.api.sdui.UiEvent
 import org.wip.plugintoolkit.api.sdui.UiModifier
@@ -189,6 +196,7 @@ import org.wip.plugintoolkit.core.utils.PlatformVerticalScrollbar
 import org.wip.plugintoolkit.shared.components.ToolkitCircularProgressIndicator
 import org.wip.plugintoolkit.shared.components.ToolkitLinearProgressIndicator
 import org.wip.plugintoolkit.shared.components.ToolkitLoadingIndicator
+import org.wip.plugintoolkit.shared.components.ToolkitTooltipBox
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.sdui_cancel
 import plugintoolkit.composeapp.generated.resources.sdui_confirm
@@ -286,36 +294,13 @@ fun SafeUiNodeRenderer(
 /**
  * Shared Material 3 TooltipBox wrapper for icon controls and chrome toggles.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun SduiTooltipBox(
     tooltip: String?,
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit
 ) {
-    if (tooltip.isNullOrBlank()) {
-        content()
-        return
-    }
-    TooltipBox(
-        positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
-        tooltip = {
-            PlainTooltip(
-                shape = ToolkitTheme.shapes.small,
-                containerColor = MaterialTheme.colorScheme.inverseSurface,
-                contentColor = MaterialTheme.colorScheme.inverseOnSurface
-            ) {
-                Text(
-                    text = tooltip,
-                    style = ToolkitTheme.typography.bodySmall
-                )
-            }
-        },
-        state = rememberTooltipState(),
-        modifier = modifier
-    ) {
-        content()
-    }
+    ToolkitTooltipBox(tooltip = tooltip, modifier = modifier, content = content)
 }
 
 /**
@@ -347,6 +332,12 @@ internal fun resolveContainerSpacing(
             it is MultiSelectDropdownNode ||
             it is RangeSliderNode ||
             it is FlowRowNode ||
+            it is TreeViewNode ||
+            it is FilePickerNode ||
+            it is ColorPickerNode ||
+            it is BreadcrumbsNode ||
+            it is PaginationNode ||
+            it is StepperNode ||
             it is AlertBannerNode ||
             it is SplitPaneNode ||
             it is TabsNode ||
@@ -764,6 +755,34 @@ fun RenderUiNode(
 
         is MarkdownTextNode -> {
             RenderMarkdownTextNode(node = node, onEvent = onEvent, modifier = appliedModifier)
+        }
+
+        is TreeViewNode -> {
+            RenderTreeViewNode(node = node, onEvent = onEvent, modifier = appliedModifier)
+        }
+
+        is FilePickerNode -> {
+            RenderFilePickerNode(node = node, onEvent = onEvent, modifier = appliedModifier)
+        }
+
+        is ColorPickerNode -> {
+            RenderColorPickerNode(node = node, onEvent = onEvent, modifier = appliedModifier)
+        }
+
+        is BreadcrumbsNode -> {
+            RenderBreadcrumbsNode(node = node, onEvent = onEvent, modifier = appliedModifier)
+        }
+
+        is PaginationNode -> {
+            RenderPaginationNode(node = node, onEvent = onEvent, modifier = appliedModifier)
+        }
+
+        is StepperNode -> {
+            RenderStepperNode(node = node, onEvent = onEvent, modifier = appliedModifier)
+        }
+
+        is MenuNode -> {
+            RenderMenuNode(node = node, onEvent = onEvent, modifier = appliedModifier)
         }
 
         is ImageNode -> {

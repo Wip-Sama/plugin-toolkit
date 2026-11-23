@@ -37,7 +37,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
-import org.wip.plugintoolkit.shared.components.tooltip
+import org.wip.plugintoolkit.shared.components.ToolkitTooltipBox
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -91,18 +91,20 @@ fun <T> SidebarItem(
     val resolvedTitle = element.title.resolve()
     var isTitleTruncated by remember(resolvedTitle) { mutableStateOf(false) }
 
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(bottom = ToolkitTheme.spacing.extraExtraSmall)
-            .clip(animatedShape)
-            .background(backgroundColor)
-            .clickable { onClick() }
-            .then(if (!isExpanded || isTitleTruncated) Modifier.tooltip(resolvedTitle) else Modifier)
-            .padding(horizontal = ToolkitTheme.spacing.small, vertical = ToolkitTheme.spacing.small),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Start
+    ToolkitTooltipBox(
+        tooltip = if (!isExpanded || isTitleTruncated) resolvedTitle else null
     ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = ToolkitTheme.spacing.extraExtraSmall)
+                .clip(animatedShape)
+                .background(backgroundColor)
+                .clickable { onClick() }
+                .padding(horizontal = ToolkitTheme.spacing.small, vertical = ToolkitTheme.spacing.small),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Start
+        ) {
         Box(
             modifier = Modifier
                 .size(ToolkitTheme.dimensions.settingsIconContainerSize)
@@ -158,6 +160,7 @@ fun <T> SidebarItem(
             Box(contentAlignment = Alignment.TopEnd) {
                 element.trailingContent(false)
             }
+        }
         }
     }
 }

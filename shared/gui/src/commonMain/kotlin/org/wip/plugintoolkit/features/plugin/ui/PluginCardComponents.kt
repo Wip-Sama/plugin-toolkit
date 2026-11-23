@@ -59,6 +59,7 @@ import org.wip.plugintoolkit.features.plugin.viewmodel.AlternateRepoUpdate
 import org.wip.plugintoolkit.features.plugin.viewmodel.PluginActivityInfo
 import org.wip.plugintoolkit.shared.components.ToolkitButtonGroup
 import org.wip.plugintoolkit.shared.components.ToolkitChip
+import org.wip.plugintoolkit.shared.components.ToolkitTooltipBox
 import org.wip.plugintoolkit.shared.components.menu.ToolkitDropdownDivider
 import org.wip.plugintoolkit.shared.components.menu.ToolkitDropdownMenu
 import org.wip.plugintoolkit.shared.components.menu.ToolkitDropdownMenuItem
@@ -437,32 +438,33 @@ internal fun PluginCardActions(
                 val action = customActions.find { it.functionName == reqAction }
                 val actionLabel = if (reqAction == "CONFIGURE_SETTINGS") "Configure" else (action?.name ?: "Fix Issue")
                 item { shape, modifierSpec ->
-                    Button(
-                        onClick = {
-                            if (reqAction == "CONFIGURE_SETTINGS") {
-                                onAction(PluginStatusAction.Settings)
-                            } else {
-                                onAction(PluginStatusAction.Custom(reqAction))
-                            }
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = ToolkitTheme.colors.warning),
-                        shape = shape,
-                        modifier = modifierSpec.tooltip(actionLabel),
-                        enabled = readyStatus
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Build,
-                            contentDescription = actionLabel,
-                            modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
-                        )
-                        if (!isCompact) {
-                            Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
-                            Text(
-                                text = actionLabel,
-                                maxLines = 1,
-                                softWrap = false,
-                                overflow = TextOverflow.Ellipsis
+                    ToolkitTooltipBox(tooltip = actionLabel, modifier = modifierSpec) {
+                        Button(
+                            onClick = {
+                                if (reqAction == "CONFIGURE_SETTINGS") {
+                                    onAction(PluginStatusAction.Settings)
+                                } else {
+                                    onAction(PluginStatusAction.Custom(reqAction))
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = ToolkitTheme.colors.warning),
+                            shape = shape,
+                            enabled = readyStatus
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Build,
+                                contentDescription = actionLabel,
+                                modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
                             )
+                            if (!isCompact) {
+                                Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
+                                Text(
+                                    text = actionLabel,
+                                    maxLines = 1,
+                                    softWrap = false,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
                         }
                     }
                 }
@@ -471,73 +473,76 @@ internal fun PluginCardActions(
             item { shape, modifierSpec ->
                 if (isUpdateAvailable) {
                     val updateLabel = stringResource(Res.string.plugin_update)
-                    Button(
-                        onClick = { onAction(PluginStatusAction.Update) },
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
-                        shape = shape,
-                        modifier = modifierSpec.tooltip(updateLabel),
-                        enabled = readyStatus
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Upgrade,
-                            contentDescription = updateLabel,
-                            modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
-                        )
-                        if (!isCompact) {
-                            Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
-                            Text(
-                                text = updateLabel,
-                                maxLines = 1,
-                                softWrap = false,
-                                overflow = TextOverflow.Ellipsis
+                    ToolkitTooltipBox(tooltip = updateLabel, modifier = modifierSpec) {
+                        Button(
+                            onClick = { onAction(PluginStatusAction.Update) },
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
+                            shape = shape,
+                            enabled = readyStatus
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Upgrade,
+                                contentDescription = updateLabel,
+                                modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
                             )
+                            if (!isCompact) {
+                                Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
+                                Text(
+                                    text = updateLabel,
+                                    maxLines = 1,
+                                    softWrap = false,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
                         }
                     }
                 } else if (hasAltUpdate) {
                     val switchLabel = stringResource(Res.string.plugin_switch_repo_action)
-                    Button(
-                        onClick = { onSwitchRepo(plugin.pkg) },
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                        shape = shape,
-                        modifier = modifierSpec.tooltip(switchLabel),
-                        enabled = readyStatus
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Upgrade,
-                            contentDescription = switchLabel,
-                            modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
-                        )
-                        if (!isCompact) {
-                            Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
-                            Text(
-                                text = switchLabel,
-                                maxLines = 1,
-                                softWrap = false,
-                                overflow = TextOverflow.Ellipsis
+                    ToolkitTooltipBox(tooltip = switchLabel, modifier = modifierSpec) {
+                        Button(
+                            onClick = { onSwitchRepo(plugin.pkg) },
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                            shape = shape,
+                            enabled = readyStatus
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Upgrade,
+                                contentDescription = switchLabel,
+                                modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
                             )
+                            if (!isCompact) {
+                                Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
+                                Text(
+                                    text = switchLabel,
+                                    maxLines = 1,
+                                    softWrap = false,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
                         }
                     }
                 } else {
                     val updateLocalLabel = stringResource(Res.string.plugin_update_local)
-                    FilledTonalButton(
-                        onClick = { onAction(PluginStatusAction.Update) },
-                        shape = shape,
-                        modifier = modifierSpec.tooltip(updateLocalLabel),
-                        enabled = readyStatus
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Refresh,
-                            contentDescription = updateLocalLabel,
-                            modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
-                        )
-                        if (!isCompact) {
-                            Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
-                            Text(
-                                text = updateLocalLabel,
-                                maxLines = 1,
-                                softWrap = false,
-                                overflow = TextOverflow.Ellipsis
+                    ToolkitTooltipBox(tooltip = updateLocalLabel, modifier = modifierSpec) {
+                        FilledTonalButton(
+                            onClick = { onAction(PluginStatusAction.Update) },
+                            shape = shape,
+                            enabled = readyStatus
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Refresh,
+                                contentDescription = updateLocalLabel,
+                                modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
                             )
+                            if (!isCompact) {
+                                Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
+                                Text(
+                                    text = updateLocalLabel,
+                                    maxLines = 1,
+                                    softWrap = false,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
                         }
                     }
                 }
@@ -573,13 +578,13 @@ internal fun PluginCardActions(
                         stringResource(Res.string.plugin_state_disabled)
                     }
                 }
-                FilledTonalButton(
-                    onClick = { onToggle(!plugin.isEnabled) },
-                    colors = toggleColor,
-                    shape = shape,
-                    modifier = modifierSpec.tooltip(toggleText),
-                    enabled = readyStatus && !isBusy
-                ) {
+                ToolkitTooltipBox(tooltip = toggleText, modifier = modifierSpec) {
+                    FilledTonalButton(
+                        onClick = { onToggle(!plugin.isEnabled) },
+                        colors = toggleColor,
+                        shape = shape,
+                        enabled = readyStatus && !isBusy
+                    ) {
                     if (isBusy) {
                         CircularProgressIndicator(
                             progress = { if (isDeterminate) progress else 0f },
@@ -603,6 +608,7 @@ internal fun PluginCardActions(
                             overflow = TextOverflow.Ellipsis
                         )
                     }
+                }
                 }
             }
 

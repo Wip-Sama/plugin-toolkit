@@ -65,7 +65,7 @@ import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.flows.model.Node
 import org.wip.plugintoolkit.shared.components.ToolkitChip
 import org.wip.plugintoolkit.shared.components.ToolkitChipStyle
-import org.wip.plugintoolkit.shared.components.tooltip
+import org.wip.plugintoolkit.shared.components.ToolkitTooltipBox
 import kotlin.time.Duration.Companion.milliseconds
 import org.jetbrains.compose.resources.stringResource
 import plugintoolkit.composeapp.generated.resources.*
@@ -199,17 +199,19 @@ fun NodeHeader(
                 modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
             )
             Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
-            Text(
-                text = node.title,
-                color = onHeaderColor,
-                fontWeight = FontWeight.Bold,
-                style = MaterialTheme.typography.titleSmall,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier
-                    .weight(1f, fill = false)
-                    .tooltip(node.title)
-            )
+            ToolkitTooltipBox(
+                tooltip = node.title,
+                modifier = Modifier.weight(1f, fill = false)
+            ) {
+                Text(
+                    text = node.title,
+                    color = onHeaderColor,
+                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.titleSmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
 
             if (node is Node.CapabilityNode && node.isBroken) {
                 Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))

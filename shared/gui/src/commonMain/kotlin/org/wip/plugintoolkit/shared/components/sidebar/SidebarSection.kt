@@ -38,7 +38,7 @@ import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.section_general
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.jetbrains.compose.resources.stringResource
-import org.wip.plugintoolkit.shared.components.tooltip
+import org.wip.plugintoolkit.shared.components.ToolkitTooltipBox
 import plugintoolkit.composeapp.generated.resources.*
 
 @Composable
@@ -68,33 +68,34 @@ fun <T> SidebarSection(
     Column(modifier = Modifier.fillMaxWidth()) {
         if (section.title != null) {
             val resolvedTitle = section.title.resolve()
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(MaterialTheme.shapes.small)
-                    .clickable { isSectionCollapsed = !isSectionCollapsed }
-                    .tooltip(resolvedTitle)
-                    .padding(horizontal = ToolkitTheme.spacing.small, vertical = ToolkitTheme.spacing.extraSmall),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = if (isExpanded) Arrangement.SpaceBetween else Arrangement.Start
-            ) {
-                if (isExpanded) {
-                    Text(
-                        text = resolvedTitle,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        softWrap = false,
-                        overflow = TextOverflow.Clip,
-                        modifier = Modifier.weight(1f, fill = false)
+            ToolkitTooltipBox(tooltip = resolvedTitle) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(MaterialTheme.shapes.small)
+                        .clickable { isSectionCollapsed = !isSectionCollapsed }
+                        .padding(horizontal = ToolkitTheme.spacing.small, vertical = ToolkitTheme.spacing.extraSmall),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = if (isExpanded) Arrangement.SpaceBetween else Arrangement.Start
+                ) {
+                    if (isExpanded) {
+                        Text(
+                            text = resolvedTitle,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            softWrap = false,
+                            overflow = TextOverflow.Clip,
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
+                    }
+                    Icon(
+                        imageVector = if (isSectionCollapsed) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
+                        contentDescription = stringResource(Res.string.action_toggle_section),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(ToolkitTheme.dimensions.circularProgressSize)
                     )
                 }
-                Icon(
-                    imageVector = if (isSectionCollapsed) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
-                    contentDescription = stringResource(Res.string.action_toggle_section),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(ToolkitTheme.dimensions.circularProgressSize)
-                )
             }
             Spacer(modifier = Modifier.height(ToolkitTheme.spacing.extraSmall))
         } else {

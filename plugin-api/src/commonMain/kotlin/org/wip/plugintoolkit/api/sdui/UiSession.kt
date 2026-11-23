@@ -321,17 +321,30 @@ abstract class UiContainerBuilder {
         add(builder.build())
     }
 
+    @JvmOverloads
     fun scrollableColumn(
         id: String = generateNodeId("scroll"),
         spacing: SpacingSize = SpacingSize.NONE,
         modifier: UiModifier = UiModifier.None,
         reorderable: Boolean = false,
+        scrollToIndex: Int? = null,
+        scrollToEdge: ScrollEdge? = null,
+        scrollRevision: Int = 0,
         block: ScrollableColumnBuilder.() -> Unit
     ) {
-        val builder = ScrollableColumnBuilder(id, spacing, modifier, reorderable).apply(block)
+        val builder = ScrollableColumnBuilder(
+            id = id,
+            spacing = spacing,
+            modifier = modifier,
+            reorderable = reorderable,
+            scrollToIndex = scrollToIndex,
+            scrollToEdge = scrollToEdge,
+            scrollRevision = scrollRevision
+        ).apply(block)
         add(builder.build())
     }
 
+    @JvmOverloads
     fun grid(
         id: String = generateNodeId("grid"),
         columns: Int? = null,
@@ -339,9 +352,22 @@ abstract class UiContainerBuilder {
         spacing: SpacingSize = SpacingSize.SMALL,
         reorderable: Boolean = false,
         modifier: UiModifier = UiModifier.None,
+        scrollToIndex: Int? = null,
+        scrollToEdge: ScrollEdge? = null,
+        scrollRevision: Int = 0,
         block: GridBuilder.() -> Unit
     ) {
-        val builder = GridBuilder(id, columns, minItemWidthDp, spacing, reorderable, modifier).apply(block)
+        val builder = GridBuilder(
+            id = id,
+            columns = columns,
+            minItemWidthDp = minItemWidthDp,
+            spacing = spacing,
+            reorderable = reorderable,
+            modifier = modifier,
+            scrollToIndex = scrollToIndex,
+            scrollToEdge = scrollToEdge,
+            scrollRevision = scrollRevision
+        ).apply(block)
         add(builder.build())
     }
 
@@ -1231,6 +1257,228 @@ abstract class UiContainerBuilder {
         )
     }
 
+    fun treeView(
+        items: List<TreeNodeItem>,
+        id: String = generateNodeId("tree"),
+        selectedKey: String? = null,
+        maxHeightDp: Int? = null,
+        action: String? = null,
+        modifier: UiModifier = UiModifier.None
+    ) {
+        add(
+            TreeViewNode(
+                id = id,
+                items = items,
+                selectedKey = selectedKey,
+                maxHeightDp = maxHeightDp,
+                action = action,
+                modifier = modifier
+            )
+        )
+    }
+
+    fun treeView(
+        id: String = generateNodeId("tree"),
+        selectedKey: String? = null,
+        maxHeightDp: Int? = null,
+        action: String? = null,
+        modifier: UiModifier = UiModifier.None,
+        block: TreeViewBuilder.() -> Unit
+    ) {
+        val builder = TreeViewBuilder().apply(block)
+        add(
+            TreeViewNode(
+                id = id,
+                items = builder.buildItems(),
+                selectedKey = selectedKey,
+                maxHeightDp = maxHeightDp,
+                action = action,
+                modifier = modifier
+            )
+        )
+    }
+
+    fun filePicker(
+        id: String = generateNodeId("file_picker"),
+        value: String = "",
+        paths: List<String> = emptyList(),
+        mode: FilePickerMode = FilePickerMode.FILE,
+        allowedExtensions: List<String> = emptyList(),
+        label: String? = null,
+        placeholder: String? = null,
+        defaultFileName: String = "export",
+        defaultExtension: String = "txt",
+        action: String? = null,
+        modifier: UiModifier = UiModifier.None
+    ) {
+        add(
+            FilePickerNode(
+                id = id,
+                value = value,
+                paths = paths,
+                mode = mode,
+                allowedExtensions = allowedExtensions,
+                label = label,
+                placeholder = placeholder,
+                defaultFileName = defaultFileName,
+                defaultExtension = defaultExtension,
+                action = action,
+                modifier = modifier
+            )
+        )
+    }
+
+    fun colorPicker(
+        colorHex: String = "#6750A4",
+        id: String = generateNodeId("color_picker"),
+        label: String? = null,
+        presets: List<String> = emptyList(),
+        showHexInput: Boolean = true,
+        modifier: UiModifier = UiModifier.None
+    ) {
+        add(
+            ColorPickerNode(
+                id = id,
+                colorHex = colorHex,
+                label = label,
+                presets = presets,
+                showHexInput = showHexInput,
+                modifier = modifier
+            )
+        )
+    }
+
+    fun breadcrumbs(
+        items: List<BreadcrumbItem>,
+        id: String = generateNodeId("breadcrumbs"),
+        separator: String = "/",
+        maxVisibleItems: Int = 5,
+        modifier: UiModifier = UiModifier.None
+    ) {
+        add(
+            BreadcrumbsNode(
+                id = id,
+                items = items,
+                separator = separator,
+                maxVisibleItems = maxVisibleItems,
+                modifier = modifier
+            )
+        )
+    }
+
+    fun breadcrumbs(
+        id: String = generateNodeId("breadcrumbs"),
+        separator: String = "/",
+        maxVisibleItems: Int = 5,
+        modifier: UiModifier = UiModifier.None,
+        block: BreadcrumbsBuilder.() -> Unit
+    ) {
+        val builder = BreadcrumbsBuilder().apply(block)
+        add(
+            BreadcrumbsNode(
+                id = id,
+                items = builder.buildItems(),
+                separator = separator,
+                maxVisibleItems = maxVisibleItems,
+                modifier = modifier
+            )
+        )
+    }
+
+    fun pagination(
+        currentPage: Int = 1,
+        totalPages: Int = 1,
+        id: String = generateNodeId("pagination"),
+        pageSize: Int? = null,
+        pageSizeOptions: List<Int> = emptyList(),
+        modifier: UiModifier = UiModifier.None
+    ) {
+        add(
+            PaginationNode(
+                id = id,
+                currentPage = currentPage,
+                totalPages = totalPages,
+                pageSize = pageSize,
+                pageSizeOptions = pageSizeOptions,
+                modifier = modifier
+            )
+        )
+    }
+
+    fun stepper(
+        steps: List<StepperItem>,
+        id: String = generateNodeId("stepper"),
+        horizontal: Boolean = true,
+        modifier: UiModifier = UiModifier.None
+    ) {
+        add(
+            StepperNode(
+                id = id,
+                steps = steps,
+                horizontal = horizontal,
+                modifier = modifier
+            )
+        )
+    }
+
+    fun stepper(
+        id: String = generateNodeId("stepper"),
+        horizontal: Boolean = true,
+        modifier: UiModifier = UiModifier.None,
+        block: StepperBuilder.() -> Unit
+    ) {
+        val builder = StepperBuilder().apply(block)
+        add(
+            StepperNode(
+                id = id,
+                steps = builder.buildSteps(),
+                horizontal = horizontal,
+                modifier = modifier
+            )
+        )
+    }
+
+    fun menu(
+        items: List<ActionMenuItem>,
+        id: String = generateNodeId("menu"),
+        triggerLabel: String? = null,
+        triggerIconName: String? = "more_vert",
+        tooltip: String? = null,
+        modifier: UiModifier = UiModifier.None
+    ) {
+        add(
+            MenuNode(
+                id = id,
+                items = items,
+                triggerLabel = triggerLabel,
+                triggerIconName = triggerIconName,
+                tooltip = tooltip,
+                modifier = modifier
+            )
+        )
+    }
+
+    fun menu(
+        id: String = generateNodeId("menu"),
+        triggerLabel: String? = null,
+        triggerIconName: String? = "more_vert",
+        tooltip: String? = null,
+        modifier: UiModifier = UiModifier.None,
+        block: ActionMenuBuilder.() -> Unit
+    ) {
+        val builder = ActionMenuBuilder().apply(block)
+        add(
+            MenuNode(
+                id = id,
+                items = builder.buildItems(),
+                triggerLabel = triggerLabel,
+                triggerIconName = triggerIconName,
+                tooltip = tooltip,
+                modifier = modifier
+            )
+        )
+    }
+
     internal fun buildChildren(): List<UiNode> = children.toList()
 
     companion object {
@@ -1490,28 +1738,37 @@ class AccordionBuilder(
     )
 }
 
-class ScrollableColumnBuilder(
+class ScrollableColumnBuilder @JvmOverloads constructor(
     val id: String,
     val spacing: SpacingSize,
     val modifier: UiModifier,
-    val reorderable: Boolean = false
+    val reorderable: Boolean = false,
+    val scrollToIndex: Int? = null,
+    val scrollToEdge: ScrollEdge? = null,
+    val scrollRevision: Int = 0
 ) : UiContainerBuilder() {
     fun build(): ScrollableColumnNode = ScrollableColumnNode(
         id = id,
         spacing = spacing,
         modifier = modifier,
         reorderable = reorderable,
-        children = children.toList()
+        children = children.toList(),
+        scrollToIndex = scrollToIndex,
+        scrollToEdge = scrollToEdge,
+        scrollRevision = scrollRevision
     )
 }
 
-class GridBuilder(
+class GridBuilder @JvmOverloads constructor(
     val id: String,
     val columns: Int?,
     val minItemWidthDp: Float,
     val spacing: SpacingSize,
     val reorderable: Boolean,
-    val modifier: UiModifier
+    val modifier: UiModifier,
+    val scrollToIndex: Int? = null,
+    val scrollToEdge: ScrollEdge? = null,
+    val scrollRevision: Int = 0
 ) : UiContainerBuilder() {
     fun build(): GridNode = GridNode(
         id = id,
@@ -1520,8 +1777,77 @@ class GridBuilder(
         spacing = spacing,
         reorderable = reorderable,
         children = children.toList(),
-        modifier = modifier
+        modifier = modifier,
+        scrollToIndex = scrollToIndex,
+        scrollToEdge = scrollToEdge,
+        scrollRevision = scrollRevision
     )
+}
+
+@UiDslMarker
+class TreeViewBuilder {
+    private val items = mutableListOf<TreeNodeItem>()
+
+    fun node(
+        key: String,
+        label: String,
+        iconName: String? = null,
+        expanded: Boolean = false,
+        block: (TreeViewBuilder.() -> Unit)? = null
+    ) {
+        val childBuilder = block?.let { TreeViewBuilder().apply(it) }
+        items.add(
+            TreeNodeItem(
+                key = key,
+                label = label,
+                iconName = iconName,
+                expanded = expanded,
+                children = childBuilder?.buildItems().orEmpty()
+            )
+        )
+    }
+
+    internal fun buildItems(): List<TreeNodeItem> = items.toList()
+}
+
+@UiDslMarker
+class BreadcrumbsBuilder {
+    private val items = mutableListOf<BreadcrumbItem>()
+
+    fun item(
+        key: String,
+        label: String,
+        iconName: String? = null
+    ) {
+        items.add(BreadcrumbItem(key = key, label = label, iconName = iconName))
+    }
+
+    internal fun buildItems(): List<BreadcrumbItem> = items.toList()
+}
+
+@UiDslMarker
+class StepperBuilder {
+    private val steps = mutableListOf<StepperItem>()
+
+    fun step(
+        key: String,
+        label: String,
+        subtitle: String? = null,
+        status: StepStatus = StepStatus.PENDING,
+        enabled: Boolean = true
+    ) {
+        steps.add(
+            StepperItem(
+                key = key,
+                label = label,
+                subtitle = subtitle,
+                status = status,
+                enabled = enabled
+            )
+        )
+    }
+
+    internal fun buildSteps(): List<StepperItem> = steps.toList()
 }
 
 class FloatingPanelBuilder(

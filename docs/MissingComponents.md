@@ -7,15 +7,15 @@ This document summarizes the UI components, Material 3 Expressive primitives, an
 
 ---
 
-## Current Baseline (Verified in Codebase — App `4.1.0-alpha03`)
+## Current Baseline (Verified in Codebase — App `4.1.0-alpha04`)
 
 - **Compose / Material 3 Versions** (`gradle/libs.versions.toml`): `compose-multiplatform = "1.12.0"`, `material3 = "1.12.0-alpha03"`.
-- **SDUI `UiNode` Catalog** (`plugin-api/.../sdui/UiNode.kt`): 48 `UiNode` types (46 author-facing + `UnknownNode` and `ErrorBoundaryNode`):
-  - **Layout & Shell:** `ColumnNode`, `RowNode`, `FlowRowNode`, `BoxNode`, `CardNode`, `ScrollableColumnNode`, `ScrollableRowNode`, `GridNode`, `SplitPaneNode`, `ScaffoldNode`, `SidebarNode`, `FloatingPanelNode`, `TabsNode`, `AccordionNode`, `DialogNode`, `SpacerNode`, `DividerNode`.
-  - **Controls & Inputs:** `ButtonNode`, `ButtonGroupNode`, `SplitButtonNode`, `IconButtonNode`, `TextInputNode` (with `isSecret`), `NumberInputNode`, `SearchBarNode`, `RadioGroupNode`, `ToggleNode`, `CheckboxNode`, `DropdownNode`, `MultiSelectDropdownNode`, `SliderNode`, `RangeSliderNode`, `ChipGroupNode`, `ListItemNode`.
-  - **Display, Media & Canvas:** `TextNode` (`selectable`, `maxLines`, `overflowEllipsis`), `MarkdownTextNode`, `CodeBlockNode`, `TableNode`, `KeyValueListNode`, `ImageNode` (`zoomable`), `IconNode`, `BadgeNode`, `ProgressBarNode` (`ProgressBarStyle`), `LoadingIndicatorNode`, `AlertBannerNode`, `EmptyStateNode`, `BoardNode`.
+- **SDUI `UiNode` Catalog** (`plugin-api/.../sdui/UiNode.kt`): 55 `UiNode` types (53 author-facing + `UnknownNode` and `ErrorBoundaryNode`):
+  - **Layout & Shell:** `ColumnNode`, `RowNode`, `FlowRowNode`, `BoxNode`, `CardNode`, `ScrollableColumnNode` (with `scrollToIndex`/`scrollToEdge`/`scrollRevision`), `ScrollableRowNode`, `GridNode` (with scroll anchoring), `SplitPaneNode`, `ScaffoldNode`, `SidebarNode`, `FloatingPanelNode`, `TabsNode`, `AccordionNode`, `DialogNode`, `SpacerNode`, `DividerNode`.
+  - **Controls & Inputs:** `ButtonNode`, `ButtonGroupNode`, `SplitButtonNode`, `IconButtonNode`, `MenuNode`, `TextInputNode` (with `isSecret`), `NumberInputNode`, `SearchBarNode`, `RadioGroupNode`, `ToggleNode`, `CheckboxNode`, `DropdownNode`, `MultiSelectDropdownNode`, `SliderNode`, `RangeSliderNode`, `FilePickerNode`, `ColorPickerNode`, `ChipGroupNode`, `ListItemNode`, `BreadcrumbsNode`, `PaginationNode`, `StepperNode`.
+  - **Display, Media & Canvas:** `TextNode` (`selectable`, `maxLines`, `overflowEllipsis`), `MarkdownTextNode`, `CodeBlockNode`, `TableNode`, `TreeViewNode`, `KeyValueListNode`, `ImageNode` (`zoomable`), `IconNode`, `BadgeNode`, `ProgressBarNode` (`ProgressBarStyle`), `LoadingIndicatorNode`, `AlertBannerNode`, `EmptyStateNode`, `BoardNode`.
   - **Universal Modifiers (`UiModifier`):** `ShapeRole` (`cornerRadius`), `tooltip`, `contextMenu` (`ActionMenuItem`).
-- **Host Theme & Shared Components** (`shared/gui/...`): `MaterialExpressiveTheme`, `MotionScheme.expressive()` + `StandardMotionScope`, 8-step `Shapes`, dual Baseline/`*Emphasized` `DesktopTypography`, `NormalizedMorphShape`, `ToolkitSplitButton` (`SplitButtonLayout`), `ToolkitConnectedToggleGroup`, `ToolkitLoadingIndicator`, `ToolkitLinearProgressIndicator`, `ToolkitCircularProgressIndicator`, `ToolkitDataTable`, `ToolkitButtonGroup`, `ToolkitCard`, `ToolkitChip`, `ToolkitTextField`, `ToolkitDropdownMenu`, `ExpressiveMenu`, `UnscaledExpressiveMenu`, `SelectedButtonGroup`, `SectionHeader`, `ToastHost`, `Tooltip`, `ZoomControls`, `NavigationSidebar` / `SidebarContainer`, `PlatformVerticalScrollbar` / `PlatformHorizontalScrollbar`, `PlatformContextMenuArea`, and parameter input widgets (`ColorInput`, `EnumDropdownInput`, `FileInput`, `PrimitiveInputs`).
+- **Host Theme & Shared Components** (`shared/gui/...`): `MaterialExpressiveTheme`, `MotionScheme.expressive()` + `StandardMotionScope`, 8-step `Shapes`, dual Baseline/`*Emphasized` `DesktopTypography`, `NormalizedMorphShape`, `ToolkitSplitButton` (`SplitButtonLayout`), `ToolkitConnectedToggleGroup`, `ToolkitLoadingIndicator`, `ToolkitLinearProgressIndicator`, `ToolkitCircularProgressIndicator`, `ToolkitDataTable`, `ToolkitTreeView`, `ToolkitSearchBar`, `ToolkitAccordion`, `ToolkitConfirmDialog`, `ToolkitSideSheet`, `ToolkitStatusBadge`, `ToolkitEmptyState`, `ToolkitTooltipBox` / `ToolkitRichTooltipBox`, `ToolkitButtonGroup`, `ToolkitCard`, `ToolkitChip`, `ToolkitTextField`, `ToolkitDropdownMenu`, `ExpressiveMenu`, `UnscaledExpressiveMenu`, `SelectedButtonGroup`, `SectionHeader`, `ToastHost`, `ZoomControls`, `NavigationSidebar` / `SidebarContainer`, `PlatformVerticalScrollbar` / `PlatformHorizontalScrollbar`, `PlatformContextMenuArea`, and parameter input widgets (`ColorInput`, `EnumDropdownInput`, `FileInput`, `PrimitiveInputs`).
 
 ---
 
@@ -30,8 +30,8 @@ This document summarizes the UI components, Material 3 Expressive primitives, an
 | **Range Slider** *(Implemented — Batch 3)* | `RangeSliderNode` | Implemented (`startValue`, `endValue`, `min`, `max`, `steps`, `unitSuffix`, `UiEvent.RangeChanged`). | `startValue`, `endValue`, `min`, `max`, `steps`, dual-thumb dragging, `UiEvent.RangeChanged`. |
 | **Search Bar / Autocomplete** *(Implemented — Batch 1)* | `SearchBarNode` | Implemented (`query`, `suggestions` menu, clear button, Enter-to-submit `UiEvent.Click`, `UiEvent.TextChanged`). | `query`, `suggestions`, `placeholder`, `showClearButton`, Enter-to-submit action + `UiEvent.TextChanged`. |
 | **Multi-Select Dropdown / ComboBox** *(Implemented — Batch 3)* | `MultiSelectDropdownNode` | Implemented (`selectedKeys: Set<String>`, filter search, Select All / Clear, `InputChip` summary, `UiEvent.MultiOptionSelected`). | `selectedKeys: Set<String>`, searchable filter, select-all/clear, chip summary. |
-| **Inline File / Directory Picker Control** | `FilePickerNode` | `UiSessionContext` exposes `pickFile` / `pickFiles` / `pickDirectory` / `saveFile`, but plugins must manually wire a `ButtonNode` + `TextInputNode` pair. | Mode (`FILE`, `FILES`, `DIRECTORY`, `SAVE`), extension filter, selected path preview, browse/clear actions. |
-| **Color Picker Control** | `ColorPickerNode` | Host has `features/colorpicker` and `ColorInput`, but SDUI only exposes `SemanticColor` enums with no user color-selection widget. | Hex/ARGB string value, optional alpha slider, swatch presets, `UiEvent.TextChanged` or `ColorChanged`. |
+| **Inline File / Directory Picker Control** *(Implemented — Batch 4)* | `FilePickerNode` | Implemented (`FILE`/`FILES`/`DIRECTORY`/`SAVE`, extension filter, `PlatformUtils` dialogs, `DynamicHostFileSystem.grantAccess` via `UiEvent.FilesPicked`). | Mode (`FILE`, `FILES`, `DIRECTORY`, `SAVE`), extension filter, selected path preview, browse/clear actions. |
+| **Color Picker Control** *(Implemented — Batch 4)* | `ColorPickerNode` | Implemented (`ColorPickerDialog` integration, hex input, swatch preview, preset swatches, `UiEvent.ColorChanged`). | Hex/ARGB string value, optional alpha slider, swatch presets, `UiEvent.TextChanged` or `ColorChanged`. |
 | **Date / Time Picker** | `DatePickerNode` / `TimePickerNode` | No date, date-range, or time input controls for scheduling, filtering, or metadata editing. | ISO-8601 date/time string or epoch millis, min/max bounds, `24h` toggle. |
 
 ### 1.2 Data Display, Code & Structured Productivity
@@ -39,7 +39,7 @@ This document summarizes the UI components, Material 3 Expressive primitives, an
 | Missing Component | Proposed `UiNode` | What Is Missing Today | Key Capabilities Needed |
 | :--- | :--- | :--- | :--- |
 | **Data Table** *(Implemented — Batch 3)* | `TableNode` | Implemented via shared `ToolkitDataTable` (`columns` weight/`widthDp`/sortable, `rows` badges, `selectedRowKeys`, sticky header, keyboard Up/Down/Enter, scrollbars, `UiEvent.TableSorted`). | `columns` (title, width/weight, sortable), `rows`, `sortColumnKey`, `sortAscending`, row selection, sticky header, vertical + horizontal scrollbars. |
-| **Hierarchical Tree View** | `TreeViewNode` | No collapsible parent/child tree component for file systems, JSON ASTs, layers, or nested categories. | `TreeNodeItem` (`key`, `label`, `iconName`, `children`, `expanded`), lazy-load / expand toggle event, selection. |
+| **Hierarchical Tree View** *(Implemented — Batch 4)* | `TreeViewNode` | Implemented via shared `ToolkitTreeView` (`TreeNodeItem`, expand/collapse `UiEvent.TreeNodeToggled`, arrow-key navigation, selection). | `TreeNodeItem` (`key`, `label`, `iconName`, `children`, `expanded`), lazy-load / expand toggle event, selection. |
 | **Accordion / Expandable Section** *(Implemented — Batch 1)* | `AccordionNode` | Implemented (`title`, `subtitle`, `expanded`, `leadingIcon`, `badgeText`/`badgeColor`, spring expand/collapse, `UiEvent.ToggleChanged`). | `title`, `subtitle`, `expanded`, `leadingIcon`, `trailingBadge`, collapsible children, `UiEvent.ToggleChanged` or `Click`. |
 | **Code / Log Block** *(Implemented — Batch 1)* | `CodeBlockNode` | Implemented (`ToolkitTheme.codeMedium`, `language` pill, line numbers, wrap toggle, copy button, `SelectionContainer`, scrollbars). | Uses `ToolkitTheme.codeMedium`, optional `language`, `showLineNumbers`, `wrapLines`, copy-to-clipboard button, `SelectionContainer`. |
 | **Markdown / Rich Text** *(Implemented — Batch 3)* | `MarkdownTextNode` | Implemented (headings `#`–`###`, bullet/numbered lists, bold/italic/strikethrough/inline code, clickable links via `LinkAnnotation`, `SelectionContainer`). | Safe subset of Markdown (headings, emphasis, code, lists, links emitting `UiEvent.Click` or opening host-approved URLs). |
@@ -50,11 +50,11 @@ This document summarizes the UI components, Material 3 Expressive primitives, an
 
 | Missing Component | Proposed `UiNode` | What Is Missing Today | Key Capabilities Needed |
 | :--- | :--- | :--- | :--- |
-| **Breadcrumbs** | `BreadcrumbsNode` | No path trail component for nested folder/repository/category navigation. | `items` (`key`, `label`, `iconName`), separator, overflow truncation, click event per segment. |
-| **Pagination Bar** | `PaginationNode` | Large datasets require plugins to hand-build page buttons with `RowNode` + `ButtonNode`. | `currentPage`, `totalPages`, optional `pageSize` selector, prev/next/first/last & page jump events. |
-| **Stepper / Wizard Progress** | `StepperNode` | Multi-step interactive workflows have no visual step progress indicator. | `steps` (`key`, `label`, `status`: pending/active/completed/error), clickable completed steps. |
-| **Side Sheet / Modal Drawer** | `SideSheetNode` | `SidebarNode` only attaches statically to `ScaffoldNode` edges; no sliding overlay/inspector drawer. | `isOpen`, `title`, `attachPoint` (`START`/`END`), dismiss event, max width `<= 400.dp`. |
-| **Standalone Popup / Context Menu** | `MenuNode` / `UiModifier.contextMenu` | `UiModifier.contextMenu` (`List<ActionMenuItem>` via `ContextMenuArea`) implemented in Batch 1; standalone `MenuNode` overflow button still missing (Batch 3). | `List<ActionMenuItem>` attached via `UiModifier.contextMenu` (desktop right-click) or standalone overflow menu button. |
+| **Breadcrumbs** *(Implemented — Batch 4)* | `BreadcrumbsNode` | Implemented (`BreadcrumbItem`, custom separator, overflow menu after `maxVisibleItems`, `UiEvent.OptionSelected`). | `items` (`key`, `label`, `iconName`), separator, overflow truncation, click event per segment. |
+| **Pagination Bar** *(Implemented — Batch 4)* | `PaginationNode` | Implemented (`currentPage`, `totalPages`, first/prev/next/last, `pageSizeOptions` menu, `UiEvent.PageChanged`). | `currentPage`, `totalPages`, optional `pageSize` selector, prev/next/first/last & page jump events. |
+| **Stepper / Wizard Progress** *(Implemented — Batch 4)* | `StepperNode` | Implemented (`StepperItem`, `StepStatus`, horizontal/vertical modes, `UiEvent.OptionSelected`). | `steps` (`key`, `label`, `status`: pending/active/completed/error), clickable completed steps. |
+| **Side Sheet / Modal Drawer** | `SideSheetNode` | `ToolkitSideSheet` host component implemented in Batch 4; SDUI `SideSheetNode` scheduled for Batch 6. | `isOpen`, `title`, `attachPoint` (`START`/`END`), dismiss event, max width `<= 400.dp`. |
+| **Standalone Popup / Context Menu** *(Implemented — Batch 4)* | `MenuNode` / `UiModifier.contextMenu` | Both `UiModifier.contextMenu` and standalone `MenuNode` (`ToolkitDropdownMenu` + `UiEvent.Click`) implemented. | `List<ActionMenuItem>` attached via `UiModifier.contextMenu` (desktop right-click) or standalone overflow menu button. |
 | **Rich / Persistent Tooltip** *(Implemented — Batch 1)* | `UiModifier.tooltip` / `RichTooltip` | Universal `UiModifier.tooltip: String?` implemented across SDUI nodes (Batch 1). | Generic `tooltip: String?` (and optional title + body) on `UiModifier`. |
 
 ### 1.4 Material 3 Expressive & Media Nodes for SDUI
@@ -75,7 +75,7 @@ This document summarizes the UI components, Material 3 Expressive primitives, an
 - [x] **`TextNode.selectable: Boolean`** *(Batch 1)* — opt-in `SelectionContainer` wrapper for copyable text/IDs/paths in desktop workflows.
 - [x] **`TextNode.maxLines` & `overflowEllipsis`** *(Batch 1)* — ellipsis/truncation control inside dense cards and table-like rows.
 - [x] **`ImageNode` zoom/lightbox mode (`zoomable: Boolean`)** *(Batch 1)* — built-in click-to-zoom preview dialog without needing a full `BoardNode`.
-- [ ] **Scroll control / anchoring** — ability to request scrolling a `ScrollableColumnNode` or `GridNode` to a specific child index or top/bottom (useful for logs and chat-style tools).
+- [x] **Scroll control / anchoring** *(Batch 4)* — `scrollToIndex`, `scrollToEdge` (`TOP`/`BOTTOM`), and `scrollRevision` on `ScrollableColumnNode` and `GridNode`.
 
 ---
 
@@ -119,12 +119,12 @@ Auditing `shared/gui` against the project's `m3-*` skill suite (`m3-desktop-expr
 | Missing Component | Purpose in Host App |
 | :--- | :--- |
 | **`ToolkitDataTable`** *(Implemented — Batch 3)* | Sortable, weighted/fixed multi-column table with sticky header, keyboard Up/Down/Enter navigation, and `VerticalScrollbar` + `HorizontalScrollbar`. |
-| **`ToolkitTreeView`** | Reusable collapsible tree with keyboard arrow navigation and context menus (for Flow nodes/files, Plugin file sandboxes). |
-| **`ToolkitSearchBar`** | Standardized search field with debounce, clear icon, result count badge, and `Ctrl+F` focus binding across views. |
-| **`ToolkitAccordion` / `ExpandableSection`** | Consistent collapsible header + animated body shared across Settings, Inspector drawers, and Job cards. |
-| **`ToolkitConfirmDialog` / `ToolkitSideSheet`** | Reusable M3-styled confirmation dialog and `<= 400.dp` co-planar/modal side sheet instead of ad-hoc `AlertDialog`s per feature. |
-| **`ToolkitStatusBadge` & `ToolkitEmptyState`** | Currently `BadgeNode` and `EmptyStateNode` are implemented inside SDUI (`DynamicUiRenderer.kt`), while host feature screens lack a single shared `Toolkit*` design-system component. |
-| **Unified `ContextMenuArea` & `TooltipBox` Helpers** | `ContextMenuArea` is not yet standardized across `shared/components` (lists, cards, tables, static `SelectionContainer` text), and `Tooltip.kt` still carries deprecated `TooltipArea` / `Modifier.tooltip(String)` alongside M3 `TooltipBox`. |
+| **`ToolkitTreeView`** *(Implemented — Batch 4)* | Collapsible tree view with arrow-key navigation, animated disclosure chevrons, and right-click context menus. |
+| **`ToolkitSearchBar`** *(Implemented — Batch 4)* | Standardized search field with clear icon, result count badge, and `FocusRequester` (`Ctrl+F`) support. |
+| **`ToolkitAccordion` / `ExpandableSection`** *(Implemented — Batch 4)* | Standardized expandable header + spring-animated body via `MotionScheme`. |
+| **`ToolkitConfirmDialog` / `ToolkitSideSheet`** *(Implemented — Batch 4)* | Reusable M3 confirmation dialog and `<= 400.dp` co-planar side sheet with scrollbar & Escape dismissal. |
+| **`ToolkitStatusBadge` & `ToolkitEmptyState`** *(Implemented — Batch 4)* | Standardized status pill badge and empty-state placeholder in `shared/components`. |
+| **Unified `ContextMenuArea` & `TooltipBox` Helpers** *(Implemented — Batch 4)* | Added `ToolkitTooltipBox` / `ToolkitRichTooltipBox` (M3 `TooltipBox`) and migrated legacy `TooltipArea` / string `Modifier.tooltip` callers. |
 
 ---
 

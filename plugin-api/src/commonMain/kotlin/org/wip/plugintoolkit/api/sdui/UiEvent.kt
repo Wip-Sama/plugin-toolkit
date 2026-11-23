@@ -279,6 +279,50 @@ sealed interface UiEvent {
     ) : UiEvent
 
     /**
+     * Emitted when an expandable node inside a [TreeViewNode] is expanded or collapsed.
+     */
+    @Serializable
+    @SerialName("tree_node_toggled")
+    data class TreeNodeToggled(
+        override val nodeId: String,
+        val itemKey: String,
+        val expanded: Boolean
+    ) : UiEvent
+
+    /**
+     * Emitted when page or page-size changes in a [PaginationNode].
+     */
+    @Serializable
+    @SerialName("page_changed")
+    data class PageChanged(
+        override val nodeId: String,
+        val page: Int,
+        val pageSize: Int? = null
+    ) : UiEvent
+
+    /**
+     * Emitted when a user selects or clears paths in a [FilePickerNode].
+     * The host grants sandboxed file access for chosen paths before delivering this event.
+     */
+    @Serializable
+    @SerialName("files_picked")
+    data class FilesPicked(
+        override val nodeId: String,
+        val action: String? = null,
+        val paths: List<String>
+    ) : UiEvent
+
+    /**
+     * Emitted when the selected color changes in a [ColorPickerNode].
+     */
+    @Serializable
+    @SerialName("color_changed")
+    data class ColorChanged(
+        override val nodeId: String,
+        val colorHex: String
+    ) : UiEvent
+
+    /**
      * Custom event payload for domain-specific controls.
      */
     @Serializable
@@ -323,6 +367,10 @@ object UiEventSerializer : KSerializer<UiEvent> {
             is UiEvent.TableSorted -> "table_sorted"
             is UiEvent.RangeChanged -> "range_changed"
             is UiEvent.MultiOptionSelected -> "multi_option_selected"
+            is UiEvent.TreeNodeToggled -> "tree_node_toggled"
+            is UiEvent.PageChanged -> "page_changed"
+            is UiEvent.FilesPicked -> "files_picked"
+            is UiEvent.ColorChanged -> "color_changed"
             is UiEvent.Custom -> "custom"
         }
         val element = when (value) {
@@ -349,6 +397,10 @@ object UiEventSerializer : KSerializer<UiEvent> {
             is UiEvent.TableSorted -> jsonEncoder.json.encodeToJsonElement(UiEvent.TableSorted.serializer(), value)
             is UiEvent.RangeChanged -> jsonEncoder.json.encodeToJsonElement(UiEvent.RangeChanged.serializer(), value)
             is UiEvent.MultiOptionSelected -> jsonEncoder.json.encodeToJsonElement(UiEvent.MultiOptionSelected.serializer(), value)
+            is UiEvent.TreeNodeToggled -> jsonEncoder.json.encodeToJsonElement(UiEvent.TreeNodeToggled.serializer(), value)
+            is UiEvent.PageChanged -> jsonEncoder.json.encodeToJsonElement(UiEvent.PageChanged.serializer(), value)
+            is UiEvent.FilesPicked -> jsonEncoder.json.encodeToJsonElement(UiEvent.FilesPicked.serializer(), value)
+            is UiEvent.ColorChanged -> jsonEncoder.json.encodeToJsonElement(UiEvent.ColorChanged.serializer(), value)
             is UiEvent.Custom -> jsonEncoder.json.encodeToJsonElement(UiEvent.Custom.serializer(), value)
         }
         if (element is JsonObject) {
@@ -387,6 +439,10 @@ object UiEventSerializer : KSerializer<UiEvent> {
             "table_sorted" -> UiEvent.TableSorted.serializer()
             "range_changed" -> UiEvent.RangeChanged.serializer()
             "multi_option_selected" -> UiEvent.MultiOptionSelected.serializer()
+            "tree_node_toggled" -> UiEvent.TreeNodeToggled.serializer()
+            "page_changed" -> UiEvent.PageChanged.serializer()
+            "files_picked" -> UiEvent.FilesPicked.serializer()
+            "color_changed" -> UiEvent.ColorChanged.serializer()
             "custom" -> UiEvent.Custom.serializer()
             else -> UiEvent.Custom.serializer()
         }

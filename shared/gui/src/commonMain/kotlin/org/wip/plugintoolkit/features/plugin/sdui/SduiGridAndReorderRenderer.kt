@@ -40,6 +40,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -66,6 +67,7 @@ import kotlin.math.hypot
 import kotlin.math.roundToInt
 import org.jetbrains.compose.resources.stringResource
 import org.wip.plugintoolkit.api.sdui.GridNode
+import org.wip.plugintoolkit.api.sdui.ScrollEdge
 import org.wip.plugintoolkit.api.sdui.ScrollableColumnNode
 import org.wip.plugintoolkit.api.sdui.UiEvent
 import org.wip.plugintoolkit.api.sdui.UiNode
@@ -632,6 +634,20 @@ internal fun RenderScrollableColumnNode(
             }
         } else {
             val lazyListState = rememberLazyListState()
+            LaunchedEffect(node.scrollRevision, node.scrollToIndex, node.scrollToEdge, node.children.size) {
+                if (node.children.isEmpty()) return@LaunchedEffect
+                if (node.scrollRevision > 0 || node.scrollToIndex != null || node.scrollToEdge != null) {
+                    val targetIndex = when {
+                        node.scrollToIndex != null -> node.scrollToIndex!!.coerceIn(0, node.children.lastIndex)
+                        node.scrollToEdge == ScrollEdge.BOTTOM -> node.children.lastIndex
+                        node.scrollToEdge == ScrollEdge.TOP -> 0
+                        else -> null
+                    }
+                    if (targetIndex != null) {
+                        lazyListState.animateScrollToItem(targetIndex)
+                    }
+                }
+            }
             val canScroll = lazyListState.canScrollForward || lazyListState.canScrollBackward
             val scrollbarReserve = if (canScroll) {
                 ToolkitTheme.dimensions.sduiScrollbarEndPadding
@@ -743,6 +759,20 @@ internal fun RenderGridNode(
             val gridCells = node.columns?.let { GridCells.Fixed(it.coerceIn(1, MAX_GRID_COLUMNS)) }
                 ?: GridCells.Adaptive(minSize = clampedMinItemDp.dp)
             val lazyGridState = rememberLazyGridState()
+            LaunchedEffect(node.scrollRevision, node.scrollToIndex, node.scrollToEdge, node.children.size) {
+                if (node.children.isEmpty()) return@LaunchedEffect
+                if (node.scrollRevision > 0 || node.scrollToIndex != null || node.scrollToEdge != null) {
+                    val targetIndex = when {
+                        node.scrollToIndex != null -> node.scrollToIndex!!.coerceIn(0, node.children.lastIndex)
+                        node.scrollToEdge == ScrollEdge.BOTTOM -> node.children.lastIndex
+                        node.scrollToEdge == ScrollEdge.TOP -> 0
+                        else -> null
+                    }
+                    if (targetIndex != null) {
+                        lazyGridState.animateScrollToItem(targetIndex)
+                    }
+                }
+            }
             val canScroll = lazyGridState.canScrollForward || lazyGridState.canScrollBackward
             val scrollbarReserve = if (canScroll) {
                 ToolkitTheme.dimensions.sduiScrollbarEndPadding

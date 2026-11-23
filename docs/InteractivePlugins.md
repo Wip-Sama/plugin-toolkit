@@ -196,9 +196,9 @@ Every DSL call inside `uiTree { ... }` builds immutable `UiNode` models with det
 | `flowRow(...) { ... }` | `FlowRowNode` | `id`, `horizontalSpacing: SpacingSize = SpacingSize.SMALL`, `verticalSpacing: SpacingSize = SpacingSize.SMALL`, `maxItemsInEachRow: Int? = null`, `modifier` |
 | `box(...) { ... }` | `BoxNode` | `id`, `modifier` |
 | `card(...) { ... }` | `CardNode` | `id`, `title: String? = null`, `surfaceRole: SemanticColor? = null` (solid M3 tonal fill), `outlined: Boolean = false`, `modifier` |
-| `scrollableColumn(...) { ... }` | `ScrollableColumnNode` | `id`, `spacing: SpacingSize = SpacingSize.NONE`, `modifier`, `reorderable: Boolean = false` |
+| `scrollableColumn(...) { ... }` | `ScrollableColumnNode` | `id`, `spacing: SpacingSize = SpacingSize.NONE`, `modifier`, `reorderable: Boolean = false`, `scrollToIndex: Int? = null`, `scrollToEdge: ScrollEdge? = null`, `scrollRevision: Int = 0` |
 | `scrollableRow(...) { ... }` | `ScrollableRowNode` | `id`, `spacing: SpacingSize = SpacingSize.NONE`, `modifier` |
-| `grid(...) { ... }` | `GridNode` | `id`, `columns: Int? = null`, `minItemWidthDp: Float = 156f`, `spacing: SpacingSize = SpacingSize.SMALL`, `reorderable: Boolean = false`, `modifier` |
+| `grid(...) { ... }` | `GridNode` | `id`, `columns: Int? = null`, `minItemWidthDp: Float = 156f`, `spacing: SpacingSize = SpacingSize.SMALL`, `reorderable: Boolean = false`, `modifier`, `scrollToIndex: Int? = null`, `scrollToEdge: ScrollEdge? = null`, `scrollRevision: Int = 0` |
 | `splitPane(...)` | `SplitPaneNode` | `id`, `splitFraction: Float = 0.35f`, `isHorizontal: Boolean = true`, `resizable: Boolean = true`, `modifier`, `first = { ... }`, `second = { ... }` |
 | `scaffold(...) { ... }` | `ScaffoldNode` | `content`, `leftSidebar`, `rightSidebar`, `sidebar`, `topBar`, `bottomBar`, `floatingPanel` |
 | `sidebar(...) { ... }` | `SidebarNode` | `id`, `attachPoint: SidebarAttachPoint`, `title`, `isCollapsible = true`, `isCollapsed = false`, `modifier` |
@@ -230,6 +230,13 @@ Every DSL call inside `uiTree { ... }` builds immutable `UiNode` models with det
 | `multiSelectDropdown(...)` | `MultiSelectDropdownNode` | `options: Map<String, String>`, `id`, `selectedKeys: Set<String> = emptySet()`, `label`, `placeholder`, `searchable = true`, `showSelectAll = true`, `modifier` -> `UiEvent.MultiOptionSelected(nodeId, selectedKeys)` |
 | `slider(...)` | `SliderNode` | `id`, `value: Double`, `min = 0.0`, `max = 1.0`, `steps = 0`, `label`, `modifier` -> `UiEvent.ValueChanged(nodeId, value)` |
 | `rangeSlider(...)` | `RangeSliderNode` | `startValue: Double`, `endValue: Double`, `id`, `min = 0.0`, `max = 1.0`, `steps = 0`, `label`, `unitSuffix`, `modifier` -> `UiEvent.RangeChanged(nodeId, startValue, endValue)` |
+| `filePicker(...)` | `FilePickerNode` | `id`, `value = ""`, `paths`, `mode: FilePickerMode = FilePickerMode.FILE`, `allowedExtensions`, `label`, `placeholder`, `defaultFileName`, `defaultExtension`, `action`, `modifier` -> `UiEvent.FilesPicked(nodeId, action, paths)` |
+| `colorPicker(...)` | `ColorPickerNode` | `colorHex = "#6750A4"`, `id`, `label`, `presets`, `showHexInput = true`, `modifier` -> `UiEvent.ColorChanged(nodeId, colorHex)` |
+| `breadcrumbs(...)` | `BreadcrumbsNode` | `items: List<BreadcrumbItem>` (or `BreadcrumbsBuilder`), `id`, `separator = "/"`, `maxVisibleItems = 5`, `modifier` -> `UiEvent.OptionSelected(nodeId, key)` |
+| `pagination(...)` | `PaginationNode` | `currentPage = 1`, `totalPages = 1`, `id`, `pageSize`, `pageSizeOptions`, `modifier` -> `UiEvent.PageChanged(nodeId, page, pageSize)` |
+| `stepper(...)` | `StepperNode` | `steps: List<StepperItem>` (or `StepperBuilder`), `id`, `horizontal = true`, `modifier` -> `UiEvent.OptionSelected(nodeId, stepKey)` |
+| `menu(...)` | `MenuNode` | `items: List<ActionMenuItem>` (or `ActionMenuBuilder`), `id`, `triggerLabel`, `triggerIconName = "more_vert"`, `tooltip`, `modifier` -> `UiEvent.Click(nodeId, action ?: key)` |
+| `treeView(...)` | `TreeViewNode` | `items: List<TreeNodeItem>` (or `TreeViewBuilder`), `id`, `selectedKey`, `maxHeightDp`, `action`, `modifier` -> `UiEvent.TreeNodeToggled` / `UiEvent.OptionSelected` |
 | `chipGroup(...)` | `ChipGroupNode` | `chips: List<ChipItem>`, `id`, `selectedKeys: Set<String> = emptySet()`, `multiSelect = false`, `modifier` -> `UiEvent.ChipSelected(nodeId, chipKey, isSelected)` |
 | `listItem(...)` | `ListItemNode` | `title`, `id`, `subtitle`, `leadingIcon`, `leadingAsset: AssetReference?`, `badgeText`, `badgeColor`, `selected = false`, `selectable = false`, `action: String? = null`, `modifier`, `trailingBlock` |
 

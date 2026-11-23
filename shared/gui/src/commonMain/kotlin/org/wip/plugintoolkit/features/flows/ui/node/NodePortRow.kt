@@ -59,7 +59,8 @@ import org.wip.plugintoolkit.features.flows.ui.formatDataType
 import org.wip.plugintoolkit.features.flows.ui.getPortValueString
 import org.wip.plugintoolkit.features.flows.model.ValidationError
 import org.wip.plugintoolkit.features.plugin.utils.SettingsUtils
-import org.wip.plugintoolkit.shared.components.TooltipArea
+import org.wip.plugintoolkit.shared.components.ToolkitRichTooltipBox
+import org.wip.plugintoolkit.shared.components.ToolkitTooltipBox
 import org.wip.plugintoolkit.shared.components.plugin.DynamicParameterInput
 import org.jetbrains.compose.resources.stringResource
 import plugintoolkit.composeapp.generated.resources.Res
@@ -176,15 +177,8 @@ fun InputPortRow(
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (isInactiveAndConnected) {
-                        TooltipArea(
-                            delayMillis = 1000,
-                            tooltip = {
-                                Text(
-                                    text = stringResource(Res.string.node_port_inactive_connected_warning),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
+                        ToolkitTooltipBox(
+                            tooltip = stringResource(Res.string.node_port_inactive_connected_warning)
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(
@@ -205,16 +199,7 @@ fun InputPortRow(
                             }
                         }
                     } else if (!input.description.isNullOrBlank()) {
-                        TooltipArea(
-                            delayMillis = 3000,
-                            tooltip = {
-                                Text(
-                                    text = input.description!!,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        ) {
+                        ToolkitTooltipBox(tooltip = input.description) {
                             Text(
                                 text = displayName,
                                 style = MaterialTheme.typography.labelMedium.copy(fontSize = 11.sp, lineHeight = 13.sp),
@@ -264,14 +249,13 @@ fun InputPortRow(
                         } else {
                             first
                         }
-                        TooltipArea(
-                            tooltip = {
+                        ToolkitRichTooltipBox(
+                            tooltipContent = {
                                 Column(modifier = Modifier.padding(ToolkitTheme.spacing.extraSmall)) {
                                     inferredSem.forEach { sem ->
                                         Text(
                                             text = "• ${sem.canonicalId}",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            style = MaterialTheme.typography.bodySmall
                                         )
                                     }
                                 }
@@ -453,15 +437,8 @@ fun OutputPortRow(
                 horizontalArrangement = Arrangement.End
             ) {
                 if (isInactiveAndConnected) {
-                    TooltipArea(
-                        delayMillis = 1000,
-                        tooltip = {
-                            Text(
-                                text = stringResource(Res.string.node_port_inactive_connected_warning),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
+                    ToolkitTooltipBox(
+                        tooltip = stringResource(Res.string.node_port_inactive_connected_warning)
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(
@@ -480,16 +457,7 @@ fun OutputPortRow(
                         }
                     }
                 } else if (!output.description.isNullOrBlank()) {
-                    TooltipArea(
-                        delayMillis = 3000,
-                        tooltip = {
-                            Text(
-                                text = output.description!!,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    ) {
+                    ToolkitTooltipBox(tooltip = output.description) {
                         Text(
                             text = output.name,
                             style = MaterialTheme.typography.labelMedium.copy(fontSize = 11.sp, lineHeight = 13.sp),
@@ -533,14 +501,13 @@ fun OutputPortRow(
                     } else {
                         first
                     }
-                    TooltipArea(
-                        tooltip = {
+                    ToolkitRichTooltipBox(
+                        tooltipContent = {
                             Column(modifier = Modifier.padding(ToolkitTheme.spacing.extraSmall)) {
                                 inferredSem.forEach { sem ->
                                     Text(
                                         text = "• ${sem.canonicalId}",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        style = MaterialTheme.typography.bodySmall
                                     )
                                 }
                             }

@@ -75,6 +75,15 @@ data class CardNode @JvmOverloads constructor(
     val outlined: Boolean = false
 ) : UiNode
 
+/**
+ * Programmatic scroll edge target for scrollable containers.
+ */
+@Serializable
+enum class ScrollEdge {
+    TOP,
+    BOTTOM
+}
+
 @Serializable
 @SerialName("scrollable_column")
 data class ScrollableColumnNode @JvmOverloads constructor(
@@ -82,7 +91,10 @@ data class ScrollableColumnNode @JvmOverloads constructor(
     val children: List<UiNode> = emptyList(),
     val spacing: SpacingSize = SpacingSize.NONE,
     override val modifier: UiModifier = UiModifier.None,
-    val reorderable: Boolean = false
+    val reorderable: Boolean = false,
+    val scrollToIndex: Int? = null,
+    val scrollToEdge: ScrollEdge? = null,
+    val scrollRevision: Int = 0
 ) : UiNode
 
 /**
@@ -100,7 +112,10 @@ data class GridNode @JvmOverloads constructor(
     val spacing: SpacingSize = SpacingSize.SMALL,
     val reorderable: Boolean = false,
     val children: List<UiNode> = emptyList(),
-    override val modifier: UiModifier = UiModifier.None
+    override val modifier: UiModifier = UiModifier.None,
+    val scrollToIndex: Int? = null,
+    val scrollToEdge: ScrollEdge? = null,
+    val scrollRevision: Int = 0
 ) : UiNode
 
 /**
@@ -827,6 +842,170 @@ data class RangeSliderNode @JvmOverloads constructor(
     override val modifier: UiModifier = UiModifier.None
 ) : UiNode
 
+// ── Workflows, Navigation & Pickers ──────────────────────────────────────────
+
+/**
+ * Hierarchical node item inside a [TreeViewNode].
+ */
+@Serializable
+data class TreeNodeItem @JvmOverloads constructor(
+    val key: String,
+    val label: String,
+    val iconName: String? = null,
+    val expanded: Boolean = false,
+    val children: List<TreeNodeItem> = emptyList()
+)
+
+/**
+ * Collapsible hierarchical tree view supporting keyboard navigation, selection,
+ * and expand/collapse events ([UiEvent.TreeNodeToggled] / [UiEvent.OptionSelected]).
+ */
+@Serializable
+@SerialName("tree_view")
+data class TreeViewNode @JvmOverloads constructor(
+    override val id: String,
+    val items: List<TreeNodeItem>,
+    val selectedKey: String? = null,
+    val maxHeightDp: Int? = null,
+    val action: String? = null,
+    override val modifier: UiModifier = UiModifier.None
+) : UiNode
+
+/**
+ * Target selection mode for [FilePickerNode].
+ */
+@Serializable
+enum class FilePickerMode {
+    FILE,
+    FILES,
+    DIRECTORY,
+    SAVE
+}
+
+/**
+ * Inline desktop file/folder picker control integrated with the host's file access bridge,
+ * emitting [UiEvent.FilesPicked] when paths are selected or cleared.
+ */
+@Serializable
+@SerialName("file_picker")
+data class FilePickerNode @JvmOverloads constructor(
+    override val id: String,
+    val value: String = "",
+    val paths: List<String> = emptyList(),
+    val mode: FilePickerMode = FilePickerMode.FILE,
+    val allowedExtensions: List<String> = emptyList(),
+    val label: String? = null,
+    val placeholder: String? = null,
+    val defaultFileName: String = "export",
+    val defaultExtension: String = "txt",
+    val action: String? = null,
+    override val modifier: UiModifier = UiModifier.None
+) : UiNode
+
+/**
+ * Color selection control with swatch trigger, hex entry, and optional preset swatches,
+ * emitting [UiEvent.ColorChanged].
+ */
+@Serializable
+@SerialName("color_picker")
+data class ColorPickerNode @JvmOverloads constructor(
+    override val id: String,
+    val colorHex: String = "#6750A4",
+    val label: String? = null,
+    val presets: List<String> = emptyList(),
+    val showHexInput: Boolean = true,
+    override val modifier: UiModifier = UiModifier.None
+) : UiNode
+
+/**
+ * Segment entry inside a [BreadcrumbsNode].
+ */
+@Serializable
+data class BreadcrumbItem @JvmOverloads constructor(
+    val key: String,
+    val label: String,
+    val iconName: String? = null
+)
+
+/**
+ * Horizontal navigation trail supporting overflow collapse menus and segment selection
+ * via [UiEvent.OptionSelected].
+ */
+@Serializable
+@SerialName("breadcrumbs")
+data class BreadcrumbsNode @JvmOverloads constructor(
+    override val id: String,
+    val items: List<BreadcrumbItem>,
+    val separator: String = "/",
+    val maxVisibleItems: Int = 5,
+    override val modifier: UiModifier = UiModifier.None
+) : UiNode
+
+/**
+ * Desktop pagination bar with page navigation controls and optional page-size menu,
+ * emitting [UiEvent.PageChanged].
+ */
+@Serializable
+@SerialName("pagination")
+data class PaginationNode @JvmOverloads constructor(
+    override val id: String,
+    val currentPage: Int = 1,
+    val totalPages: Int = 1,
+    val pageSize: Int? = null,
+    val pageSizeOptions: List<Int> = emptyList(),
+    override val modifier: UiModifier = UiModifier.None
+) : UiNode
+
+/**
+ * Lifecycle state for an individual step in [StepperNode].
+ */
+@Serializable
+enum class StepStatus {
+    PENDING,
+    ACTIVE,
+    COMPLETED,
+    ERROR
+}
+
+/**
+ * Step entry inside a [StepperNode].
+ */
+@Serializable
+data class StepperItem @JvmOverloads constructor(
+    val key: String,
+    val label: String,
+    val subtitle: String? = null,
+    val status: StepStatus = StepStatus.PENDING,
+    val enabled: Boolean = true
+)
+
+/**
+ * Multi-step wizard progress indicator emitting [UiEvent.OptionSelected] for enabled steps.
+ */
+@Serializable
+@SerialName("stepper")
+data class StepperNode @JvmOverloads constructor(
+    override val id: String,
+    val steps: List<StepperItem>,
+    val horizontal: Boolean = true,
+    override val modifier: UiModifier = UiModifier.None
+) : UiNode
+
+/**
+ * Standalone dropdown/overflow menu button opening [ActionMenuItem] entries
+ * and emitting [UiEvent.Click].
+ */
+@Serializable
+@SerialName("menu")
+data class MenuNode @JvmOverloads constructor(
+    override val id: String,
+    val items: List<ActionMenuItem>,
+    val triggerLabel: String? = null,
+    val triggerIconName: String? = "more_vert",
+    val tooltip: String? = null,
+    override val modifier: UiModifier = UiModifier.None
+) : UiNode
+
 /**
  * Error boundary node injected by the Pre-Composition AST Sanitizer when a subtree
  * violates tree constraints (e.g. max nesting depth, max node count, NaN ranges).
@@ -893,6 +1072,13 @@ object UiNodeSerializer : KSerializer<UiNode> {
             is MarkdownTextNode -> "markdown_text"
             is MultiSelectDropdownNode -> "multi_select_dropdown"
             is RangeSliderNode -> "range_slider"
+            is TreeViewNode -> "tree_view"
+            is FilePickerNode -> "file_picker"
+            is ColorPickerNode -> "color_picker"
+            is BreadcrumbsNode -> "breadcrumbs"
+            is PaginationNode -> "pagination"
+            is StepperNode -> "stepper"
+            is MenuNode -> "menu"
             is BoardNode -> "board"
             is ErrorBoundaryNode -> "error_boundary"
             is UnknownNode -> value.rawType
@@ -942,6 +1128,13 @@ object UiNodeSerializer : KSerializer<UiNode> {
             is MarkdownTextNode -> jsonEncoder.json.encodeToJsonElement(MarkdownTextNode.serializer(), value)
             is MultiSelectDropdownNode -> jsonEncoder.json.encodeToJsonElement(MultiSelectDropdownNode.serializer(), value)
             is RangeSliderNode -> jsonEncoder.json.encodeToJsonElement(RangeSliderNode.serializer(), value)
+            is TreeViewNode -> jsonEncoder.json.encodeToJsonElement(TreeViewNode.serializer(), value)
+            is FilePickerNode -> jsonEncoder.json.encodeToJsonElement(FilePickerNode.serializer(), value)
+            is ColorPickerNode -> jsonEncoder.json.encodeToJsonElement(ColorPickerNode.serializer(), value)
+            is BreadcrumbsNode -> jsonEncoder.json.encodeToJsonElement(BreadcrumbsNode.serializer(), value)
+            is PaginationNode -> jsonEncoder.json.encodeToJsonElement(PaginationNode.serializer(), value)
+            is StepperNode -> jsonEncoder.json.encodeToJsonElement(StepperNode.serializer(), value)
+            is MenuNode -> jsonEncoder.json.encodeToJsonElement(MenuNode.serializer(), value)
             is LoadingIndicatorNode -> jsonEncoder.json.encodeToJsonElement(LoadingIndicatorNode.serializer(), value)
             is BoardNode -> jsonEncoder.json.encodeToJsonElement(BoardNode.serializer(), value)
             is ErrorBoundaryNode -> jsonEncoder.json.encodeToJsonElement(ErrorBoundaryNode.serializer(), value)
@@ -1005,6 +1198,13 @@ object UiNodeSerializer : KSerializer<UiNode> {
             "markdown_text" -> MarkdownTextNode.serializer()
             "multi_select_dropdown" -> MultiSelectDropdownNode.serializer()
             "range_slider" -> RangeSliderNode.serializer()
+            "tree_view" -> TreeViewNode.serializer()
+            "file_picker" -> FilePickerNode.serializer()
+            "color_picker" -> ColorPickerNode.serializer()
+            "breadcrumbs" -> BreadcrumbsNode.serializer()
+            "pagination" -> PaginationNode.serializer()
+            "stepper" -> StepperNode.serializer()
+            "menu" -> MenuNode.serializer()
             "board" -> BoardNode.serializer()
             "error_boundary" -> ErrorBoundaryNode.serializer()
             "unknown" -> UnknownNodeCustomSerializer

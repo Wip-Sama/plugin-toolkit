@@ -2,6 +2,11 @@
 
 All notable changes to the Plugin API will be documented in this file.
 
+## 4.1.0-alpha04
+- Added `TreeViewNode` (`TreeNodeItem`), `FilePickerNode` (`FilePickerMode`), `ColorPickerNode`, `BreadcrumbsNode` (`BreadcrumbItem`), `PaginationNode`, `StepperNode` (`StepperItem`, `StepStatus`), and `MenuNode` with `@JvmOverloads` constructors and `UiNodeSerializer` registration.
+- Extended `ScrollableColumnNode` and `GridNode` (and DSL builders) with `scrollToIndex`, `scrollToEdge` (`ScrollEdge`), and `scrollRevision`.
+- Added `UiEvent.TreeNodeToggled`, `UiEvent.PageChanged`, `UiEvent.FilesPicked`, and `UiEvent.ColorChanged` with `UiEventSerializer` support and corresponding `UiContainerBuilder` DSL helpers.
+
 ## 4.1.0-alpha03
 - Added `TableNode` (`TableColumn`, `TableRow`), `FlowRowNode`, `KeyValueListNode` (`KeyValueEntry`), `MarkdownTextNode`, `MultiSelectDropdownNode`, and `RangeSliderNode` with `@JvmOverloads` constructors and `UiNodeSerializer` support.
 - Added `UiEvent.TableSorted`, `UiEvent.RangeChanged`, and `UiEvent.MultiOptionSelected` with `UiEventSerializer` support.

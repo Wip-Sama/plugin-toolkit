@@ -21,11 +21,13 @@ import org.wip.plugintoolkit.api.sdui.CapabilityJobSnapshot
 import org.wip.plugintoolkit.api.sdui.CapabilityJobStatus
 import org.wip.plugintoolkit.api.sdui.ChipItem
 import org.wip.plugintoolkit.api.sdui.ControlSize
+import org.wip.plugintoolkit.api.sdui.FilePickerMode
 import org.wip.plugintoolkit.api.sdui.ImageScale
 import org.wip.plugintoolkit.api.sdui.ProgressBarStyle
 import org.wip.plugintoolkit.api.sdui.SemanticColor
 import org.wip.plugintoolkit.api.sdui.ShapeRole
 import org.wip.plugintoolkit.api.sdui.SpacingSize
+import org.wip.plugintoolkit.api.sdui.StepStatus
 import org.wip.plugintoolkit.api.sdui.TabItem
 import org.wip.plugintoolkit.api.sdui.TypographyRole
 import org.wip.plugintoolkit.api.sdui.UiContainerBuilder
@@ -86,6 +88,14 @@ private data class ChapterPublisherState(
     val tableSortColumn: String = "pages",
     val tableSortAscending: Boolean = false,
     val selectedTableRowKey: String? = null,
+    val releaseBreadcrumbKey: String = "matrix",
+    val activeStepKey: String = "validate",
+    val archiveTreeSelectedKey: String = "leaf_webp",
+    val archiveTreeExpandedKeys: Set<String> = setOf("dir_exports"),
+    val exportArchivePath: String = "",
+    val readerAccentHex: String = "#6750A4",
+    val catalogPage: Int = 1,
+    val catalogPageSize: Int = 10,
     val isLoading: Boolean = true,
     val showConfirmDialog: Boolean = false,
     val pendingPushIds: List<String> = emptyList(),
@@ -537,6 +547,15 @@ internal fun runChapterPublisherSession(
                         "cfg_priority_radio" -> {
                             stateFlow.update { it.copy(publishPriority = event.selectedKey) }
                         }
+                        "cfg_workflow_breadcrumbs" -> {
+                            stateFlow.update { it.copy(releaseBreadcrumbKey = event.selectedKey) }
+                        }
+                        "cfg_publish_stepper" -> {
+                            stateFlow.update { it.copy(activeStepKey = event.selectedKey) }
+                        }
+                        "cfg_archive_tree" -> {
+                            stateFlow.update { it.copy(archiveTreeSelectedKey = event.selectedKey) }
+                        }
                     }
                 }
                 is UiEvent.ToggleChanged -> {
@@ -959,6 +978,57 @@ internal fun runChapterPublisherSession(
                                 )
                             }
                         }
+                        action == "matrix_reset_accent" -> {
+                            stateFlow.update {
+                                it.copy(
+                                    readerAccentHex = "#6750A4",
+                                    bannerMessage = "Reset reader accent color to default.",
+                                    bannerSeverity = SemanticColor.INFO
+                                )
+                            }
+                        }
+                        action == "matrix_queue_export" -> {
+                            stateFlow.update {
+                                it.copy(
+                                    bannerMessage = "Queued matrix export on page ${it.catalogPage}.",
+                                    bannerSeverity = SemanticColor.SUCCESS
+                                )
+                            }
+                        }
+                    }
+                }
+                is UiEvent.TreeNodeToggled -> {
+                    if (event.nodeId == "cfg_archive_tree") {
+                        stateFlow.update { current ->
+                            val next = if (event.expanded) {
+                                current.archiveTreeExpandedKeys + event.itemKey
+                            } else {
+                                current.archiveTreeExpandedKeys - event.itemKey
+                            }
+                            current.copy(archiveTreeExpandedKeys = next)
+                        }
+                    }
+                }
+                is UiEvent.PageChanged -> {
+                    if (event.nodeId == "cfg_catalog_pagination") {
+                        stateFlow.update {
+                            it.copy(
+                                catalogPage = event.page,
+                                catalogPageSize = event.pageSize ?: it.catalogPageSize
+                            )
+                        }
+                    }
+                }
+                is UiEvent.FilesPicked -> {
+                    if (event.nodeId == "cfg_export_file_picker") {
+                        stateFlow.update {
+                            it.copy(exportArchivePath = event.paths.firstOrNull().orEmpty())
+                        }
+                    }
+                }
+                is UiEvent.ColorChanged -> {
+                    if (event.nodeId == "cfg_accent_color_picker") {
+                        stateFlow.update { it.copy(readerAccentHex = event.colorHex) }
                     }
                 }
                 is UiEvent.TableSorted -> {
@@ -2418,6 +2488,73 @@ private fun UiContainerBuilder.renderSettingsTab(
                     )
                 }
             }
+        }
+
+        card(id = "cfg_workflow_pickers_card", title = "Workflow Navigation, Tree & Pickers") {
+            row(id = "cfg_wf_header_row", spacing = SpacingSize.SMALL) {
+                breadcrumbs(id = "cfg_workflow_breadcrumbs", maxVisibleItems = 4) {
+                    item(key = "workspace", label = "Publisher", iconName = "folder")
+                    item(key = "series", label = "Series", iconName = "book")
+                    item(key = "matrix", label = "Release Matrix (${state.releaseBreadcrumbKey})")
+                }
+                menu(id = "cfg_matrix_menu", triggerLabel = "Matrix Actions", triggerIconName = "more_vert") {
+                    item(key = "export", label = "Queue Export", action = "matrix_queue_export", iconName = "download")
+                    item(
+                        key = "reset",
+                        label = "Reset Accent",
+                        action = "matrix_reset_accent",
+                        iconName = "refresh",
+                        startsSection = true
+                    )
+                }
+            }
+            stepper(id = "cfg_publish_stepper", horizontal = true) {
+                step(key = "select", label = "Select Chapters", status = StepStatus.COMPLETED)
+                step(
+                    key = "validate",
+                    label = "Validate Bundle",
+                    subtitle = "Active: ${state.activeStepKey}",
+                    status = StepStatus.ACTIVE
+                )
+                step(key = "publish", label = "Upload Release", status = StepStatus.PENDING, enabled = false)
+            }
+            treeView(
+                id = "cfg_archive_tree",
+                selectedKey = state.archiveTreeSelectedKey,
+                maxHeightDp = 180
+            ) {
+                node(
+                    key = "dir_exports",
+                    label = "Output Bundles",
+                    iconName = "folder_open",
+                    expanded = "dir_exports" in state.archiveTreeExpandedKeys
+                ) {
+                    node(key = "leaf_webp", label = "chapters-webp.json", iconName = "code")
+                    node(key = "leaf_cbz", label = "volume-01.cbz", iconName = "folder")
+                }
+            }
+            filePicker(
+                id = "cfg_export_file_picker",
+                value = state.exportArchivePath,
+                paths = listOfNotNull(state.exportArchivePath.takeIf { it.isNotBlank() }),
+                mode = FilePickerMode.FILE,
+                allowedExtensions = listOf("json", "cbz"),
+                label = "Manual Override Archive",
+                action = "pick_override_archive"
+            )
+            colorPicker(
+                id = "cfg_accent_color_picker",
+                colorHex = state.readerAccentHex,
+                label = "Reader Accent Color",
+                presets = listOf("#6750A4", "#006A6A", "#B3261E")
+            )
+            pagination(
+                id = "cfg_catalog_pagination",
+                currentPage = state.catalogPage,
+                totalPages = 4,
+                pageSize = state.catalogPageSize,
+                pageSizeOptions = listOf(10, 25, 50)
+            )
         }
     }
 }

@@ -144,8 +144,20 @@ class PluginUiSessionHandle(
             is UiEvent.ShortcutTriggered,
             is UiEvent.TableSorted,
             is UiEvent.MultiOptionSelected,
+            is UiEvent.TreeNodeToggled,
+            is UiEvent.PageChanged,
+            is UiEvent.ColorChanged,
             is UiEvent.Custom -> {
                 transactionalChannel.trySend(event)
+            }
+            is UiEvent.FilesPicked -> {
+                val dynamicFs = hostFileSystem as? DynamicHostFileSystem
+                val validPaths = event.paths
+                    .map { it.trim() }
+                    .filter { it.isNotEmpty() }
+                    .distinct()
+                validPaths.forEach { dynamicFs?.grantAccess(it) }
+                transactionalChannel.trySend(event.copy(paths = validPaths))
             }
             is UiEvent.FilesDropped -> {
                 val dynamicFs = hostFileSystem as? DynamicHostFileSystem

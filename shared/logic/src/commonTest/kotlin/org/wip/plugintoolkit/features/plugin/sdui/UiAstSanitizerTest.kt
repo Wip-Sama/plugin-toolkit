@@ -7,36 +7,47 @@ import org.wip.plugintoolkit.api.sdui.BoardLayer
 import org.wip.plugintoolkit.api.sdui.BoardNode
 import org.wip.plugintoolkit.api.sdui.BoardShapeType
 import org.wip.plugintoolkit.api.sdui.BoardViewportConfig
+import org.wip.plugintoolkit.api.sdui.BreadcrumbItem
+import org.wip.plugintoolkit.api.sdui.BreadcrumbsNode
 import org.wip.plugintoolkit.api.sdui.ButtonGroupItem
 import org.wip.plugintoolkit.api.sdui.ButtonGroupNode
 import org.wip.plugintoolkit.api.sdui.CodeBlockNode
+import org.wip.plugintoolkit.api.sdui.ColorPickerNode
 import org.wip.plugintoolkit.api.sdui.ColumnNode
 import org.wip.plugintoolkit.api.sdui.ErrorBoundaryNode
 import org.wip.plugintoolkit.api.sdui.FloatingAnchor
 import org.wip.plugintoolkit.api.sdui.FloatingPanelNode
 import org.wip.plugintoolkit.api.sdui.FlowRowNode
+import org.wip.plugintoolkit.api.sdui.GridNode
 import org.wip.plugintoolkit.api.sdui.KeyValueEntry
 import org.wip.plugintoolkit.api.sdui.KeyValueListNode
 import org.wip.plugintoolkit.api.sdui.LoadingIndicatorNode
 import org.wip.plugintoolkit.api.sdui.MarkdownTextNode
+import org.wip.plugintoolkit.api.sdui.MenuNode
 import org.wip.plugintoolkit.api.sdui.MultiSelectDropdownNode
 import org.wip.plugintoolkit.api.sdui.NormalizedPoint
 import org.wip.plugintoolkit.api.sdui.NormalizedSize
 import org.wip.plugintoolkit.api.sdui.NumberInputNode
+import org.wip.plugintoolkit.api.sdui.PaginationNode
 import org.wip.plugintoolkit.api.sdui.RadioGroupNode
 import org.wip.plugintoolkit.api.sdui.RadioOptionItem
 import org.wip.plugintoolkit.api.sdui.RangeSliderNode
 import org.wip.plugintoolkit.api.sdui.RowNode
 import org.wip.plugintoolkit.api.sdui.ScaffoldNode
+import org.wip.plugintoolkit.api.sdui.ScrollableColumnNode
 import org.wip.plugintoolkit.api.sdui.SemanticColor
 import org.wip.plugintoolkit.api.sdui.SidebarAttachPoint
 import org.wip.plugintoolkit.api.sdui.SidebarNode
 import org.wip.plugintoolkit.api.sdui.SliderNode
 import org.wip.plugintoolkit.api.sdui.SplitButtonNode
+import org.wip.plugintoolkit.api.sdui.StepperItem
+import org.wip.plugintoolkit.api.sdui.StepperNode
 import org.wip.plugintoolkit.api.sdui.TableColumn
 import org.wip.plugintoolkit.api.sdui.TableNode
 import org.wip.plugintoolkit.api.sdui.TableRow
 import org.wip.plugintoolkit.api.sdui.TextNode
+import org.wip.plugintoolkit.api.sdui.TreeNodeItem
+import org.wip.plugintoolkit.api.sdui.TreeViewNode
 import org.wip.plugintoolkit.api.sdui.UiDropTarget
 import org.wip.plugintoolkit.api.sdui.UiModifier
 import org.wip.plugintoolkit.api.sdui.UiNodeTree
@@ -561,6 +572,63 @@ class UiAstSanitizerTest {
         assertEquals(1, flow.maxItemsInEachRow)
         assertIs<TextNode>(flow.children[0])
         assertTrue(assertIs<ErrorBoundaryNode>(flow.children[1]).errorMessage.contains("Duplicate node ID collision"))
+    }
+
+    @Test
+    fun testWorkflowPickerAndScrollAnchorValidation() {
+        val tree = UiNodeTree(
+            root = ColumnNode(
+                id = "wf_root",
+                children = listOf(
+                    TreeViewNode(
+                        id = "bad_tree",
+                        items = listOf(
+                            TreeNodeItem(
+                                key = "dup",
+                                label = "Parent",
+                                children = listOf(TreeNodeItem(key = "dup", label = "Child"))
+                            )
+                        )
+                    ),
+                    ColorPickerNode(id = "bad_color", colorHex = "   "),
+                    BreadcrumbsNode(
+                        id = "clamped_crumbs",
+                        maxVisibleItems = 0,
+                        items = listOf(
+                            BreadcrumbItem(key = "a", label = "Root"),
+                            BreadcrumbItem(key = "b", label = "Sub")
+                        )
+                    ),
+                    PaginationNode(id = "clamped_pages", currentPage = 9, totalPages = 3),
+                    StepperNode(
+                        id = "bad_stepper",
+                        steps = listOf(
+                            StepperItem(key = "s1", label = "Step 1"),
+                            StepperItem(key = "s1", label = "Dup Step")
+                        )
+                    ),
+                    MenuNode(id = "bad_menu", items = listOf(ActionMenuItem(key = "", label = "Broken"))),
+                    ScrollableColumnNode(id = "scroll_neg", scrollToIndex = -4),
+                    GridNode(id = "grid_neg", scrollToIndex = -2)
+                )
+            )
+        )
+
+        val sanitized = tree.sanitize()
+        val root = assertIs<ColumnNode>(sanitized.root)
+
+        assertIs<ErrorBoundaryNode>(root.children[0])
+        assertIs<ErrorBoundaryNode>(root.children[1])
+        assertEquals(2, assertIs<BreadcrumbsNode>(root.children[2]).maxVisibleItems)
+
+        val clampedPages = assertIs<PaginationNode>(root.children[3])
+        assertEquals(3, clampedPages.currentPage)
+        assertEquals(3, clampedPages.totalPages)
+
+        assertIs<ErrorBoundaryNode>(root.children[4])
+        assertIs<ErrorBoundaryNode>(root.children[5])
+        assertEquals(0, assertIs<ScrollableColumnNode>(root.children[6]).scrollToIndex)
+        assertEquals(0, assertIs<GridNode>(root.children[7]).scrollToIndex)
     }
 }
 

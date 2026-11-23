@@ -544,7 +544,11 @@ private suspend fun handleBoardCompositorEvent(
         is UiEvent.FilesDropped,
         is UiEvent.TableSorted,
         is UiEvent.RangeChanged,
-        is UiEvent.MultiOptionSelected -> Unit
+        is UiEvent.MultiOptionSelected,
+        is UiEvent.TreeNodeToggled,
+        is UiEvent.PageChanged,
+        is UiEvent.FilesPicked,
+        is UiEvent.ColorChanged -> Unit
     }
 }
 

@@ -1,3 +1,11 @@
+Version: 4.1.0-alpha04
+Date: 23-11-2026
+Added:
+	- Added Batch 4 SDUI workflow & picker components: TreeViewNode, FilePickerNode, ColorPickerNode, BreadcrumbsNode, PaginationNode, StepperNode, MenuNode, and scroll anchoring (`scrollToIndex`, `scrollToEdge`, `scrollRevision`) on ScrollableColumnNode and GridNode
+	- Added UiEvent.TreeNodeToggled, UiEvent.PageChanged, UiEvent.FilesPicked (with DynamicHostFileSystem access grants), and UiEvent.ColorChanged
+	- Standardized reusable host UI components (`ToolkitTreeView`, `ToolkitSearchBar`, `ToolkitAccordion`, `ToolkitConfirmDialog`, `ToolkitSideSheet`, `ToolkitStatusBadge`, `ToolkitEmptyState`) and added M3 `ToolkitTooltipBox`
+	- Migrated legacy TooltipArea and deprecated string Modifier.tooltip call sites across flow editor and plugin views to Material 3 TooltipBox
+------------------------------------------------------------------------
 Version: 4.1.0-alpha03
 Date: 23-11-2026
 Added:

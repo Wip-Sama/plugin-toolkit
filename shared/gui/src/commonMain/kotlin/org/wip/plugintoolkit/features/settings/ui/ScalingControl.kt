@@ -30,7 +30,7 @@ import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.shortcuts.model.ShortcutActionId
 import org.wip.plugintoolkit.features.shortcuts.ui.LocalShortcutManager
 import org.wip.plugintoolkit.shared.components.ToolkitTextField
-import org.wip.plugintoolkit.shared.components.tooltip
+import org.wip.plugintoolkit.shared.components.ToolkitTooltipBox
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.scaling_decrease
 import plugintoolkit.composeapp.generated.resources.scaling_decrease_double
@@ -70,29 +70,30 @@ fun ScalingControl(
         horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small),
         modifier = modifier
     ) {
-        FilledTonalIconButton(
-            onClick = {
-                val next = (round((scaling - step) * 20f) / 20f).coerceIn(0.5f, 2.0f)
-                onScalingChange(next)
-            },
-            enabled = canDecrease,
-            modifier = Modifier
-                .size(ToolkitTheme.dimensions.pluginIcon)
-                .onPointerEvent(PointerEventType.Press) {
-                    isShiftPressed = shortcutManager?.isActionTriggered(ShortcutActionId.SETTINGS_SCALE_2X_STEP, it.keyboardModifiers)
-                        ?: it.keyboardModifiers.isShiftPressed
-                }
-                .onPointerEvent(PointerEventType.Move) {
-                    isShiftPressed = shortcutManager?.isActionTriggered(ShortcutActionId.SETTINGS_SCALE_2X_STEP, it.keyboardModifiers)
-                        ?: it.keyboardModifiers.isShiftPressed
-                }
-                .tooltip(decreaseTooltip)
-        ) {
-            Icon(
-                imageVector = Icons.Default.Remove,
-                contentDescription = decreaseTooltip,
-                modifier = Modifier.size(ToolkitTheme.dimensions.iconMedium)
-            )
+        ToolkitTooltipBox(tooltip = decreaseTooltip) {
+            FilledTonalIconButton(
+                onClick = {
+                    val next = (round((scaling - step) * 20f) / 20f).coerceIn(0.5f, 2.0f)
+                    onScalingChange(next)
+                },
+                enabled = canDecrease,
+                modifier = Modifier
+                    .size(ToolkitTheme.dimensions.pluginIcon)
+                    .onPointerEvent(PointerEventType.Press) {
+                        isShiftPressed = shortcutManager?.isActionTriggered(ShortcutActionId.SETTINGS_SCALE_2X_STEP, it.keyboardModifiers)
+                            ?: it.keyboardModifiers.isShiftPressed
+                    }
+                    .onPointerEvent(PointerEventType.Move) {
+                        isShiftPressed = shortcutManager?.isActionTriggered(ShortcutActionId.SETTINGS_SCALE_2X_STEP, it.keyboardModifiers)
+                            ?: it.keyboardModifiers.isShiftPressed
+                    }
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Remove,
+                    contentDescription = decreaseTooltip,
+                    modifier = Modifier.size(ToolkitTheme.dimensions.iconMedium)
+                )
+            }
         }
 
         ToolkitTextField(
@@ -107,29 +108,30 @@ fun ScalingControl(
                 .height(ToolkitTheme.dimensions.pluginIcon)
         )
 
-        FilledTonalIconButton(
-            onClick = {
-                val next = (round((scaling + step) * 20f) / 20f).coerceIn(0.5f, 2.0f)
-                onScalingChange(next)
-            },
-            enabled = canIncrease,
-            modifier = Modifier
-                .size(ToolkitTheme.dimensions.pluginIcon)
-                .onPointerEvent(PointerEventType.Press) {
-                    isShiftPressed = shortcutManager?.isActionTriggered(ShortcutActionId.SETTINGS_SCALE_2X_STEP, it.keyboardModifiers)
-                        ?: it.keyboardModifiers.isShiftPressed
-                }
-                .onPointerEvent(PointerEventType.Move) {
-                    isShiftPressed = shortcutManager?.isActionTriggered(ShortcutActionId.SETTINGS_SCALE_2X_STEP, it.keyboardModifiers)
-                        ?: it.keyboardModifiers.isShiftPressed
-                }
-                .tooltip(increaseTooltip)
-        ) {
-            Icon(
-                imageVector = Icons.Default.Add,
-                contentDescription = increaseTooltip,
-                modifier = Modifier.size(ToolkitTheme.dimensions.iconMedium)
-            )
+        ToolkitTooltipBox(tooltip = increaseTooltip) {
+            FilledTonalIconButton(
+                onClick = {
+                    val next = (round((scaling + step) * 20f) / 20f).coerceIn(0.5f, 2.0f)
+                    onScalingChange(next)
+                },
+                enabled = canIncrease,
+                modifier = Modifier
+                    .size(ToolkitTheme.dimensions.pluginIcon)
+                    .onPointerEvent(PointerEventType.Press) {
+                        isShiftPressed = shortcutManager?.isActionTriggered(ShortcutActionId.SETTINGS_SCALE_2X_STEP, it.keyboardModifiers)
+                            ?: it.keyboardModifiers.isShiftPressed
+                    }
+                    .onPointerEvent(PointerEventType.Move) {
+                        isShiftPressed = shortcutManager?.isActionTriggered(ShortcutActionId.SETTINGS_SCALE_2X_STEP, it.keyboardModifiers)
+                            ?: it.keyboardModifiers.isShiftPressed
+                    }
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = increaseTooltip,
+                    modifier = Modifier.size(ToolkitTheme.dimensions.iconMedium)
+                )
+            }
         }
     }
 }

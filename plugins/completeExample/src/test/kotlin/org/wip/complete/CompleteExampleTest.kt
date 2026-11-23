@@ -47,11 +47,14 @@ import org.wip.plugintoolkit.api.sdui.AssetReference
 import org.wip.plugintoolkit.api.sdui.BoardLayer
 import org.wip.plugintoolkit.api.sdui.BoardNode
 import org.wip.plugintoolkit.api.sdui.BoardTool
+import org.wip.plugintoolkit.api.sdui.BreadcrumbsNode
 import org.wip.plugintoolkit.api.sdui.CapabilityJobSnapshot
 import org.wip.plugintoolkit.api.sdui.CapabilityJobStatus
 import org.wip.plugintoolkit.api.sdui.CodeBlockNode
+import org.wip.plugintoolkit.api.sdui.ColorPickerNode
 import org.wip.plugintoolkit.api.sdui.ColumnNode
 import org.wip.plugintoolkit.api.sdui.DialogNode
+import org.wip.plugintoolkit.api.sdui.FilePickerNode
 import org.wip.plugintoolkit.api.sdui.FloatingAnchor
 import org.wip.plugintoolkit.api.sdui.FlowRowNode
 import org.wip.plugintoolkit.api.sdui.GridNode
@@ -60,9 +63,11 @@ import org.wip.plugintoolkit.api.sdui.KeyValueListNode
 import org.wip.plugintoolkit.api.sdui.ListItemNode
 import org.wip.plugintoolkit.api.sdui.LoadingIndicatorNode
 import org.wip.plugintoolkit.api.sdui.MarkdownTextNode
+import org.wip.plugintoolkit.api.sdui.MenuNode
 import org.wip.plugintoolkit.api.sdui.MultiSelectDropdownNode
 import org.wip.plugintoolkit.api.sdui.NormalizedPoint
 import org.wip.plugintoolkit.api.sdui.NumberInputNode
+import org.wip.plugintoolkit.api.sdui.PaginationNode
 import org.wip.plugintoolkit.api.sdui.ProgressBarNode
 import org.wip.plugintoolkit.api.sdui.ProgressBarStyle
 import org.wip.plugintoolkit.api.sdui.RadioGroupNode
@@ -72,8 +77,10 @@ import org.wip.plugintoolkit.api.sdui.SearchBarNode
 import org.wip.plugintoolkit.api.sdui.SemanticColor
 import org.wip.plugintoolkit.api.sdui.ShapeRole
 import org.wip.plugintoolkit.api.sdui.SplitPaneNode
+import org.wip.plugintoolkit.api.sdui.StepperNode
 import org.wip.plugintoolkit.api.sdui.TableNode
 import org.wip.plugintoolkit.api.sdui.TabsNode
+import org.wip.plugintoolkit.api.sdui.TreeViewNode
 import org.wip.plugintoolkit.api.sdui.TextInputNode
 import org.wip.plugintoolkit.api.sdui.TextNode
 import org.wip.plugintoolkit.api.sdui.UiEvent
@@ -1251,6 +1258,24 @@ class CompleteExampleTest {
             assertEquals("title", overviewTable.sortColumnKey)
             assertTrue(overviewTable.sortAscending)
             assertTrue(overviewTable.rows.isNotEmpty())
+
+            eventsFlow.emit(UiEvent.TreeNodeToggled("cfg_archive_tree", "dir_exports", false))
+            eventsFlow.emit(UiEvent.OptionSelected("cfg_archive_tree", "leaf_cbz"))
+            eventsFlow.emit(UiEvent.PageChanged("cfg_catalog_pagination", 3, 25))
+            eventsFlow.emit(UiEvent.FilesPicked("cfg_export_file_picker", "pick_override_archive", listOf("C:/override.cbz")))
+            eventsFlow.emit(UiEvent.ColorChanged("cfg_accent_color_picker", "#006A6A"))
+            advanceUntilIdle()
+
+            val batch4Nodes = collectNodes(emittedTrees.last().root)
+            assertEquals(3, batch4Nodes.filterIsInstance<BreadcrumbsNode>().first { it.id == "cfg_workflow_breadcrumbs" }.items.size)
+            assertEquals(3, batch4Nodes.filterIsInstance<StepperNode>().first { it.id == "cfg_publish_stepper" }.steps.size)
+            assertEquals("leaf_cbz", batch4Nodes.filterIsInstance<TreeViewNode>().first { it.id == "cfg_archive_tree" }.selectedKey)
+            assertEquals("C:/override.cbz", batch4Nodes.filterIsInstance<FilePickerNode>().first { it.id == "cfg_export_file_picker" }.value)
+            assertEquals("#006A6A", batch4Nodes.filterIsInstance<ColorPickerNode>().first { it.id == "cfg_accent_color_picker" }.colorHex)
+            val pagerNode = batch4Nodes.filterIsInstance<PaginationNode>().first { it.id == "cfg_catalog_pagination" }
+            assertEquals(3, pagerNode.currentPage)
+            assertEquals(25, pagerNode.pageSize)
+            assertEquals(2, batch4Nodes.filterIsInstance<MenuNode>().first { it.id == "cfg_matrix_menu" }.items.size)
         } finally {
             job.cancel()
         }
