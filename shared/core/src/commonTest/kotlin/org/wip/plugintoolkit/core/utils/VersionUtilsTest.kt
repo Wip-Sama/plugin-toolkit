@@ -16,6 +16,13 @@ class VersionUtilsTest {
         assertEquals(1, VersionUtils.compare("2.0.0", "1.9.9"))
         assertEquals(0, VersionUtils.compare("v1.0.0", "1.0.0"))
         assertEquals(1, VersionUtils.compare("1.1", "1.0.5"))
+        assertEquals(-1, VersionUtils.compare("4.1.0-alpha01", "4.1.0"))
+        assertEquals(1, VersionUtils.compare("4.1.0", "4.1.0-alpha01"))
+        assertEquals(-1, VersionUtils.compare("4.1.0-alpha01", "4.1.0-alpha02"))
+        assertEquals(-1, VersionUtils.compare("4.1.0-alpha02", "4.1.0-alpha10"))
+        assertEquals(-1, VersionUtils.compare("4.1.0-alpha01", "4.1.0-beta01"))
+        assertEquals(1, VersionUtils.compare("4.1.0-alpha01", "4.0.0"))
+        assertEquals(0, VersionUtils.compare("v4.1.0-alpha01", "4.1.0-alpha01"))
     }
 
     @Test

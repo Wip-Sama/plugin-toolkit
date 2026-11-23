@@ -152,14 +152,20 @@ data class SidebarNode(
 
 // ── Control Nodes ───────────────────────────────────────────────────────────
 
+/**
+ * Displays formatted text with optional selection support and line-clamping controls.
+ */
 @Serializable
 @SerialName("text")
-data class TextNode(
+data class TextNode @JvmOverloads constructor(
     override val id: String,
     val text: String,
     val role: TypographyRole = TypographyRole.BODY_MEDIUM,
     val color: SemanticColor? = null,
-    override val modifier: UiModifier = UiModifier.None
+    override val modifier: UiModifier = UiModifier.None,
+    val selectable: Boolean = false,
+    val maxLines: Int? = null,
+    val overflowEllipsis: Boolean = false
 ) : UiNode
 
 @Serializable
@@ -303,6 +309,70 @@ data class DropdownNode(
     override val modifier: UiModifier = UiModifier.None
 ) : UiNode
 
+/**
+ * Option entry inside a [RadioGroupNode].
+ */
+@Serializable
+data class RadioOptionItem @JvmOverloads constructor(
+    val key: String,
+    val label: String,
+    val subtitle: String? = null,
+    val enabled: Boolean = true
+)
+
+/**
+ * Exclusive single-choice radio group control emitting [UiEvent.OptionSelected].
+ */
+@Serializable
+@SerialName("radio_group")
+data class RadioGroupNode @JvmOverloads constructor(
+    override val id: String,
+    val options: List<RadioOptionItem>,
+    val selectedKey: String? = null,
+    val label: String? = null,
+    val horizontal: Boolean = false,
+    override val modifier: UiModifier = UiModifier.None
+) : UiNode
+
+/**
+ * Numeric stepper / input control supporting bounded values, optional decimal entry, and unit labels.
+ */
+@Serializable
+@SerialName("number_input")
+data class NumberInputNode @JvmOverloads constructor(
+    override val id: String,
+    val value: Double = 0.0,
+    val min: Double? = null,
+    val max: Double? = null,
+    val step: Double = 1.0,
+    val isDecimal: Boolean = false,
+    val unitSuffix: String? = null,
+    val label: String? = null,
+    val placeholder: String? = null,
+    val revision: Int = 0,
+    val forceOverwrite: Boolean = false,
+    override val modifier: UiModifier = UiModifier.None
+) : UiNode
+
+/**
+ * Search field with clear affordance and optional suggestion popup emitting [UiEvent.TextChanged] and [UiEvent.Click].
+ */
+@Serializable
+@SerialName("search_bar")
+data class SearchBarNode @JvmOverloads constructor(
+    override val id: String,
+    val query: String = "",
+    val suggestions: List<String> = emptyList(),
+    val placeholder: String? = null,
+    val label: String? = null,
+    val showClearButton: Boolean = true,
+    val action: String? = null,
+    val debounceMs: Long = 150L,
+    val revision: Int = 0,
+    val forceOverwrite: Boolean = false,
+    override val modifier: UiModifier = UiModifier.None
+) : UiNode
+
 // ── Media & Visual Nodes ────────────────────────────────────────────────────
 
 @Serializable
@@ -316,7 +386,8 @@ data class ImageNode @JvmOverloads constructor(
     val clickable: Boolean = false,
     val action: String? = null,
     val selected: Boolean = false,
-    val badgeText: String? = null
+    val badgeText: String? = null,
+    val zoomable: Boolean = false
 ) : UiNode
 
 @Serializable
@@ -555,6 +626,40 @@ object UnknownNodeCustomSerializer : KSerializer<UnknownNode> {
 }
 
 /**
+ * Collapsible section header wrapping child SDUI nodes, emitting [UiEvent.ToggleChanged] when toggled.
+ */
+@Serializable
+@SerialName("accordion")
+data class AccordionNode @JvmOverloads constructor(
+    override val id: String,
+    val title: String,
+    val subtitle: String? = null,
+    val expanded: Boolean = false,
+    val leadingIcon: String? = null,
+    val badgeText: String? = null,
+    val badgeColor: SemanticColor? = null,
+    val children: List<UiNode> = emptyList(),
+    override val modifier: UiModifier = UiModifier.None
+) : UiNode
+
+/**
+ * Monospace source code or JSON viewer with optional line numbers, line wrapping, and one-click clipboard copy.
+ */
+@Serializable
+@SerialName("code_block")
+data class CodeBlockNode @JvmOverloads constructor(
+    override val id: String,
+    val code: String,
+    val language: String? = null,
+    val title: String? = null,
+    val showLineNumbers: Boolean = true,
+    val wrapLines: Boolean = false,
+    val showCopyButton: Boolean = true,
+    val maxHeightDp: Int? = null,
+    override val modifier: UiModifier = UiModifier.None
+) : UiNode
+
+/**
  * Error boundary node injected by the Pre-Composition AST Sanitizer when a subtree
  * violates tree constraints (e.g. max nesting depth, max node count, NaN ranges).
  */
@@ -608,6 +713,11 @@ object UiNodeSerializer : KSerializer<UiNode> {
             is ScrollableRowNode -> "scrollable_row"
             is BadgeNode -> "badge"
             is DividerNode -> "divider"
+            is RadioGroupNode -> "radio_group"
+            is NumberInputNode -> "number_input"
+            is SearchBarNode -> "search_bar"
+            is AccordionNode -> "accordion"
+            is CodeBlockNode -> "code_block"
             is BoardNode -> "board"
             is ErrorBoundaryNode -> "error_boundary"
             is UnknownNode -> value.rawType
@@ -646,6 +756,11 @@ object UiNodeSerializer : KSerializer<UiNode> {
             is ScrollableRowNode -> jsonEncoder.json.encodeToJsonElement(ScrollableRowNode.serializer(), value)
             is BadgeNode -> jsonEncoder.json.encodeToJsonElement(BadgeNode.serializer(), value)
             is DividerNode -> jsonEncoder.json.encodeToJsonElement(DividerNode.serializer(), value)
+            is RadioGroupNode -> jsonEncoder.json.encodeToJsonElement(RadioGroupNode.serializer(), value)
+            is NumberInputNode -> jsonEncoder.json.encodeToJsonElement(NumberInputNode.serializer(), value)
+            is SearchBarNode -> jsonEncoder.json.encodeToJsonElement(SearchBarNode.serializer(), value)
+            is AccordionNode -> jsonEncoder.json.encodeToJsonElement(AccordionNode.serializer(), value)
+            is CodeBlockNode -> jsonEncoder.json.encodeToJsonElement(CodeBlockNode.serializer(), value)
             is BoardNode -> jsonEncoder.json.encodeToJsonElement(BoardNode.serializer(), value)
             is ErrorBoundaryNode -> jsonEncoder.json.encodeToJsonElement(ErrorBoundaryNode.serializer(), value)
             is UnknownNode -> jsonEncoder.json.encodeToJsonElement(UnknownNodeCustomSerializer, value)
@@ -696,6 +811,11 @@ object UiNodeSerializer : KSerializer<UiNode> {
             "scrollable_row" -> ScrollableRowNode.serializer()
             "badge" -> BadgeNode.serializer()
             "divider" -> DividerNode.serializer()
+            "radio_group" -> RadioGroupNode.serializer()
+            "number_input" -> NumberInputNode.serializer()
+            "search_bar" -> SearchBarNode.serializer()
+            "accordion" -> AccordionNode.serializer()
+            "code_block" -> CodeBlockNode.serializer()
             "board" -> BoardNode.serializer()
             "error_boundary" -> ErrorBoundaryNode.serializer()
             "unknown" -> UnknownNodeCustomSerializer

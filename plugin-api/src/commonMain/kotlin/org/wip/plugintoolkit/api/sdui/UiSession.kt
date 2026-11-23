@@ -14,6 +14,7 @@ import org.wip.plugintoolkit.api.ExecutionResult
 import org.wip.plugintoolkit.api.PluginContext
 import org.wip.plugintoolkit.api.PluginResponse
 import org.wip.plugintoolkit.api.ProgressData
+import kotlin.jvm.JvmOverloads
 
 /**
  * Execution status for a capability or action triggered from within a UI session.
@@ -344,14 +345,29 @@ abstract class UiContainerBuilder {
         add(builder.build())
     }
 
+    @JvmOverloads
     fun text(
         text: String,
         id: String = generateNodeId("txt"),
         role: TypographyRole = TypographyRole.BODY_MEDIUM,
         color: SemanticColor? = null,
-        modifier: UiModifier = UiModifier.None
+        modifier: UiModifier = UiModifier.None,
+        selectable: Boolean = false,
+        maxLines: Int? = null,
+        overflowEllipsis: Boolean = false
     ) {
-        add(TextNode(id = id, text = text, role = role, color = color, modifier = modifier))
+        add(
+            TextNode(
+                id = id,
+                text = text,
+                role = role,
+                color = color,
+                modifier = modifier,
+                selectable = selectable,
+                maxLines = maxLines,
+                overflowEllipsis = overflowEllipsis
+            )
+        )
     }
 
     fun button(
@@ -490,6 +506,110 @@ abstract class UiContainerBuilder {
         add(DropdownNode(id = id, selectedKey = selectedKey, options = options, label = label, modifier = modifier))
     }
 
+    fun radioGroup(
+        options: List<RadioOptionItem>,
+        id: String = generateNodeId("radio"),
+        selectedKey: String? = null,
+        label: String? = null,
+        horizontal: Boolean = false,
+        modifier: UiModifier = UiModifier.None
+    ) {
+        add(
+            RadioGroupNode(
+                id = id,
+                options = options,
+                selectedKey = selectedKey,
+                label = label,
+                horizontal = horizontal,
+                modifier = modifier
+            )
+        )
+    }
+
+    fun radioGroup(
+        id: String = generateNodeId("radio"),
+        selectedKey: String? = null,
+        label: String? = null,
+        horizontal: Boolean = false,
+        modifier: UiModifier = UiModifier.None,
+        block: RadioGroupBuilder.() -> Unit
+    ) {
+        val builder = RadioGroupBuilder().apply(block)
+        add(
+            RadioGroupNode(
+                id = id,
+                options = builder.buildOptions(),
+                selectedKey = selectedKey,
+                label = label,
+                horizontal = horizontal,
+                modifier = modifier
+            )
+        )
+    }
+
+    fun numberInput(
+        id: String = generateNodeId("num"),
+        value: Double = 0.0,
+        min: Double? = null,
+        max: Double? = null,
+        step: Double = 1.0,
+        isDecimal: Boolean = false,
+        unitSuffix: String? = null,
+        label: String? = null,
+        placeholder: String? = null,
+        revision: Int = 0,
+        forceOverwrite: Boolean = false,
+        modifier: UiModifier = UiModifier.None
+    ) {
+        add(
+            NumberInputNode(
+                id = id,
+                value = value,
+                min = min,
+                max = max,
+                step = step,
+                isDecimal = isDecimal,
+                unitSuffix = unitSuffix,
+                label = label,
+                placeholder = placeholder,
+                revision = revision,
+                forceOverwrite = forceOverwrite,
+                modifier = modifier
+            )
+        )
+    }
+
+    fun searchBar(
+        id: String = generateNodeId("search"),
+        query: String = "",
+        suggestions: List<String> = emptyList(),
+        placeholder: String? = null,
+        label: String? = null,
+        showClearButton: Boolean = true,
+        action: String? = null,
+        debounceMs: Long = 150L,
+        revision: Int = 0,
+        forceOverwrite: Boolean = false,
+        modifier: UiModifier = UiModifier.None
+    ) {
+        add(
+            SearchBarNode(
+                id = id,
+                query = query,
+                suggestions = suggestions,
+                placeholder = placeholder,
+                label = label,
+                showClearButton = showClearButton,
+                action = action,
+                debounceMs = debounceMs,
+                revision = revision,
+                forceOverwrite = forceOverwrite,
+                modifier = modifier
+            )
+        )
+    }
+
+    @JvmOverloads
     fun image(
         asset: AssetReference,
         id: String = generateNodeId("img"),
@@ -499,7 +619,8 @@ abstract class UiContainerBuilder {
         action: String? = null,
         selected: Boolean = false,
         badgeText: String? = null,
-        modifier: UiModifier = UiModifier.None
+        modifier: UiModifier = UiModifier.None,
+        zoomable: Boolean = false
     ) {
         add(
             ImageNode(
@@ -511,7 +632,8 @@ abstract class UiContainerBuilder {
                 clickable = clickable,
                 action = action,
                 selected = selected,
-                badgeText = badgeText
+                badgeText = badgeText,
+                zoomable = zoomable
             )
         )
     }
@@ -853,6 +975,56 @@ abstract class UiContainerBuilder {
         add(builder.build())
     }
 
+    fun accordion(
+        title: String,
+        id: String = generateNodeId("accordion"),
+        subtitle: String? = null,
+        expanded: Boolean = false,
+        leadingIcon: String? = null,
+        badgeText: String? = null,
+        badgeColor: SemanticColor? = null,
+        modifier: UiModifier = UiModifier.None,
+        block: AccordionBuilder.() -> Unit
+    ) {
+        val builder = AccordionBuilder(
+            id = id,
+            title = title,
+            subtitle = subtitle,
+            expanded = expanded,
+            leadingIcon = leadingIcon,
+            badgeText = badgeText,
+            badgeColor = badgeColor,
+            modifier = modifier
+        ).apply(block)
+        add(builder.build())
+    }
+
+    fun codeBlock(
+        code: String,
+        id: String = generateNodeId("code"),
+        language: String? = null,
+        title: String? = null,
+        showLineNumbers: Boolean = true,
+        wrapLines: Boolean = false,
+        showCopyButton: Boolean = true,
+        maxHeightDp: Int? = null,
+        modifier: UiModifier = UiModifier.None
+    ) {
+        add(
+            CodeBlockNode(
+                id = id,
+                code = code,
+                language = language,
+                title = title,
+                showLineNumbers = showLineNumbers,
+                wrapLines = wrapLines,
+                showCopyButton = showCopyButton,
+                maxHeightDp = maxHeightDp,
+                modifier = modifier
+            )
+        )
+    }
+
     internal fun buildChildren(): List<UiNode> = children.toList()
 
     companion object {
@@ -948,7 +1120,7 @@ class ButtonGroupBuilder {
 }
 
 @UiDslMarker
-class SplitButtonMenuBuilder {
+open class ActionMenuBuilder {
     private val items = mutableListOf<ActionMenuItem>()
 
     fun item(
@@ -974,6 +1146,55 @@ class SplitButtonMenuBuilder {
     }
 
     internal fun buildItems(): List<ActionMenuItem> = items.toList()
+}
+
+@UiDslMarker
+class SplitButtonMenuBuilder : ActionMenuBuilder()
+
+@UiDslMarker
+class RadioGroupBuilder {
+    private val options = mutableListOf<RadioOptionItem>()
+
+    fun option(
+        key: String,
+        label: String,
+        subtitle: String? = null,
+        enabled: Boolean = true
+    ) {
+        options.add(
+            RadioOptionItem(
+                key = key,
+                label = label,
+                subtitle = subtitle,
+                enabled = enabled
+            )
+        )
+    }
+
+    internal fun buildOptions(): List<RadioOptionItem> = options.toList()
+}
+
+class AccordionBuilder(
+    val id: String,
+    val title: String,
+    val subtitle: String? = null,
+    val expanded: Boolean = false,
+    val leadingIcon: String? = null,
+    val badgeText: String? = null,
+    val badgeColor: SemanticColor? = null,
+    val modifier: UiModifier = UiModifier.None
+) : UiContainerBuilder() {
+    fun build(): AccordionNode = AccordionNode(
+        id = id,
+        title = title,
+        subtitle = subtitle,
+        expanded = expanded,
+        leadingIcon = leadingIcon,
+        badgeText = badgeText,
+        badgeColor = badgeColor,
+        children = children.toList(),
+        modifier = modifier
+    )
 }
 
 class ScrollableColumnBuilder(

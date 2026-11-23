@@ -1,3 +1,11 @@
+Version: 4.1.0-alpha01
+Date: 23-11-2026
+Added:
+	- Bumped application version to the 4.1.0-alpha01 release cycle with SemVer pre-release support in version comparisons and update detection
+	- SDUI universal modifier enhancements: ShapeRole (`cornerRadius`), native desktop tooltips (`UiModifier.tooltip`), and right-click context menus (`UiModifier.contextMenu`)
+	- Enhanced TextNode (`selectable`, `maxLines`, `overflowEllipsis`) and ImageNode (`zoomable` lightbox viewer)
+	- New high-priority SDUI nodes: RadioGroupNode, NumberInputNode, SearchBarNode, AccordionNode, and CodeBlockNode
+------------------------------------------------------------------------
 Version: 4.0.0
 Date: 16-11-2026
 Added:

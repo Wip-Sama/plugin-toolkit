@@ -202,6 +202,7 @@ Every DSL call inside `uiTree { ... }` builds immutable `UiNode` models with det
 | `scaffold(...) { ... }` | `ScaffoldNode` | `content`, `leftSidebar`, `rightSidebar`, `sidebar`, `topBar`, `bottomBar`, `floatingPanel` |
 | `sidebar(...) { ... }` | `SidebarNode` | `id`, `attachPoint: SidebarAttachPoint`, `title`, `isCollapsible = true`, `isCollapsed = false`, `modifier` |
 | `floatingPanel(...) { ... }` | `FloatingPanelNode` | `id`, `anchor: FloatingAnchor`, `title`, `isCollapsible = true`, `isCollapsed = false`, `compact: Boolean = false`, `modifier` |
+| `accordion(...) { ... }` | `AccordionNode` | `title`, `id`, `subtitle`, `expanded = false`, `leadingIcon`, `badgeText`, `badgeColor`, `modifier` -> `UiEvent.ToggleChanged(nodeId, expanded)` |
 | `tabs(...) { ... }` | `TabsNode` | `selectedTabKey: String`, `tabs: List<TabItem>`, `id`, `modifier`, `contentBlock` |
 | `dialog(...) { ... }` | `DialogNode` | `title`, `id`, `isOpen = true`, `confirmLabel = "OK"`, `dismissLabel = "Cancel"`, `isDestructive = false`, `modifier` |
 | `spacer(...)` | `SpacerNode` | `size: SpacingSize = SpacingSize.MEDIUM`, `id`, `modifier` |
@@ -219,6 +220,9 @@ Every DSL call inside `uiTree { ... }` builds immutable `UiNode` models with det
 | `splitButton(...) { item(...) }` | `SplitButtonNode` | `label`, `primaryAction`, `id`, `iconName`, `isTonal = false`, `menuTooltip`, `modifier`, popup menu items (`key`, `label`, `action`, `iconName`, `isDestructive`, `enabled`, `startsSection`) -> `UiEvent.Click(nodeId, action ?: key)` |
 | `iconButton(...)` | `IconButtonNode` | `iconName`, `id`, `action: String? = null`, `tooltip: String? = null`, `tint: SemanticColor? = null`, `isTonal: Boolean = false`, `modifier` -> `UiEvent.Click(nodeId, action)` |
 | `textInput(...)` | `TextInputNode` | `id`, `text = ""`, `label`, `placeholder`, `singleLine = true`, `debounceMs = 150L`, `revision = 0`, `forceOverwrite = false`, `regexPattern = null`, `maxLength = null`, `isSecret = false`, `modifier` -> `UiEvent.TextChanged(nodeId, text)` |
+| `searchBar(...)` | `SearchBarNode` | `id`, `query = ""`, `suggestions: List<String>`, `placeholder`, `label`, `showClearButton = true`, `action`, `debounceMs = 150L`, `revision = 0`, `forceOverwrite = false`, `modifier` -> `UiEvent.TextChanged` + `UiEvent.Click` |
+| `numberInput(...)` | `NumberInputNode` | `id`, `value = 0.0`, `min`, `max`, `step = 1.0`, `isDecimal = false`, `unitSuffix`, `label`, `placeholder`, `revision = 0`, `forceOverwrite = false`, `modifier` -> `UiEvent.ValueChanged(nodeId, value)` |
+| `radioGroup(...) { option(...) }` | `RadioGroupNode` | `id`, `selectedKey`, `label`, `horizontal = false`, `modifier`, options (`key`, `label`, `subtitle`, `enabled`) -> `UiEvent.OptionSelected(nodeId, key)` |
 | `toggle(...)` | `ToggleNode` | `id`, `checked: Boolean`, `label`, `modifier` -> `UiEvent.ToggleChanged(nodeId, checked)` |
 | `checkbox(...)` | `CheckboxNode` | `checked: Boolean`, `id`, `label`, `modifier` -> `UiEvent.ToggleChanged(nodeId, checked)` |
 | `dropdown(...)` | `DropdownNode` | `id`, `selectedKey: String`, `options: Map<String, String>`, `label`, `modifier` -> `UiEvent.OptionSelected(nodeId, selectedKey)` |
@@ -233,8 +237,9 @@ Every DSL call inside `uiTree { ... }` builds immutable `UiNode` models with det
 
 | DSL Builder | Node Class | Key Parameters |
 | :--- | :--- | :--- |
-| `text(...)` | `TextNode` | `text`, `id`, `role: TypographyRole = TypographyRole.BODY_MEDIUM`, `color: SemanticColor? = null`, `modifier` |
-| `image(...)` | `ImageNode` | `asset: AssetReference`, `id`, `contentDescription`, `contentScale: ImageScale = ImageScale.FIT`, `clickable = false`, `action = null`, `selected = false`, `badgeText = null`, `modifier` |
+| `text(...)` | `TextNode` | `text`, `id`, `role: TypographyRole = TypographyRole.BODY_MEDIUM`, `color: SemanticColor? = null`, `modifier`, `selectable = false`, `maxLines = null`, `overflowEllipsis = false` |
+| `codeBlock(...)` | `CodeBlockNode` | `code`, `id`, `language`, `title`, `showLineNumbers = true`, `wrapLines = false`, `showCopyButton = true`, `maxHeightDp`, `modifier` |
+| `image(...)` | `ImageNode` | `asset: AssetReference`, `id`, `contentDescription`, `contentScale: ImageScale = ImageScale.FIT`, `clickable = false`, `action = null`, `selected = false`, `badgeText = null`, `modifier`, `zoomable = false` |
 | `icon(...)` | `IconNode` | `name: String`, `id`, `tint: SemanticColor? = null`, `size: ControlSize = ControlSize.MEDIUM`, `modifier` |
 | `badge(...)` | `BadgeNode` | `text: String`, `id`, `color: SemanticColor = SemanticColor.PRIMARY`, `modifier` |
 | `progressBar(...)` | `ProgressBarNode` | `id`, `progress: Float? = null` (`null` = indeterminate), `secondaryProgress: Float? = null`, `label`, `statusText`, `isCircular = false`, `color: SemanticColor = SemanticColor.PRIMARY`, `modifier` |
@@ -267,6 +272,11 @@ UiModifier
     .background(SemanticColor.SURFACE)
     .border(SemanticColor.OUTLINE)
     .clipRounded(true)
+    .cornerRadius(ShapeRole.LARGE)     // NONE, EXTRA_SMALL, SMALL, MEDIUM, LARGE, EXTRA_LARGE, PILL
+    .tooltip("Hover help text")        // Universal hover/focus tooltip
+    .contextMenu {                     // Native desktop right-click ContextMenuArea
+        item(key = "copy", label = "Copy", action = "copy_action")
+    }
     .enabled(true)
     .visible(true)
     .shortcut(key = UiShortcut.KEY_DELETE, action = "delete_page", label = "Del")
@@ -287,6 +297,7 @@ UiModifier
   - Solid Tonal Elevation & Text Hierarchy: `SURFACE`, `SURFACE_CONTAINER_LOWEST`, `SURFACE_CONTAINER_LOW`, `SURFACE_CONTAINER`, `SURFACE_CONTAINER_HIGH`, `SURFACE_CONTAINER_HIGHEST`, `ON_SURFACE`, `ON_SURFACE_VARIANT`, `OUTLINE`
   - Semantic Status Fills & Containers: `INFO`, `INFO_CONTAINER`, `SUCCESS`, `SUCCESS_CONTAINER`, `WARNING`, `WARNING_CONTAINER`
 - **`ControlSize`**: `SMALL`, `MEDIUM`, `LARGE`
+- **`ShapeRole`**: `NONE`, `EXTRA_SMALL`, `SMALL`, `MEDIUM`, `LARGE`, `EXTRA_LARGE`, `PILL`
 - **`ImageScale`**: `FIT`, `CROP`, `FILL_BOUNDS`, `INSIDE`
 - **`FloatingAnchor`**: `TOP_START`, `TOP_CENTER`, `TOP_END`, `BOTTOM_START`, `BOTTOM_CENTER`, `BOTTOM_END`, `CENTER_START`, `CENTER_END`, `CENTER`
 - **`SidebarAttachPoint`**: `LEFT`, `TOP`, `RIGHT`, `BOTTOM`
@@ -300,8 +311,8 @@ The host resolves icon names case-insensitively after trimming and normalizing `
 
 - **Files, Media & Content:** `folder`, `folder_open`, `image`, `article`, `description`, `book`, `chapter`, `code`, `list`, `grid_view`, `grid`, `layers`
 - **Upload, Sync & Cloud:** `upload`, `download`, `sync`, `cloud_done`, `cloud_upload`, `cloud_download`, `publish`, `refresh`, `send`, `open_in_new`
-- **Actions & Editing:** `add`, `plus`, `edit`, `delete`, `trash`, `save`, `close`, `search`, `filter`, `filter_list`, `undo`, `redo`, `more_vert`
-- **Ordering & Navigation:** `drag_indicator`, `drag`, `reorder`, `swap_vert`, `arrow_back`, `arrow_forward`, `arrow_upward`, `arrow_downward`
+- **Actions & Editing:** `add`, `plus`, `edit`, `delete`, `trash`, `save`, `close`, `clear`, `copy`, `content_copy`, `search`, `filter`, `filter_list`, `undo`, `redo`, `more_vert`
+- **Ordering & Navigation:** `drag_indicator`, `drag`, `reorder`, `swap_vert`, `arrow_back`, `arrow_forward`, `arrow_upward`, `arrow_downward`, `expand_more`, `expand_less`, `chevron_right`
 - **Status & Notifications:** `check`, `done`, `check_circle`, `warning`, `error`, `info`, `notifications`, `schedule`, `history`, `star`
 - **Security, Visibility & Transport:** `lock`, `unlock`, `lock_open`, `key`, `visibility`, `eye`, `visibility_off`, `settings`, `play`, `pause`, `stop`
 - **Spatial Board Tools:** `zoom_in`, `zoom_out`, `fit_screen`, `pan_tool`, `pan`, `select`, `brush`, `crop_square`, `rectangle`, `text_fields`, `text`, `chat_bubble`, `callout`

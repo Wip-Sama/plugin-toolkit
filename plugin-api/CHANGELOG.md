@@ -2,6 +2,11 @@
 
 All notable changes to the Plugin API will be documented in this file.
 
+## 4.1.0-alpha01
+- Added `ShapeRole` and universal `UiModifier` properties (`tooltip`, `contextMenu`, `cornerRadius`) with `@JvmOverloads` and fluent helpers.
+- Extended `TextNode` (`selectable`, `maxLines`, `overflowEllipsis`) and `ImageNode` (`zoomable`) with backward-compatible defaults.
+- Added `RadioGroupNode` (`RadioOptionItem`), `NumberInputNode`, `SearchBarNode`, `AccordionNode`, and `CodeBlockNode` alongside corresponding DSL builders in `UiContainerBuilder`.
+
 - Initial Maven publication to GitHub Packages.
 - Standardized plugin manifest models and loading logic.
 - KSP processor for automatic plugin manifest generation.

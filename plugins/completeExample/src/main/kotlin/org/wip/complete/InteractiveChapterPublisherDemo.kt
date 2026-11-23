@@ -23,6 +23,7 @@ import org.wip.plugintoolkit.api.sdui.ChipItem
 import org.wip.plugintoolkit.api.sdui.ControlSize
 import org.wip.plugintoolkit.api.sdui.ImageScale
 import org.wip.plugintoolkit.api.sdui.SemanticColor
+import org.wip.plugintoolkit.api.sdui.ShapeRole
 import org.wip.plugintoolkit.api.sdui.SpacingSize
 import org.wip.plugintoolkit.api.sdui.TabItem
 import org.wip.plugintoolkit.api.sdui.TypographyRole
@@ -75,6 +76,9 @@ private data class ChapterPublisherState(
     val secretConfigured: Boolean = false,
     val linkedRepoPath: String = "",
     val webhookStatus: String? = null,
+    val publishPriority: String = "BALANCED",
+    val batchSize: Int = 4,
+    val showManifestAccordion: Boolean = false,
     val isLoading: Boolean = true,
     val showConfirmDialog: Boolean = false,
     val pendingPushIds: List<String> = emptyList(),
@@ -476,12 +480,15 @@ internal fun runChapterPublisherSession(
                     }
                 }
                 is UiEvent.ValueChanged -> {
-                    if (event.nodeId == "pub_chapters_split" ||
-                        event.nodeId == "pub_series_split" ||
-                        event.nodeId == "pub_images_split"
-                    ) {
-                        val clamped = event.value.toFloat().coerceIn(0.25f, 0.75f)
-                        stateFlow.update { it.copy(splitFraction = clamped) }
+                    when (event.nodeId) {
+                        "pub_chapters_split", "pub_series_split", "pub_images_split" -> {
+                            val clamped = event.value.toFloat().coerceIn(0.25f, 0.75f)
+                            stateFlow.update { it.copy(splitFraction = clamped) }
+                        }
+                        "cfg_batch_size_input" -> {
+                            val clamped = event.value.toInt().coerceIn(1, 20)
+                            stateFlow.update { it.copy(batchSize = clamped) }
+                        }
                     }
                 }
                 is UiEvent.ItemsReordered -> {
@@ -520,10 +527,16 @@ internal fun runChapterPublisherSession(
                         "series_sort_dropdown" -> {
                             stateFlow.update { it.copy(seriesSortMode = event.selectedKey) }
                         }
+                        "cfg_priority_radio" -> {
+                            stateFlow.update { it.copy(publishPriority = event.selectedKey) }
+                        }
                     }
                 }
                 is UiEvent.ToggleChanged -> {
                     when {
+                        event.nodeId == "cfg_manifest_accordion" -> {
+                            stateFlow.update { it.copy(showManifestAccordion = event.checked) }
+                        }
                         event.nodeId == "pub_select_all_chk" -> {
                             stateFlow.update { current ->
                                 val visibleIds = filteredChapters(current).map { it.id }.toSet()
@@ -1367,12 +1380,14 @@ private fun UiContainerBuilder.renderSeriesLevel(
                 modifier = UiModifier.fillMaxSize().padding(SpacingSize.SMALL)
             ) {
                 row(id = "pub_series_controls_row", spacing = SpacingSize.SMALL, modifier = UiModifier.fillMaxWidth()) {
-                    textInput(
+                    searchBar(
                         id = "pub_series_search_input",
-                        text = state.seriesSearchQuery,
+                        query = state.seriesSearchQuery,
+                        suggestions = state.seriesList.map { it.title }.distinct(),
                         label = "Filter Series",
                         placeholder = "Search title or author...",
-                        modifier = UiModifier.weight(1f)
+                        action = "submit_series_search",
+                        modifier = UiModifier.weight(1f).tooltip("Filter catalog by series title or author")
                     )
                     dropdown(
                         id = "series_sort_dropdown",
@@ -1419,6 +1434,29 @@ private fun UiContainerBuilder.renderSeriesLevel(
                                 badgeColor = if (pendingCount > 0) SemanticColor.WARNING else SemanticColor.SUCCESS,
                                 selected = series.id == state.selectedSeriesId,
                                 action = "select_series:${series.id}",
+                                modifier = UiModifier
+                                    .cornerRadius(ShapeRole.MEDIUM)
+                                    .tooltip("Right-click for series actions")
+                                    .contextMenu {
+                                        item(
+                                            key = "open_series",
+                                            label = "Open Chapters",
+                                            action = "select_series:${series.id}",
+                                            iconName = "layers"
+                                        )
+                                        item(
+                                            key = "move_up",
+                                            label = "Move Earlier",
+                                            action = "move_series_up:${series.id}",
+                                            iconName = "arrow_upward"
+                                        )
+                                        item(
+                                            key = "move_down",
+                                            label = "Move Later",
+                                            action = "move_series_down:${series.id}",
+                                            iconName = "arrow_downward"
+                                        )
+                                    },
                                 trailingBlock = {
                                     iconButton(
                                         id = "series_up_btn_${series.id}",
@@ -1888,7 +1926,12 @@ private fun UiContainerBuilder.renderImagesLevel(
                             contentDescription = activePage.label,
                             contentScale = ImageScale.FIT,
                             badgeText = "#${activeIdx + 1}",
-                            modifier = UiModifier.fillMaxWidth().height(230)
+                            zoomable = true,
+                            modifier = UiModifier
+                                .fillMaxWidth()
+                                .height(230)
+                                .cornerRadius(ShapeRole.LARGE)
+                                .tooltip("Click or use zoom button to inspect full page")
                         )
                         row(id = "img_preview_actions", spacing = SpacingSize.SMALL) {
                             button(
@@ -2047,6 +2090,53 @@ private fun UiContainerBuilder.renderSettingsTab(
                 ),
                 label = "Target Environment"
             )
+            radioGroup(
+                id = "cfg_priority_radio",
+                selectedKey = state.publishPriority,
+                label = "Publishing Priority",
+                horizontal = true
+            ) {
+                option(key = "FAST", label = "Fast", subtitle = "Parallel chapters")
+                option(key = "BALANCED", label = "Balanced", subtitle = "Throttled queue")
+                option(key = "SAFE", label = "Strict", subtitle = "Sequential verified")
+            }
+            numberInput(
+                id = "cfg_batch_size_input",
+                value = state.batchSize.toDouble(),
+                min = 1.0,
+                max = 20.0,
+                step = 1.0,
+                unitSuffix = "ch/batch",
+                label = "Max Batch Size"
+            )
+            accordion(
+                id = "cfg_manifest_accordion",
+                title = "Publisher Runtime Snapshot",
+                subtitle = "Inspect serialized runtime config",
+                expanded = state.showManifestAccordion,
+                leadingIcon = "code",
+                badgeText = "JSON",
+                badgeColor = SemanticColor.INFO
+            ) {
+                text(
+                    id = "cfg_snapshot_summary",
+                    text = "Env: ${state.environment} | Priority: ${state.publishPriority} | Batch Size: ${state.batchSize}",
+                    role = TypographyRole.BODY_SMALL,
+                    selectable = true,
+                    maxLines = 1,
+                    overflowEllipsis = true,
+                    modifier = UiModifier.tooltip("Copyable runtime summary").cornerRadius(ShapeRole.SMALL)
+                )
+                codeBlock(
+                    id = "cfg_manifest_code_block",
+                    code = "{\n  \"environment\": \"${state.environment}\",\n  \"priority\": \"${state.publishPriority}\",\n  \"batchSize\": ${state.batchSize}\n}",
+                    language = "json",
+                    title = "publisher-config.json",
+                    showLineNumbers = true,
+                    showCopyButton = true,
+                    maxHeightDp = 200
+                )
+            }
             text(
                 id = "cfg_user_info",
                 text = "Signed-in User ID (live from settingsFlow): $userId",

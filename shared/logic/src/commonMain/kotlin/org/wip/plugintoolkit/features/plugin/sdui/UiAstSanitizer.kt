@@ -1,17 +1,21 @@
 package org.wip.plugintoolkit.features.plugin.sdui
 
+import org.wip.plugintoolkit.api.sdui.AccordionNode
 import org.wip.plugintoolkit.api.sdui.BoardLayer
 import org.wip.plugintoolkit.api.sdui.BoardNode
 import org.wip.plugintoolkit.api.sdui.BoxNode
 import org.wip.plugintoolkit.api.sdui.ButtonGroupNode
 import org.wip.plugintoolkit.api.sdui.CardNode
+import org.wip.plugintoolkit.api.sdui.CodeBlockNode
 import org.wip.plugintoolkit.api.sdui.ColumnNode
 import org.wip.plugintoolkit.api.sdui.DialogNode
 import org.wip.plugintoolkit.api.sdui.ErrorBoundaryNode
 import org.wip.plugintoolkit.api.sdui.FloatingPanelNode
 import org.wip.plugintoolkit.api.sdui.GridNode
 import org.wip.plugintoolkit.api.sdui.ListItemNode
+import org.wip.plugintoolkit.api.sdui.NumberInputNode
 import org.wip.plugintoolkit.api.sdui.ProgressBarNode
+import org.wip.plugintoolkit.api.sdui.RadioGroupNode
 import org.wip.plugintoolkit.api.sdui.RowNode
 import org.wip.plugintoolkit.api.sdui.ScaffoldNode
 import org.wip.plugintoolkit.api.sdui.ScrollableColumnNode
@@ -21,6 +25,7 @@ import org.wip.plugintoolkit.api.sdui.SliderNode
 import org.wip.plugintoolkit.api.sdui.SplitButtonNode
 import org.wip.plugintoolkit.api.sdui.SplitPaneNode
 import org.wip.plugintoolkit.api.sdui.TabsNode
+import org.wip.plugintoolkit.api.sdui.TextNode
 import org.wip.plugintoolkit.api.sdui.UiNode
 import org.wip.plugintoolkit.api.sdui.UiNodeTree
 
@@ -195,7 +200,67 @@ object UiAstSanitizer {
                 }
             }
 
+            for (menuItem in node.modifier.contextMenu) {
+                if (menuItem.key.isBlank() || menuItem.label.isBlank()) {
+                    return ErrorBoundaryNode(
+                        id = node.id,
+                        errorMessage = "Invalid contextMenu item on '${node.id}': key and label must not be blank",
+                        failedNodeType = node::class.simpleName
+                    )
+                }
+            }
+
             // Validate component-specific invariants
+            if (node is TextNode) {
+                val maxLines = node.maxLines
+                if (maxLines != null && maxLines <= 0) {
+                    return ErrorBoundaryNode(
+                        id = node.id,
+                        errorMessage = "Invalid TextNode '${node.id}': maxLines=$maxLines must be > 0",
+                        failedNodeType = "TextNode"
+                    )
+                }
+            }
+
+            if (node is RadioGroupNode) {
+                val seenOptionKeys = mutableSetOf<String>()
+                for (option in node.options) {
+                    if (option.key.isBlank() || option.label.isBlank() || !seenOptionKeys.add(option.key)) {
+                        return ErrorBoundaryNode(
+                            id = node.id,
+                            errorMessage = "Invalid RadioGroupNode '${node.id}': option keys/labels must be non-blank and unique",
+                            failedNodeType = "RadioGroupNode"
+                        )
+                    }
+                }
+            }
+
+            if (node is NumberInputNode) {
+                val invalidFloat = node.value.isNaN() || node.value.isInfinite() ||
+                    node.step.isNaN() || node.step.isInfinite() || node.step <= 0.0 ||
+                    (node.min != null && (node.min!!.isNaN() || node.min!!.isInfinite())) ||
+                    (node.max != null && (node.max!!.isNaN() || node.max!!.isInfinite())) ||
+                    (node.min != null && node.max != null && node.min!! > node.max!!)
+                if (invalidFloat) {
+                    return ErrorBoundaryNode(
+                        id = node.id,
+                        errorMessage = "Malformed number input range on '${node.id}': min=${node.min}, max=${node.max}, step=${node.step}, value=${node.value}",
+                        failedNodeType = "NumberInputNode"
+                    )
+                }
+            }
+
+            if (node is CodeBlockNode) {
+                val maxHeight = node.maxHeightDp
+                if (maxHeight != null && maxHeight <= 0) {
+                    return ErrorBoundaryNode(
+                        id = node.id,
+                        errorMessage = "Invalid CodeBlockNode '${node.id}': maxHeightDp=$maxHeight must be > 0",
+                        failedNodeType = "CodeBlockNode"
+                    )
+                }
+            }
+
             if (node is SliderNode) {
                 if (node.min.isNaN() || node.max.isNaN() || node.value.isNaN() || node.min >= node.max) {
                     return ErrorBoundaryNode(
@@ -286,6 +351,7 @@ object UiAstSanitizer {
                 )
                 is FloatingPanelNode -> node.copy(children = node.children.map { sanitizeNode(it, depth + 1) })
                 is SidebarNode -> node.copy(children = node.children.map { sanitizeNode(it, depth + 1) })
+                is AccordionNode -> node.copy(children = node.children.map { sanitizeNode(it, depth + 1) })
                 is BoardNode -> {
                     val seenLayerIds = mutableSetOf<String>()
                     val sanitizedLayers = mutableListOf<BoardLayer>()

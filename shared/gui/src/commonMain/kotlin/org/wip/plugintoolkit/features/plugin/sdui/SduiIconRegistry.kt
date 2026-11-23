@@ -16,11 +16,14 @@ import androidx.compose.material.icons.filled.Brush
 import androidx.compose.material.icons.filled.ChatBubble
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.CropSquare
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
@@ -28,6 +31,8 @@ import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.DragIndicator
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.FitScreen
 import androidx.compose.material.icons.filled.Folder
@@ -146,7 +151,13 @@ object SduiIconRegistry {
         "open_in_new" to Icons.AutoMirrored.Filled.OpenInNew,
         "folder_open" to Icons.Default.FolderOpen,
         "description" to Icons.Default.Description,
-        "article" to Icons.Default.Description
+        "article" to Icons.Default.Description,
+        "copy" to Icons.Default.ContentCopy,
+        "content_copy" to Icons.Default.ContentCopy,
+        "expand_more" to Icons.Default.ExpandMore,
+        "expand_less" to Icons.Default.ExpandLess,
+        "chevron_right" to Icons.Default.ChevronRight,
+        "clear" to Icons.Default.Clear
     )
 
     /**

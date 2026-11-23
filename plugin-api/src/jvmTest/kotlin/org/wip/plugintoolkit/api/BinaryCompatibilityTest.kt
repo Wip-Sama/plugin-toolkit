@@ -178,4 +178,63 @@ class BinaryCompatibilityTest {
         legacyReporter.reportSecondary(0.5f)
         legacyReporter.clearSecondary()
     }
+
+    @Test
+    fun testBatch1SduiLegacyConstructorsExistInJvmBytecode() {
+        val modifierConstructor = org.wip.plugintoolkit.api.sdui.UiModifier::class.java.getConstructor(
+            org.wip.plugintoolkit.api.sdui.SpacingSize::class.java,
+            Float::class.javaObjectType,
+            Float::class.javaObjectType,
+            Float::class.javaObjectType,
+            Int::class.javaObjectType,
+            Int::class.javaObjectType,
+            Int::class.javaObjectType,
+            Int::class.javaObjectType,
+            Int::class.javaObjectType,
+            Int::class.javaObjectType,
+            Float::class.javaObjectType,
+            org.wip.plugintoolkit.api.sdui.AlignmentRole::class.java,
+            org.wip.plugintoolkit.api.sdui.ControlSize::class.java,
+            org.wip.plugintoolkit.api.sdui.SemanticColor::class.java,
+            org.wip.plugintoolkit.api.sdui.SemanticColor::class.java,
+            Boolean::class.javaPrimitiveType,
+            Boolean::class.javaPrimitiveType,
+            Boolean::class.javaPrimitiveType,
+            List::class.java,
+            org.wip.plugintoolkit.api.sdui.UiDropTarget::class.java
+        )
+        assertNotNull(modifierConstructor, "20-arg legacy constructor for UiModifier must exist")
+
+        val textConstructor = org.wip.plugintoolkit.api.sdui.TextNode::class.java.getConstructor(
+            String::class.java,
+            String::class.java,
+            org.wip.plugintoolkit.api.sdui.TypographyRole::class.java,
+            org.wip.plugintoolkit.api.sdui.SemanticColor::class.java,
+            org.wip.plugintoolkit.api.sdui.UiModifier::class.java
+        )
+        assertNotNull(textConstructor, "5-arg legacy constructor for TextNode must exist")
+        val textNode = textConstructor.newInstance(
+            "t1",
+            "Legacy",
+            org.wip.plugintoolkit.api.sdui.TypographyRole.BODY_MEDIUM,
+            null,
+            org.wip.plugintoolkit.api.sdui.UiModifier.None
+        )
+        assertEquals(false, textNode.selectable)
+        assertEquals(null, textNode.maxLines)
+        assertEquals(false, textNode.overflowEllipsis)
+
+        val imageConstructor = org.wip.plugintoolkit.api.sdui.ImageNode::class.java.getConstructor(
+            String::class.java,
+            org.wip.plugintoolkit.api.sdui.AssetReference::class.java,
+            String::class.java,
+            org.wip.plugintoolkit.api.sdui.UiModifier::class.java,
+            org.wip.plugintoolkit.api.sdui.ImageScale::class.java,
+            Boolean::class.javaPrimitiveType,
+            String::class.java,
+            Boolean::class.javaPrimitiveType,
+            String::class.java
+        )
+        assertNotNull(imageConstructor, "9-arg legacy constructor for ImageNode must exist")
+    }
 }

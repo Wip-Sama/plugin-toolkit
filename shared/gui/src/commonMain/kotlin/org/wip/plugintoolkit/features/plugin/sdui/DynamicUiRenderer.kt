@@ -36,6 +36,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
@@ -46,6 +47,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.ZoomIn
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -99,6 +101,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
@@ -116,6 +119,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import org.jetbrains.compose.resources.stringResource
+import org.wip.plugintoolkit.api.sdui.AccordionNode
 import org.wip.plugintoolkit.api.sdui.AlertBannerNode
 import org.wip.plugintoolkit.api.sdui.AlignmentRole
 import org.wip.plugintoolkit.api.sdui.BadgeNode
@@ -126,6 +130,7 @@ import org.wip.plugintoolkit.api.sdui.ButtonNode
 import org.wip.plugintoolkit.api.sdui.CardNode
 import org.wip.plugintoolkit.api.sdui.CheckboxNode
 import org.wip.plugintoolkit.api.sdui.ChipGroupNode
+import org.wip.plugintoolkit.api.sdui.CodeBlockNode
 import org.wip.plugintoolkit.api.sdui.ColumnNode
 import org.wip.plugintoolkit.api.sdui.ControlSize
 import org.wip.plugintoolkit.api.sdui.DialogNode
@@ -141,12 +146,16 @@ import org.wip.plugintoolkit.api.sdui.IconNode
 import org.wip.plugintoolkit.api.sdui.ImageNode
 import org.wip.plugintoolkit.api.sdui.ImageScale
 import org.wip.plugintoolkit.api.sdui.ListItemNode
+import org.wip.plugintoolkit.api.sdui.NumberInputNode
 import org.wip.plugintoolkit.api.sdui.ProgressBarNode
+import org.wip.plugintoolkit.api.sdui.RadioGroupNode
 import org.wip.plugintoolkit.api.sdui.RowNode
 import org.wip.plugintoolkit.api.sdui.ScaffoldNode
 import org.wip.plugintoolkit.api.sdui.ScrollableColumnNode
 import org.wip.plugintoolkit.api.sdui.ScrollableRowNode
+import org.wip.plugintoolkit.api.sdui.SearchBarNode
 import org.wip.plugintoolkit.api.sdui.SemanticColor
+import org.wip.plugintoolkit.api.sdui.ShapeRole
 import org.wip.plugintoolkit.api.sdui.SidebarAttachPoint
 import org.wip.plugintoolkit.api.sdui.SidebarNode
 import org.wip.plugintoolkit.api.sdui.SliderNode
@@ -164,6 +173,8 @@ import org.wip.plugintoolkit.api.sdui.UiModifier
 import org.wip.plugintoolkit.api.sdui.UiNode
 import org.wip.plugintoolkit.api.sdui.UnknownNode
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
+import org.wip.plugintoolkit.core.utils.PlatformContextMenuArea
+import org.wip.plugintoolkit.core.utils.PlatformContextMenuItem
 import org.wip.plugintoolkit.core.utils.PlatformHorizontalScrollbar
 import org.wip.plugintoolkit.core.utils.PlatformUtils
 import org.wip.plugintoolkit.core.utils.PlatformVerticalScrollbar
@@ -172,6 +183,7 @@ import plugintoolkit.composeapp.generated.resources.sdui_cancel
 import plugintoolkit.composeapp.generated.resources.sdui_confirm
 import plugintoolkit.composeapp.generated.resources.sdui_error_boundary_title
 import plugintoolkit.composeapp.generated.resources.sdui_hide_secret
+import plugintoolkit.composeapp.generated.resources.sdui_image_zoom_open
 import plugintoolkit.composeapp.generated.resources.sdui_resize_pane
 import plugintoolkit.composeapp.generated.resources.sdui_show_secret
 import plugintoolkit.composeapp.generated.resources.sdui_toggle_panel
@@ -312,6 +324,11 @@ internal fun resolveContainerSpacing(
         it is CardNode ||
             it is TextInputNode ||
             it is DropdownNode ||
+            it is RadioGroupNode ||
+            it is NumberInputNode ||
+            it is SearchBarNode ||
+            it is AccordionNode ||
+            it is CodeBlockNode ||
             it is AlertBannerNode ||
             it is SplitPaneNode ||
             it is TabsNode ||
@@ -329,7 +346,7 @@ internal fun resolveContainerSpacing(
  * Applies desktop form width normalization when a field does not specify explicit sizing constraints.
  */
 @Composable
-private fun Modifier.withFormWidthConstraint(uiModifier: UiModifier): Modifier {
+internal fun Modifier.withFormWidthConstraint(uiModifier: UiModifier): Modifier {
     val hasExplicitWidth = uiModifier.widthDp != null ||
         uiModifier.fillMaxWidth != null ||
         uiModifier.maxWidthDp != null
@@ -369,7 +386,24 @@ fun RenderUiNode(
             onEvent = onEvent
         )
 
-    when (node) {
+    val contextMenuEntries = remember(node.id, modifierSpec.contextMenu, onEvent) {
+        modifierSpec.contextMenu
+            .filter { it.enabled }
+            .map { item ->
+                PlatformContextMenuItem(label = item.label) {
+                    onEvent(UiEvent.Click(node.id, item.action ?: item.key))
+                }
+            }
+    }
+    val effectiveTooltip = when {
+        node is DialogNode -> null
+        node is IconButtonNode && (!node.tooltip.isNullOrBlank() || !modifierSpec.tooltip.isNullOrBlank()) -> null
+        else -> modifierSpec.tooltip
+    }
+
+    PlatformContextMenuArea(items = contextMenuEntries, enabled = modifierSpec.enabled) {
+        SduiTooltipBox(tooltip = effectiveTooltip) {
+            when (node) {
         is ColumnNode -> {
             val spacingDp = resolveContainerSpacing(node.spacing, node.children, isVertical = true)
             val horizontalAlignment = node.modifier.alignment?.toHorizontalAlignment() ?: Alignment.Start
@@ -500,14 +534,38 @@ fun RenderUiNode(
 
         is TextNode -> {
             val singleLineHeader = LocalInSingleLineHeader.current
-            Text(
-                text = node.text,
-                style = node.role.toTextStyle(),
-                color = node.color?.toComposeColor() ?: MaterialTheme.colorScheme.onSurface,
-                maxLines = if (singleLineHeader) 1 else Int.MAX_VALUE,
-                overflow = if (singleLineHeader) TextOverflow.Ellipsis else TextOverflow.Clip,
-                modifier = appliedModifier
-            )
+            val resolvedMaxLines = when {
+                singleLineHeader -> 1
+                node.maxLines != null -> node.maxLines!!.coerceAtLeast(1)
+                else -> Int.MAX_VALUE
+            }
+            val resolvedOverflow = if (singleLineHeader || node.overflowEllipsis) {
+                TextOverflow.Ellipsis
+            } else {
+                TextOverflow.Clip
+            }
+            val textColor = node.color?.toComposeColor() ?: MaterialTheme.colorScheme.onSurface
+            if (node.selectable) {
+                SelectionContainer(modifier = appliedModifier) {
+                    Text(
+                        text = node.text,
+                        style = node.role.toTextStyle(),
+                        color = textColor,
+                        maxLines = resolvedMaxLines,
+                        overflow = resolvedOverflow,
+                        modifier = Modifier.pointerHoverIcon(PointerIcon.Text)
+                    )
+                }
+            } else {
+                Text(
+                    text = node.text,
+                    style = node.role.toTextStyle(),
+                    color = textColor,
+                    maxLines = resolvedMaxLines,
+                    overflow = resolvedOverflow,
+                    modifier = appliedModifier
+                )
+            }
         }
 
         is ButtonNode -> {
@@ -635,6 +693,26 @@ fun RenderUiNode(
             RenderDropdown(node = node, onEvent = onEvent, modifier = appliedModifier)
         }
 
+        is RadioGroupNode -> {
+            RenderRadioGroup(node = node, onEvent = onEvent, modifier = appliedModifier)
+        }
+
+        is NumberInputNode -> {
+            RenderNumberInput(node = node, onEvent = onEvent, modifier = appliedModifier)
+        }
+
+        is SearchBarNode -> {
+            RenderSearchBar(node = node, onEvent = onEvent, modifier = appliedModifier)
+        }
+
+        is AccordionNode -> {
+            RenderAccordion(node = node, onEvent = onEvent, modifier = appliedModifier)
+        }
+
+        is CodeBlockNode -> {
+            RenderCodeBlock(node = node, modifier = appliedModifier)
+        }
+
         is ImageNode -> {
             RenderImageNode(node = node, onEvent = onEvent, modifier = appliedModifier)
         }
@@ -759,6 +837,8 @@ fun RenderUiNode(
         is ScrollableRowNode -> {
             RenderScrollableRow(node = node, onEvent = onEvent, modifier = appliedModifier)
         }
+            }
+        }
     }
 }
 
@@ -767,7 +847,7 @@ fun RenderUiNode(
  * to prevent cursor jumping and asynchronous typing overwrite races.
  */
 @Composable
-private fun sduiOutlinedTextFieldColors() = OutlinedTextFieldDefaults.colors(
+internal fun sduiOutlinedTextFieldColors() = OutlinedTextFieldDefaults.colors(
     unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
     focusedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
     disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
@@ -857,8 +937,9 @@ private fun RenderImageNode(
         ImageScale.FILL_BOUNDS -> ContentScale.FillBounds
         ImageScale.INSIDE -> ContentScale.Inside
     }
+    var zoomDialogOpen by remember(node.id) { mutableStateOf(false) }
     val isInteractive = node.clickable || node.action != null
-    val hasOverlayOrFrame = isInteractive || node.selected || !node.badgeText.isNullOrBlank()
+    val hasOverlayOrFrame = isInteractive || node.selected || !node.badgeText.isNullOrBlank() || node.zoomable
     val hasBoundedExtent = node.modifier.heightDp != null ||
         node.modifier.fillMaxHeight != null ||
         node.modifier.aspectRatio != null
@@ -878,29 +959,33 @@ private fun RenderImageNode(
     val isHovered by interactionSource.collectIsHoveredAsState()
     val borderStroke = when {
         node.selected -> BorderStroke(ToolkitTheme.dimensions.borderSelected, MaterialTheme.colorScheme.primary)
-        isHovered && isInteractive -> BorderStroke(
+        isHovered && (isInteractive || node.zoomable) -> BorderStroke(
             ToolkitTheme.dimensions.borderUnselected,
             MaterialTheme.colorScheme.primary.copy(alpha = ToolkitTheme.opacity.high)
         )
-        isInteractive -> BorderStroke(
+        isInteractive || node.zoomable -> BorderStroke(
             ToolkitTheme.dimensions.borderUnselected,
             MaterialTheme.colorScheme.outlineVariant.copy(alpha = ToolkitTheme.opacity.divider)
         )
         else -> null
     }
-    val shape = if (node.modifier.clipRounded) {
-        ToolkitTheme.shapes.medium
+    val shape = if (node.modifier.cornerRadius != null || node.modifier.clipRounded) {
+        resolveUiModifierShape(node.modifier)
     } else {
         ToolkitTheme.shapes.small
     }
 
+    val onImageClick: (() -> Unit)? = when {
+        isInteractive -> { { onEvent(UiEvent.Click(node.id, node.action)) } }
+        node.zoomable -> { { zoomDialogOpen = true } }
+        else -> null
+    }
+
     Surface(
         modifier = modifier.then(
-            if (isInteractive) {
+            if (onImageClick != null) {
                 Modifier
-                    .clickable(interactionSource = interactionSource, indication = null) {
-                        onEvent(UiEvent.Click(node.id, node.action))
-                    }
+                    .clickable(interactionSource = interactionSource, indication = null, onClick = onImageClick)
                     .pointerHoverIcon(PointerIcon.Hand)
             } else {
                 Modifier.hoverable(interactionSource = interactionSource)
@@ -917,6 +1002,40 @@ private fun RenderImageNode(
                 contentScale = contentScale,
                 modifier = imageFillModifier
             )
+            if (node.zoomable) {
+                val zoomLabel = stringResource(Res.string.sdui_image_zoom_open)
+                SduiTooltipBox(
+                    tooltip = zoomLabel,
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(ToolkitTheme.spacing.xs)
+                ) {
+                    Surface(
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(
+                            alpha = ToolkitTheme.opacity.almostOpaque
+                        ),
+                        border = BorderStroke(
+                            ToolkitTheme.dimensions.borderUnselected,
+                            MaterialTheme.colorScheme.outlineVariant.copy(alpha = ToolkitTheme.opacity.divider)
+                        )
+                    ) {
+                        IconButton(
+                            onClick = { zoomDialogOpen = true },
+                            modifier = Modifier
+                                .size(ToolkitTheme.dimensions.denseIconButtonSize)
+                                .pointerHoverIcon(PointerIcon.Hand)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.ZoomIn,
+                                contentDescription = zoomLabel,
+                                tint = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
+                            )
+                        }
+                    }
+                }
+            }
             node.badgeText?.takeIf { it.isNotBlank() }?.let { badge ->
                 Surface(
                     modifier = Modifier
@@ -954,6 +1073,14 @@ private fun RenderImageNode(
                 }
             }
         }
+    }
+
+    if (zoomDialogOpen && node.zoomable) {
+        SduiImageZoomDialog(
+            asset = node.asset,
+            contentDescription = node.contentDescription,
+            onDismiss = { zoomDialogOpen = false }
+        )
     }
 }
 
@@ -1556,7 +1683,8 @@ private fun RenderIconButton(
     }
     val iconSize = if (isDense) ToolkitTheme.dimensions.denseIconSize else ToolkitTheme.dimensions.iconMedium
 
-    SduiTooltipBox(tooltip = node.tooltip) {
+    val tooltipText = node.tooltip ?: node.modifier.tooltip
+    SduiTooltipBox(tooltip = tooltipText) {
         IconButton(
             onClick = { onEvent(UiEvent.Click(node.id, action)) },
             enabled = node.modifier.enabled,
@@ -1571,7 +1699,7 @@ private fun RenderIconButton(
         ) {
             Icon(
                 imageVector = SduiIconRegistry.resolve(node.iconName),
-                contentDescription = node.tooltip ?: node.iconName,
+                contentDescription = tooltipText ?: node.iconName,
                 tint = tint,
                 modifier = Modifier.size(iconSize)
             )
@@ -2540,8 +2668,28 @@ private fun UiNode.containsScrollableOrWeightedContent(): Boolean {
         is ColumnNode -> children.any { it.containsScrollableOrWeightedContent() }
         is BoxNode -> children.any { it.containsScrollableOrWeightedContent() }
         is RowNode -> children.any { it.containsScrollableOrWeightedContent() }
+        is AccordionNode -> children.any { it.containsScrollableOrWeightedContent() }
         is TabsNode -> content.containsScrollableOrWeightedContent()
         else -> false
+    }
+}
+
+/**
+ * Resolves the active Compose [Shape] from a [UiModifier]'s semantic corner radius or `clipRounded` flag.
+ */
+@Composable
+internal fun resolveUiModifierShape(uiModifier: UiModifier): Shape = when (uiModifier.cornerRadius) {
+    ShapeRole.NONE -> RoundedCornerShape(ToolkitTheme.spacing.none)
+    ShapeRole.EXTRA_SMALL -> ToolkitTheme.shapes.extraSmall
+    ShapeRole.SMALL -> ToolkitTheme.shapes.small
+    ShapeRole.MEDIUM -> ToolkitTheme.shapes.medium
+    ShapeRole.LARGE -> ToolkitTheme.shapes.large
+    ShapeRole.EXTRA_LARGE -> ToolkitTheme.shapes.extraLarge
+    ShapeRole.PILL -> ToolkitTheme.shapes.pill
+    null -> if (uiModifier.clipRounded) {
+        ToolkitTheme.shapes.medium
+    } else {
+        RoundedCornerShape(ToolkitTheme.spacing.none)
     }
 }
 
@@ -2576,12 +2724,8 @@ fun Modifier.applyUiModifier(uiModifier: UiModifier): Modifier {
     uiModifier.aspectRatio?.let { ratio ->
         mod = mod.aspectRatio(ratio)
     }
-    val cornerShape = if (uiModifier.clipRounded) {
-        ToolkitTheme.shapes.medium
-    } else {
-        RoundedCornerShape(ToolkitTheme.spacing.none)
-    }
-    if (uiModifier.clipRounded) {
+    val cornerShape = resolveUiModifierShape(uiModifier)
+    if (uiModifier.clipRounded || uiModifier.cornerRadius != null) {
         mod = mod.clip(cornerShape)
     }
     uiModifier.backgroundColor?.let { bgColor ->

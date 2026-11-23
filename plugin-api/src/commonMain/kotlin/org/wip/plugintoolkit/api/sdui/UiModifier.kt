@@ -1,6 +1,7 @@
 package org.wip.plugintoolkit.api.sdui
 
 import kotlinx.serialization.Serializable
+import kotlin.jvm.JvmOverloads
 
 /**
  * Semantic spacing tokens mapped directly to ToolkitTheme.spacing.
@@ -14,6 +15,20 @@ enum class SpacingSize {
     MEDIUM,
     LARGE,
     EXTRA_LARGE
+}
+
+/**
+ * Semantic corner radius tokens mapped to ToolkitTheme.shapes.
+ */
+@Serializable
+enum class ShapeRole {
+    NONE,
+    EXTRA_SMALL,
+    SMALL,
+    MEDIUM,
+    LARGE,
+    EXTRA_LARGE,
+    PILL
 }
 
 /**
@@ -162,7 +177,7 @@ data class UiDropTarget(
  * and behavior of an SDUI node.
  */
 @Serializable
-data class UiModifier(
+data class UiModifier @JvmOverloads constructor(
     val padding: SpacingSize = SpacingSize.NONE,
     val fillMaxWidth: Float? = null,
     val fillMaxHeight: Float? = null,
@@ -182,7 +197,10 @@ data class UiModifier(
     val enabled: Boolean = true,
     val visible: Boolean = true,
     val shortcuts: List<UiShortcut> = emptyList(),
-    val dropTarget: UiDropTarget? = null
+    val dropTarget: UiDropTarget? = null,
+    val tooltip: String? = null,
+    val contextMenu: List<ActionMenuItem> = emptyList(),
+    val cornerRadius: ShapeRole? = null
 ) {
     fun padding(size: SpacingSize): UiModifier = copy(padding = size)
     fun fillMaxWidth(fraction: Float = 1.0f): UiModifier = copy(fillMaxWidth = fraction)
@@ -200,8 +218,13 @@ data class UiModifier(
     fun background(color: SemanticColor?): UiModifier = copy(backgroundColor = color)
     fun border(color: SemanticColor?): UiModifier = copy(borderColor = color)
     fun clipRounded(rounded: Boolean = true): UiModifier = copy(clipRounded = rounded)
+    fun cornerRadius(role: ShapeRole?): UiModifier = copy(cornerRadius = role)
     fun enabled(enabled: Boolean): UiModifier = copy(enabled = enabled)
     fun visible(visible: Boolean): UiModifier = copy(visible = visible)
+    fun tooltip(text: String?): UiModifier = copy(tooltip = text)
+    fun contextMenu(items: List<ActionMenuItem>): UiModifier = copy(contextMenu = items)
+    fun contextMenu(block: ActionMenuBuilder.() -> Unit): UiModifier =
+        copy(contextMenu = ActionMenuBuilder().apply(block).buildItems())
     fun shortcut(shortcut: UiShortcut): UiModifier = copy(shortcuts = shortcuts + shortcut)
     fun shortcut(
         key: String,
@@ -263,8 +286,12 @@ data class UiModifier(
         fun background(color: SemanticColor?): UiModifier = None.background(color)
         fun border(color: SemanticColor?): UiModifier = None.border(color)
         fun clipRounded(rounded: Boolean = true): UiModifier = None.clipRounded(rounded)
+        fun cornerRadius(role: ShapeRole?): UiModifier = None.cornerRadius(role)
         fun enabled(enabled: Boolean): UiModifier = None.enabled(enabled)
         fun visible(visible: Boolean): UiModifier = None.visible(visible)
+        fun tooltip(text: String?): UiModifier = None.tooltip(text)
+        fun contextMenu(items: List<ActionMenuItem>): UiModifier = None.contextMenu(items)
+        fun contextMenu(block: ActionMenuBuilder.() -> Unit): UiModifier = None.contextMenu(block)
         fun shortcut(shortcut: UiShortcut): UiModifier = None.shortcut(shortcut)
         fun shortcut(
             key: String,

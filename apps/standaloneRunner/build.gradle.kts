@@ -82,7 +82,7 @@ compose.desktop {
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb, TargetFormat.Exe, TargetFormat.AppImage)
             packageName = appName
-            packageVersion = libs.versions.app.get()
+            packageVersion = libs.versions.app.get().substringBefore("-")
             vendor = "Wip-Sama"
             description = "$appName Standalone Application"
             includeAllModules = true

@@ -63,7 +63,7 @@ compose.desktop {
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb, TargetFormat.Exe, TargetFormat.AppImage)
             packageName = "PluginToolkit"
-            packageVersion = libs.versions.app.get()
+            packageVersion = libs.versions.app.get().substringBefore("-")
             vendor = "Wip-Sama"
             description = "A working toolkit for using plugins."
             includeAllModules = true

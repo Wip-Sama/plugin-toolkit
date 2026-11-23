@@ -22,6 +22,7 @@ import org.wip.plugintoolkit.AppConfig
 import org.wip.plugintoolkit.core.SystemConfig
 import org.wip.plugintoolkit.core.loomDispatcher
 import org.wip.plugintoolkit.core.utils.FileUtils
+import org.wip.plugintoolkit.core.utils.VersionUtils
 
 class UpdateService(
     private val client: HttpClient = HttpClient {
@@ -73,18 +74,12 @@ class UpdateService(
     }
 
     internal fun isNewer(latest: String, current: String): Boolean {
-        val latestParts = latest.split(".").mapNotNull { it.toIntOrNull() }
-        val currentParts = current.split(".").mapNotNull { it.toIntOrNull() }
-
-        for (i in 0 until minOf(latestParts.size, currentParts.size)) {
-            if (latestParts[i] > currentParts[i]) return true
-            if (latestParts[i] < currentParts[i]) return false
-        }
-        return latestParts.size > currentParts.size
+        return VersionUtils.compare(latest, current) > 0
     }
 
-    private fun extractVersion(fileName: String): String? {
-        val regex = """(\d+\.\d+\.\d+)""".toRegex()
+    internal fun extractVersion(fileName: String): String? {
+        val regex = """(\d+\.\d+\.\d+(?:-(?:alpha|beta|rc|dev|snapshot)(?:\.?\d+)*)?)"""
+            .toRegex(RegexOption.IGNORE_CASE)
         return regex.find(fileName)?.value
     }
 

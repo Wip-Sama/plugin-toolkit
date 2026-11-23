@@ -42,12 +42,14 @@ import org.wip.plugintoolkit.api.PluginStorage
 import org.wip.plugintoolkit.api.ProgressData
 import org.wip.plugintoolkit.api.ProgressReporter
 import org.wip.plugintoolkit.api.RelativePath
+import org.wip.plugintoolkit.api.sdui.AccordionNode
 import org.wip.plugintoolkit.api.sdui.AssetReference
 import org.wip.plugintoolkit.api.sdui.BoardLayer
 import org.wip.plugintoolkit.api.sdui.BoardNode
 import org.wip.plugintoolkit.api.sdui.BoardTool
 import org.wip.plugintoolkit.api.sdui.CapabilityJobSnapshot
 import org.wip.plugintoolkit.api.sdui.CapabilityJobStatus
+import org.wip.plugintoolkit.api.sdui.CodeBlockNode
 import org.wip.plugintoolkit.api.sdui.ColumnNode
 import org.wip.plugintoolkit.api.sdui.DialogNode
 import org.wip.plugintoolkit.api.sdui.FloatingAnchor
@@ -55,11 +57,16 @@ import org.wip.plugintoolkit.api.sdui.GridNode
 import org.wip.plugintoolkit.api.sdui.ImageNode
 import org.wip.plugintoolkit.api.sdui.ListItemNode
 import org.wip.plugintoolkit.api.sdui.NormalizedPoint
+import org.wip.plugintoolkit.api.sdui.NumberInputNode
+import org.wip.plugintoolkit.api.sdui.RadioGroupNode
 import org.wip.plugintoolkit.api.sdui.ScaffoldNode
+import org.wip.plugintoolkit.api.sdui.SearchBarNode
 import org.wip.plugintoolkit.api.sdui.SemanticColor
+import org.wip.plugintoolkit.api.sdui.ShapeRole
 import org.wip.plugintoolkit.api.sdui.SplitPaneNode
 import org.wip.plugintoolkit.api.sdui.TabsNode
 import org.wip.plugintoolkit.api.sdui.TextInputNode
+import org.wip.plugintoolkit.api.sdui.TextNode
 import org.wip.plugintoolkit.api.sdui.UiEvent
 import org.wip.plugintoolkit.api.sdui.UiNode
 import org.wip.plugintoolkit.api.sdui.UiNodeTree
@@ -341,6 +348,7 @@ class CompleteExampleTest {
             is org.wip.plugintoolkit.api.sdui.SidebarNode -> node.children.forEach { result.addAll(collectNodes(it)) }
             is org.wip.plugintoolkit.api.sdui.FloatingPanelNode -> node.children.forEach { result.addAll(collectNodes(it)) }
             is DialogNode -> node.children.forEach { result.addAll(collectNodes(it)) }
+            is AccordionNode -> node.children.forEach { result.addAll(collectNodes(it)) }
             is org.wip.plugintoolkit.api.sdui.ListItemNode -> node.trailingContent.forEach { result.addAll(collectNodes(it)) }
             is SplitPaneNode -> {
                 result.addAll(collectNodes(node.first))
@@ -1103,6 +1111,98 @@ class CompleteExampleTest {
 
         assertNotNull(manifest.capabilities.find { it.name == "renderCompositedPage" })
         assertNotNull(manifest.capabilities.find { it.name == "queryChapterCatalog" })
+    }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun testChapterPublisherBatch1ControlsAndModifiers() = runTest {
+        val plugin = CompleteExamplePlugin(CompleteExampleSettings(userId = "batch1_tester"))
+        val entry = CompleteExamplePluginPluginEntry(plugin)
+        val interactiveProcessor = entry.getInteractiveProcessor()?.getOrNull()
+        assertNotNull(interactiveProcessor)
+
+        val eventsFlow = MutableSharedFlow<UiEvent>(extraBufferCapacity = 32)
+        val emittedTrees = mutableListOf<UiNodeTree>()
+        val fakeFs = FakePluginFileSystem()
+        val settingsState = MutableStateFlow<Map<String, JsonElement>>(
+            mapOf(
+                "userId" to JsonPrimitive("batch1_tester"),
+                "apiKey" to JsonPrimitive("")
+            )
+        )
+        val testContext = TestPluginContext(
+            fileSystem = fakeFs,
+            initialSettings = settingsState.value
+        ) { updated -> settingsState.value = updated }
+
+        val locksState = MutableStateFlow(mapOf("feature_unlocked" to false))
+        val sessionScope = CoroutineScope(coroutineContext)
+        val sessionContext = TestWiredSessionContext(
+            capabilityName = "interactiveChapterPublisher",
+            entry = entry,
+            scope = sessionScope,
+            baseContext = testContext,
+            settingsState = settingsState,
+            locksState = locksState
+        )
+
+        val job = launch {
+            interactiveProcessor.openUiSession(sessionContext, eventsFlow).collect { tree ->
+                emittedTrees.add(tree)
+            }
+        }
+        try {
+            advanceUntilIdle()
+            assertTrue(emittedTrees.isNotEmpty(), "Publisher session must emit initial UiNodeTree")
+
+            val initialNodes = collectNodes(emittedTrees.last().root)
+            val seriesSearch = initialNodes.filterIsInstance<SearchBarNode>()
+                .first { it.id == "pub_series_search_input" }
+            assertTrue(seriesSearch.suggestions.isNotEmpty())
+            assertTrue(!seriesSearch.modifier.tooltip.isNullOrBlank())
+
+            val seriesRow = initialNodes.filterIsInstance<ListItemNode>()
+                .first { it.id.startsWith("series_row_") }
+            assertEquals(ShapeRole.MEDIUM, seriesRow.modifier.cornerRadius)
+            assertEquals(3, seriesRow.modifier.contextMenu.size)
+
+            eventsFlow.emit(UiEvent.TabSelected("pub_tabs", "settings"))
+            advanceUntilIdle()
+
+            val settingsNodes = collectNodes(emittedTrees.last().root)
+            val priorityRadio = settingsNodes.filterIsInstance<RadioGroupNode>()
+                .first { it.id == "cfg_priority_radio" }
+            assertEquals("BALANCED", priorityRadio.selectedKey)
+
+            val batchInput = settingsNodes.filterIsInstance<NumberInputNode>()
+                .first { it.id == "cfg_batch_size_input" }
+            assertEquals(4.0, batchInput.value)
+
+            eventsFlow.emit(UiEvent.OptionSelected("cfg_priority_radio", "FAST"))
+            eventsFlow.emit(UiEvent.ValueChanged("cfg_batch_size_input", 12.0))
+            eventsFlow.emit(UiEvent.ToggleChanged("cfg_manifest_accordion", true))
+            advanceUntilIdle()
+
+            val updatedNodes = collectNodes(emittedTrees.last().root)
+            val accordion = updatedNodes.filterIsInstance<AccordionNode>()
+                .first { it.id == "cfg_manifest_accordion" }
+            assertTrue(accordion.expanded)
+
+            val summaryText = updatedNodes.filterIsInstance<TextNode>()
+                .first { it.id == "cfg_snapshot_summary" }
+            assertTrue(summaryText.selectable)
+            assertEquals(1, summaryText.maxLines)
+            assertTrue(summaryText.overflowEllipsis)
+            assertTrue(summaryText.text.contains("Priority: FAST"))
+            assertTrue(summaryText.text.contains("Batch Size: 12"))
+
+            val codeBlock = updatedNodes.filterIsInstance<CodeBlockNode>()
+                .first { it.id == "cfg_manifest_code_block" }
+            assertEquals("json", codeBlock.language)
+            assertTrue(codeBlock.code.contains("\"batchSize\": 12"))
+        } finally {
+            job.cancel()
+        }
     }
 }
 

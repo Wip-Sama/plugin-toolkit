@@ -1,5 +1,6 @@
 package org.wip.plugintoolkit.features.plugin.sdui
 
+import org.wip.plugintoolkit.api.sdui.AccordionNode
 import org.wip.plugintoolkit.api.sdui.ActionMenuItem
 import org.wip.plugintoolkit.api.sdui.AssetReference
 import org.wip.plugintoolkit.api.sdui.BoardLayer
@@ -8,12 +9,16 @@ import org.wip.plugintoolkit.api.sdui.BoardShapeType
 import org.wip.plugintoolkit.api.sdui.BoardViewportConfig
 import org.wip.plugintoolkit.api.sdui.ButtonGroupItem
 import org.wip.plugintoolkit.api.sdui.ButtonGroupNode
+import org.wip.plugintoolkit.api.sdui.CodeBlockNode
 import org.wip.plugintoolkit.api.sdui.ColumnNode
 import org.wip.plugintoolkit.api.sdui.ErrorBoundaryNode
 import org.wip.plugintoolkit.api.sdui.FloatingAnchor
 import org.wip.plugintoolkit.api.sdui.FloatingPanelNode
 import org.wip.plugintoolkit.api.sdui.NormalizedPoint
 import org.wip.plugintoolkit.api.sdui.NormalizedSize
+import org.wip.plugintoolkit.api.sdui.NumberInputNode
+import org.wip.plugintoolkit.api.sdui.RadioGroupNode
+import org.wip.plugintoolkit.api.sdui.RadioOptionItem
 import org.wip.plugintoolkit.api.sdui.RowNode
 import org.wip.plugintoolkit.api.sdui.ScaffoldNode
 import org.wip.plugintoolkit.api.sdui.SemanticColor
@@ -419,6 +424,55 @@ class UiAstSanitizerTest {
         assertTrue(assertIs<ErrorBoundaryNode>(root.children[0]).errorMessage.contains("ButtonGroupNode"))
         assertTrue(assertIs<ErrorBoundaryNode>(root.children[1]).errorMessage.contains("SplitButtonNode"))
         assertTrue(assertIs<ErrorBoundaryNode>(root.children[2]).errorMessage.contains("SplitButtonNode"))
+    }
+
+    @Test
+    fun testBatch1NodesAndModifiersSanitizedCorrectly() {
+        val tree = UiNodeTree(
+            root = ColumnNode(
+                id = "b1_root",
+                children = listOf(
+                    TextNode(
+                        id = "bad_context_menu",
+                        text = "Menu",
+                        modifier = UiModifier.contextMenu(listOf(ActionMenuItem(key = "", label = "Copy")))
+                    ),
+                    TextNode(id = "bad_lines", text = "Truncated", maxLines = 0),
+                    RadioGroupNode(
+                        id = "bad_radio_dup",
+                        options = listOf(
+                            RadioOptionItem(key = "a", label = "A"),
+                            RadioOptionItem(key = "a", label = "Duplicate")
+                        )
+                    ),
+                    NumberInputNode(
+                        id = "bad_num",
+                        value = 5.0,
+                        min = 10.0,
+                        max = 2.0,
+                        step = 1.0
+                    ),
+                    CodeBlockNode(id = "bad_code", code = "val x = 1", maxHeightDp = 0),
+                    AccordionNode(
+                        id = "good_accordion",
+                        title = "Section",
+                        children = listOf(
+                            TextNode(id = "good_accordion", text = "Colliding ID inside accordion")
+                        )
+                    )
+                )
+            )
+        )
+
+        val sanitized = tree.sanitize()
+        val root = assertIs<ColumnNode>(sanitized.root)
+        assertTrue(assertIs<ErrorBoundaryNode>(root.children[0]).errorMessage.contains("contextMenu"))
+        assertTrue(assertIs<ErrorBoundaryNode>(root.children[1]).errorMessage.contains("maxLines"))
+        assertTrue(assertIs<ErrorBoundaryNode>(root.children[2]).errorMessage.contains("RadioGroupNode"))
+        assertTrue(assertIs<ErrorBoundaryNode>(root.children[3]).errorMessage.contains("Malformed number input"))
+        assertTrue(assertIs<ErrorBoundaryNode>(root.children[4]).errorMessage.contains("CodeBlockNode"))
+        val acc = assertIs<AccordionNode>(root.children[5])
+        assertTrue(assertIs<ErrorBoundaryNode>(acc.children.single()).errorMessage.contains("Duplicate node ID collision"))
     }
 }
 
