@@ -1,5 +1,7 @@
 package org.wip.plugintoolkit.features.plugin.sdui
 
+import androidx.compose.material3.ExposedDropdownMenu
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
@@ -135,24 +137,30 @@ import org.wip.plugintoolkit.api.sdui.CodeBlockNode
 import org.wip.plugintoolkit.api.sdui.ColorPickerNode
 import org.wip.plugintoolkit.api.sdui.ColumnNode
 import org.wip.plugintoolkit.api.sdui.ControlSize
+import org.wip.plugintoolkit.api.sdui.DatePickerNode
 import org.wip.plugintoolkit.api.sdui.DialogNode
 import org.wip.plugintoolkit.api.sdui.DividerNode
 import org.wip.plugintoolkit.api.sdui.DropdownNode
 import org.wip.plugintoolkit.api.sdui.EmptyStateNode
 import org.wip.plugintoolkit.api.sdui.ErrorBoundaryNode
+import org.wip.plugintoolkit.api.sdui.FabMenuNode
+import org.wip.plugintoolkit.api.sdui.FabNode
 import org.wip.plugintoolkit.api.sdui.FilePickerNode
 import org.wip.plugintoolkit.api.sdui.FloatingAnchor
 import org.wip.plugintoolkit.api.sdui.FloatingPanelNode
+import org.wip.plugintoolkit.api.sdui.FloatingToolbarNode
 import org.wip.plugintoolkit.api.sdui.FlowRowNode
 import org.wip.plugintoolkit.api.sdui.GridNode
 import org.wip.plugintoolkit.api.sdui.IconButtonNode
 import org.wip.plugintoolkit.api.sdui.IconNode
+import org.wip.plugintoolkit.api.sdui.ImageCompareNode
 import org.wip.plugintoolkit.api.sdui.ImageNode
 import org.wip.plugintoolkit.api.sdui.ImageScale
 import org.wip.plugintoolkit.api.sdui.KeyValueListNode
 import org.wip.plugintoolkit.api.sdui.ListItemNode
 import org.wip.plugintoolkit.api.sdui.LoadingIndicatorNode
 import org.wip.plugintoolkit.api.sdui.MarkdownTextNode
+import org.wip.plugintoolkit.api.sdui.MediaPlayerNode
 import org.wip.plugintoolkit.api.sdui.MenuNode
 import org.wip.plugintoolkit.api.sdui.MultiSelectDropdownNode
 import org.wip.plugintoolkit.api.sdui.NumberInputNode
@@ -163,11 +171,13 @@ import org.wip.plugintoolkit.api.sdui.RadioGroupNode
 import org.wip.plugintoolkit.api.sdui.RangeSliderNode
 import org.wip.plugintoolkit.api.sdui.RowNode
 import org.wip.plugintoolkit.api.sdui.ScaffoldNode
+import org.wip.plugintoolkit.api.sdui.ScrollEdge
 import org.wip.plugintoolkit.api.sdui.ScrollableColumnNode
 import org.wip.plugintoolkit.api.sdui.ScrollableRowNode
 import org.wip.plugintoolkit.api.sdui.SearchBarNode
 import org.wip.plugintoolkit.api.sdui.SemanticColor
 import org.wip.plugintoolkit.api.sdui.ShapeRole
+import org.wip.plugintoolkit.api.sdui.SideSheetNode
 import org.wip.plugintoolkit.api.sdui.SidebarAttachPoint
 import org.wip.plugintoolkit.api.sdui.SidebarNode
 import org.wip.plugintoolkit.api.sdui.SliderNode
@@ -180,6 +190,7 @@ import org.wip.plugintoolkit.api.sdui.TableNode
 import org.wip.plugintoolkit.api.sdui.TabsNode
 import org.wip.plugintoolkit.api.sdui.TextInputNode
 import org.wip.plugintoolkit.api.sdui.TextNode
+import org.wip.plugintoolkit.api.sdui.TimePickerNode
 import org.wip.plugintoolkit.api.sdui.ToggleNode
 import org.wip.plugintoolkit.api.sdui.TreeViewNode
 import org.wip.plugintoolkit.api.sdui.TypographyRole
@@ -783,6 +794,38 @@ fun RenderUiNode(
 
         is MenuNode -> {
             RenderMenuNode(node = node, onEvent = onEvent, modifier = appliedModifier)
+        }
+
+        is FloatingToolbarNode -> {
+            RenderFloatingToolbarNode(node = node, onEvent = onEvent, modifier = appliedModifier)
+        }
+
+        is FabNode -> {
+            RenderFabNode(node = node, onEvent = onEvent, modifier = appliedModifier)
+        }
+
+        is FabMenuNode -> {
+            RenderFabMenuNode(node = node, onEvent = onEvent, modifier = appliedModifier)
+        }
+
+        is SideSheetNode -> {
+            RenderSideSheetNode(node = node, onEvent = onEvent, modifier = appliedModifier)
+        }
+
+        is DatePickerNode -> {
+            RenderDatePickerNode(node = node, onEvent = onEvent, modifier = appliedModifier)
+        }
+
+        is TimePickerNode -> {
+            RenderTimePickerNode(node = node, onEvent = onEvent, modifier = appliedModifier)
+        }
+
+        is ImageCompareNode -> {
+            RenderImageCompareNode(node = node, onEvent = onEvent, modifier = appliedModifier)
+        }
+
+        is MediaPlayerNode -> {
+            RenderMediaPlayerNode(node = node, onEvent = onEvent, modifier = appliedModifier)
         }
 
         is ImageNode -> {

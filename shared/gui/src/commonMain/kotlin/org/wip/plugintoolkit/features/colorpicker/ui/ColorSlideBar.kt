@@ -13,7 +13,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -73,15 +75,26 @@ internal fun ColorSlideBar(
         }
     }
 
+    val clampedValue = value.coerceIn(0f, 1f)
+    val sliderState = remember { SliderState(value = clampedValue) }
+    LaunchedEffect(clampedValue) {
+        if (sliderState.value != clampedValue) {
+            sliderState.value = clampedValue
+        }
+    }
+
     Slider(
-        value = value.coerceIn(0f, 1f),
-        onValueChange = onValueChange,
+        state = sliderState,
+        onValueChange = { next ->
+            sliderState.value = next
+            onValueChange(next)
+        },
         enabled = enabled,
         interactionSource = interactionSource,
         modifier = modifier
             .fillMaxWidth()
             .height(handleHeight),
-        thumb = {
+        thumb = { _ ->
             // Material Expressive Vertical Pill/Bar Thumb
             Box(
                 modifier = Modifier
@@ -90,7 +103,7 @@ internal fun ColorSlideBar(
                     .background(thumbColor)
             )
         },
-        track = {
+        track = { _ ->
             val brush = Brush.horizontalGradient(colors)
 
             Box(

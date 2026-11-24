@@ -1479,6 +1479,229 @@ abstract class UiContainerBuilder {
         )
     }
 
+    fun floatingToolbar(
+        items: List<ActionMenuItem>,
+        id: String = generateNodeId("floating_toolbar"),
+        orientation: ToolbarOrientation = ToolbarOrientation.HORIZONTAL,
+        vibrant: Boolean = false,
+        expanded: Boolean = true,
+        primaryAction: ActionMenuItem? = null,
+        modifier: UiModifier = UiModifier.None
+    ) {
+        add(
+            FloatingToolbarNode(
+                id = id,
+                items = items,
+                orientation = orientation,
+                vibrant = vibrant,
+                expanded = expanded,
+                primaryAction = primaryAction,
+                modifier = modifier
+            )
+        )
+    }
+
+    fun floatingToolbar(
+        id: String = generateNodeId("floating_toolbar"),
+        orientation: ToolbarOrientation = ToolbarOrientation.HORIZONTAL,
+        vibrant: Boolean = false,
+        expanded: Boolean = true,
+        primaryAction: ActionMenuItem? = null,
+        modifier: UiModifier = UiModifier.None,
+        block: ActionMenuBuilder.() -> Unit
+    ) {
+        val builder = ActionMenuBuilder().apply(block)
+        add(
+            FloatingToolbarNode(
+                id = id,
+                items = builder.buildItems(),
+                orientation = orientation,
+                vibrant = vibrant,
+                expanded = expanded,
+                primaryAction = primaryAction,
+                modifier = modifier
+            )
+        )
+    }
+
+    fun fab(
+        iconName: String,
+        action: String,
+        id: String = generateNodeId("fab"),
+        label: String? = null,
+        size: FabSize = FabSize.STANDARD,
+        tooltip: String? = null,
+        modifier: UiModifier = UiModifier.None
+    ) {
+        add(
+            FabNode(
+                id = id,
+                iconName = iconName,
+                action = action,
+                label = label,
+                size = size,
+                tooltip = tooltip,
+                modifier = modifier
+            )
+        )
+    }
+
+    fun fabMenu(
+        items: List<ActionMenuItem>,
+        id: String = generateNodeId("fab_menu"),
+        iconName: String = "add",
+        expanded: Boolean = false,
+        label: String? = null,
+        tooltip: String? = null,
+        modifier: UiModifier = UiModifier.None
+    ) {
+        add(
+            FabMenuNode(
+                id = id,
+                items = items,
+                iconName = iconName,
+                expanded = expanded,
+                label = label,
+                tooltip = tooltip,
+                modifier = modifier
+            )
+        )
+    }
+
+    fun fabMenu(
+        id: String = generateNodeId("fab_menu"),
+        iconName: String = "add",
+        expanded: Boolean = false,
+        label: String? = null,
+        tooltip: String? = null,
+        modifier: UiModifier = UiModifier.None,
+        block: ActionMenuBuilder.() -> Unit
+    ) {
+        val builder = ActionMenuBuilder().apply(block)
+        add(
+            FabMenuNode(
+                id = id,
+                items = builder.buildItems(),
+                iconName = iconName,
+                expanded = expanded,
+                label = label,
+                tooltip = tooltip,
+                modifier = modifier
+            )
+        )
+    }
+
+    fun sideSheet(
+        title: String,
+        id: String = generateNodeId("side_sheet"),
+        isOpen: Boolean = false,
+        attachPoint: SideSheetAttachPoint = SideSheetAttachPoint.END,
+        dismissAction: String? = null,
+        modifier: UiModifier = UiModifier.None,
+        block: UiContainerBuilder.() -> Unit
+    ) {
+        val container = object : UiContainerBuilder() {}.apply(block)
+        add(
+            SideSheetNode(
+                id = id,
+                title = title,
+                isOpen = isOpen,
+                attachPoint = attachPoint,
+                children = container.buildChildren(),
+                dismissAction = dismissAction,
+                modifier = modifier
+            )
+        )
+    }
+
+    fun datePicker(
+        selectedDateIso: String? = null,
+        id: String = generateNodeId("date_picker"),
+        minDateIso: String? = null,
+        maxDateIso: String? = null,
+        label: String? = null,
+        inline: Boolean = false,
+        modifier: UiModifier = UiModifier.None
+    ) {
+        add(
+            DatePickerNode(
+                id = id,
+                selectedDateIso = selectedDateIso,
+                minDateIso = minDateIso,
+                maxDateIso = maxDateIso,
+                label = label,
+                inline = inline,
+                modifier = modifier
+            )
+        )
+    }
+
+    fun timePicker(
+        hour: Int = 9,
+        minute: Int = 0,
+        id: String = generateNodeId("time_picker"),
+        is24Hour: Boolean = true,
+        label: String? = null,
+        inline: Boolean = false,
+        modifier: UiModifier = UiModifier.None
+    ) {
+        add(
+            TimePickerNode(
+                id = id,
+                hour = hour,
+                minute = minute,
+                is24Hour = is24Hour,
+                label = label,
+                inline = inline,
+                modifier = modifier
+            )
+        )
+    }
+
+    fun imageCompare(
+        beforeAsset: AssetReference,
+        afterAsset: AssetReference,
+        id: String = generateNodeId("image_compare"),
+        beforeLabel: String? = null,
+        afterLabel: String? = null,
+        splitPosition: Float = 0.5f,
+        modifier: UiModifier = UiModifier.None
+    ) {
+        add(
+            ImageCompareNode(
+                id = id,
+                beforeAsset = beforeAsset,
+                afterAsset = afterAsset,
+                beforeLabel = beforeLabel,
+                afterLabel = afterLabel,
+                splitPosition = splitPosition,
+                modifier = modifier
+            )
+        )
+    }
+
+    fun mediaPlayer(
+        asset: AssetReference,
+        id: String = generateNodeId("media_player"),
+        title: String? = null,
+        kind: MediaKind = MediaKind.AUTO,
+        autoPlay: Boolean = false,
+        showControls: Boolean = true,
+        modifier: UiModifier = UiModifier.None
+    ) {
+        add(
+            MediaPlayerNode(
+                id = id,
+                asset = asset,
+                title = title,
+                kind = kind,
+                autoPlay = autoPlay,
+                showControls = showControls,
+                modifier = modifier
+            )
+        )
+    }
+
     internal fun buildChildren(): List<UiNode> = children.toList()
 
     companion object {

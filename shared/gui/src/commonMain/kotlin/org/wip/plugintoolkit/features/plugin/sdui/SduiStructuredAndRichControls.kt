@@ -1,5 +1,7 @@
 package org.wip.plugintoolkit.features.plugin.sdui
 
+import androidx.compose.material3.ExposedDropdownMenu
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable

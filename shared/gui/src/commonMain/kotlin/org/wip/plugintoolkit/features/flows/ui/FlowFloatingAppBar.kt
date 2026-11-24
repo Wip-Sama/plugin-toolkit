@@ -32,7 +32,10 @@ import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FloatingToolbarDefaults
+import androidx.compose.material3.HorizontalFloatingToolbar
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
@@ -105,6 +108,7 @@ private const val DEFAULT_PAINT_COLOR = "#4CAF50"
  * Material 3 Floating App Bar (Toolbar) for the Flow Editor canvas.
  * Consolidates Add Group, Add Label, Paint Tool, Wash Brush, Eyedropper, Spline Settings, Info, and Zoom Controls.
  */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun FlowFloatingAppBar(
     scale: Float,
@@ -151,24 +155,16 @@ fun FlowFloatingAppBar(
         parseColorString(DEFAULT_PAINT_COLOR)
     }
 
-    Surface(
+    HorizontalFloatingToolbar(
+        expanded = true,
         modifier = modifier
             .padding(spacing.medium)
             .testTag("flow_floating_app_bar"),
-        shape = CircleShape,
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        tonalElevation = dimensions.elevationMedium,
-        shadowElevation = dimensions.elevationMedium,
-        border = BorderStroke(
-            width = dimensions.borderUnselected,
-            color = MaterialTheme.colorScheme.outlineVariant
-        )
+        colors = FloatingToolbarDefaults.standardFloatingToolbarColors(
+            toolbarContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+        ),
+        expandedShadowElevation = dimensions.elevationMedium
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = spacing.small, vertical = spacing.extraSmall),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(spacing.extraSmall)
-        ) {
             if (!isReadOnly) {
                 // 1. Add Group button
                 IconButton(
@@ -443,7 +439,6 @@ fun FlowFloatingAppBar(
                 onZoomOut = onZoomOut,
                 modifier = Modifier.testTag("zoom_controls")
             )
-        }
     }
 
     if (showColorPicker) {

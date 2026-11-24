@@ -7,10 +7,10 @@ This document summarizes the UI components, Material 3 Expressive primitives, an
 
 ---
 
-## Current Baseline (Verified in Codebase — App `4.1.0-alpha05`)
+## Current Baseline (Verified in Codebase — App `4.1.0-alpha06`)
 
-- **Compose / Material 3 Versions** (`gradle/libs.versions.toml`): `compose-multiplatform = "1.12.0"`, `material3 = "1.12.0-alpha03"`, `compose-adaptive = "1.3.0"`.
-- **SDUI `UiNode` Catalog** (`plugin-api/.../sdui/UiNode.kt`): 55 `UiNode` types (53 author-facing + `UnknownNode` and `ErrorBoundaryNode`):
+- **Compose / Material 3 Versions** (`gradle/libs.versions.toml`): `compose-multiplatform = "1.13.0-rc01"`, `material3 = "1.13.0-rc01"`, `compose-adaptive = "1.3.0"`.
+- **SDUI `UiNode` Catalog** (`plugin-api/.../sdui/UiNode.kt`): 63 `UiNode` types (61 author-facing + `UnknownNode` and `ErrorBoundaryNode`):
   - **Layout & Shell:** `ColumnNode`, `RowNode`, `FlowRowNode`, `BoxNode`, `CardNode`, `ScrollableColumnNode` (with `scrollToIndex`/`scrollToEdge`/`scrollRevision`), `ScrollableRowNode`, `GridNode` (with scroll anchoring), `SplitPaneNode`, `ScaffoldNode`, `SidebarNode`, `FloatingPanelNode`, `TabsNode`, `AccordionNode`, `DialogNode`, `SpacerNode`, `DividerNode`.
   - **Controls & Inputs:** `ButtonNode`, `ButtonGroupNode`, `SplitButtonNode`, `IconButtonNode`, `MenuNode`, `TextInputNode` (with `isSecret`), `NumberInputNode`, `SearchBarNode`, `RadioGroupNode`, `ToggleNode`, `CheckboxNode`, `DropdownNode`, `MultiSelectDropdownNode`, `SliderNode`, `RangeSliderNode`, `FilePickerNode`, `ColorPickerNode`, `ChipGroupNode`, `ListItemNode`, `BreadcrumbsNode`, `PaginationNode`, `StepperNode`.
   - **Display, Media & Canvas:** `TextNode` (`selectable`, `maxLines`, `overflowEllipsis`), `MarkdownTextNode`, `CodeBlockNode`, `TableNode`, `TreeViewNode`, `KeyValueListNode`, `ImageNode` (`zoomable`), `IconNode`, `BadgeNode`, `ProgressBarNode` (`ProgressBarStyle`), `LoadingIndicatorNode`, `AlertBannerNode`, `EmptyStateNode`, `BoardNode`.
@@ -32,7 +32,7 @@ This document summarizes the UI components, Material 3 Expressive primitives, an
 | **Multi-Select Dropdown / ComboBox** *(Implemented — Batch 3)* | `MultiSelectDropdownNode` | Implemented (`selectedKeys: Set<String>`, filter search, Select All / Clear, `InputChip` summary, `UiEvent.MultiOptionSelected`). | `selectedKeys: Set<String>`, searchable filter, select-all/clear, chip summary. |
 | **Inline File / Directory Picker Control** *(Implemented — Batch 4)* | `FilePickerNode` | Implemented (`FILE`/`FILES`/`DIRECTORY`/`SAVE`, extension filter, `PlatformUtils` dialogs, `DynamicHostFileSystem.grantAccess` via `UiEvent.FilesPicked`). | Mode (`FILE`, `FILES`, `DIRECTORY`, `SAVE`), extension filter, selected path preview, browse/clear actions. |
 | **Color Picker Control** *(Implemented — Batch 4)* | `ColorPickerNode` | Implemented (`ColorPickerDialog` integration, hex input, swatch preview, preset swatches, `UiEvent.ColorChanged`). | Hex/ARGB string value, optional alpha slider, swatch presets, `UiEvent.TextChanged` or `ColorChanged`. |
-| **Date / Time Picker** | `DatePickerNode` / `TimePickerNode` | No date, date-range, or time input controls for scheduling, filtering, or metadata editing. | ISO-8601 date/time string or epoch millis, min/max bounds, `24h` toggle. |
+| **Date / Time Picker** *(Implemented — Batch 6)* | `DatePickerNode` / `TimePickerNode` | Implemented (`selectedDateIso`/`minDateIso`/`maxDateIso` with M3 `DatePicker`/`DatePickerDialog`, `hour`/`minute`/`is24Hour` with M3 `TimeInput`, emitting `UiEvent.TextChanged`). | ISO-8601 date/time string or epoch millis, min/max bounds, `24h` toggle. |
 
 ### 1.2 Data Display, Code & Structured Productivity
 
@@ -53,7 +53,7 @@ This document summarizes the UI components, Material 3 Expressive primitives, an
 | **Breadcrumbs** *(Implemented — Batch 4)* | `BreadcrumbsNode` | Implemented (`BreadcrumbItem`, custom separator, overflow menu after `maxVisibleItems`, `UiEvent.OptionSelected`). | `items` (`key`, `label`, `iconName`), separator, overflow truncation, click event per segment. |
 | **Pagination Bar** *(Implemented — Batch 4)* | `PaginationNode` | Implemented (`currentPage`, `totalPages`, first/prev/next/last, `pageSizeOptions` menu, `UiEvent.PageChanged`). | `currentPage`, `totalPages`, optional `pageSize` selector, prev/next/first/last & page jump events. |
 | **Stepper / Wizard Progress** *(Implemented — Batch 4)* | `StepperNode` | Implemented (`StepperItem`, `StepStatus`, horizontal/vertical modes, `UiEvent.OptionSelected`). | `steps` (`key`, `label`, `status`: pending/active/completed/error), clickable completed steps. |
-| **Side Sheet / Modal Drawer** | `SideSheetNode` | `ToolkitSideSheet` host component implemented in Batch 4; SDUI `SideSheetNode` scheduled for Batch 6. | `isOpen`, `title`, `attachPoint` (`START`/`END`), dismiss event, max width `<= 400.dp`. |
+| **Side Sheet / Modal Drawer** *(Implemented — Batch 6)* | `SideSheetNode` | Implemented via `ToolkitSideSheet` (`isOpen`, `title`, `attachPoint` `START`/`END`, `children`, `dismissAction`, Escape dismissal). | `isOpen`, `title`, `attachPoint` (`START`/`END`), dismiss event, max width `<= 400.dp`. |
 | **Standalone Popup / Context Menu** *(Implemented — Batch 4)* | `MenuNode` / `UiModifier.contextMenu` | Both `UiModifier.contextMenu` and standalone `MenuNode` (`ToolkitDropdownMenu` + `UiEvent.Click`) implemented. | `List<ActionMenuItem>` attached via `UiModifier.contextMenu` (desktop right-click) or standalone overflow menu button. |
 | **Rich / Persistent Tooltip** *(Implemented — Batch 1)* | `UiModifier.tooltip` / `RichTooltip` | Universal `UiModifier.tooltip: String?` implemented across SDUI nodes (Batch 1). | Generic `tooltip: String?` (and optional title + body) on `UiModifier`. |
 
@@ -61,11 +61,11 @@ This document summarizes the UI components, Material 3 Expressive primitives, an
 
 | Missing Component | Proposed `UiNode` | What Is Missing Today | Key Capabilities Needed |
 | :--- | :--- | :--- | :--- |
-| **Floating Toolbar** | `FloatingToolbarNode` | Canvas/editor tools must currently use `FloatingPanelNode` + `RowNode` instead of M3 Expressive `HorizontalFloatingToolbar` / `VerticalFloatingToolbar`. | `orientation` (horizontal/vertical), `vibrant: Boolean`, `expanded: Boolean`, optional attached FAB action. |
-| **Floating Action Button & FAB Menu** | `FabNode` / `FabMenuNode` | No FAB or `FloatingActionButtonMenu` node for primary workspace creation + 3–6 sub-actions. | Standard/small/extended FAB, or `ToggleFloatingActionButton` expanding `ActionMenuItem`s. |
+| **Floating Toolbar** *(Implemented — Batch 6)* | `FloatingToolbarNode` | Implemented via M3 `HorizontalFloatingToolbar` / `VerticalFloatingToolbar` (`orientation`, `vibrant`, `expanded`, optional attached `primaryAction` FAB). | `orientation` (horizontal/vertical), `vibrant: Boolean`, `expanded: Boolean`, optional attached FAB action. |
+| **Floating Action Button & FAB Menu** *(Implemented — Batch 6)* | `FabNode` / `FabMenuNode` | Implemented (`FabSize` variants on `FabNode` + M3 `FloatingActionButtonMenu` & `ToggleFloatingActionButton` via `ToolkitFabMenu`). | Standard/small/extended FAB, or `ToggleFloatingActionButton` expanding `ActionMenuItem`s. |
 | **Expressive Loading & Wavy Progress** *(Implemented — Batch 2)* | `LoadingIndicatorNode` / `ProgressBarNode.style` | Implemented (`ProgressBarStyle.STANDARD`/`WAVY`/`MORPHING_INDICATOR`/`CONTAINED_INDICATOR` and standalone `LoadingIndicatorNode`). | `style` (`STANDARD`, `WAVY`, `MORPHING_INDICATOR`, `CONTAINED_INDICATOR`). |
-| **Image Comparison / Diff Slider** | `ImageCompareNode` | Image-processing plugins (upscaling, translation, cleaning) have no before/after split-handle viewer. | `beforeAsset`, `afterAsset`, `splitPosition`, synchronized zoom/pan. |
-| **Audio / Video Preview** | `MediaPlayerNode` | Only static `ImageNode` is supported; no audio/video playback node for multimedia plugins. | `asset: AssetReference`, play/pause, scrub bar, duration display. |
+| **Image Comparison / Diff Slider** *(Implemented — Batch 6)* | `ImageCompareNode` | Implemented via `ToolkitImageCompare` (`beforeAsset`, `afterAsset`, draggable/tappable split divider + Left/Right keyboard stepping, `UiEvent.ValueChanged`). | `beforeAsset`, `afterAsset`, `splitPosition`, synchronized zoom/pan. |
+| **Audio / Video Preview** *(Implemented — Batch 6)* | `MediaPlayerNode` | Implemented via `ToolkitMediaPlayer` + `PlatformMediaAudioPlayer` (WAV/AIFF/AU playback, scrub slider, mute, duration readout, video preview card). | `asset: AssetReference`, play/pause, scrub bar, duration display. |
 
 ### 1.5 Missing SDUI Modifiers & `UiNode` Properties
 
@@ -107,9 +107,9 @@ Auditing `shared/gui` against the project's `m3-*` skill suite (`m3-desktop-expr
 
 | Missing Component | Target M3 Expressive API | Current State in `shared/gui` |
 | :--- | :--- | :--- |
-| **Floating Canvas / Editor Toolbars** | `HorizontalFloatingToolbar` & `VerticalFloatingToolbar` (+ `VibrantFloatingActionButton`) | Not present in `shared/gui` (useful for Flow Editor, BoardNode, and preview panes). |
+| **Floating Canvas / Editor Toolbars** *(Implemented — Batch 6)* | `HorizontalFloatingToolbar` & `VerticalFloatingToolbar` (+ `VibrantFloatingActionButton`) | Adopted `HorizontalFloatingToolbar` in `FlowFloatingAppBar` and `BoardNodeRenderer`, plus SDUI `FloatingToolbarNode`. |
 | **Native M3 Split Button** *(Implemented — Batch 2)* | `SplitButtonLayout` (`LeadingButton` / `TrailingButton`) | Added `ToolkitSplitButton` using `SplitButtonLayout`, `SplitButtonDefaults`, spring chevron rotation, and `ToolkitDropdownMenu`. |
-| **FAB & Expandable FAB Menu** | `FloatingActionButtonMenu`, `ToggleFloatingActionButton`, `SmallExtendedFloatingActionButton` | Not present in `shared/components`. |
+| **FAB & Expandable FAB Menu** *(Implemented — Batch 6)* | `FloatingActionButtonMenu`, `ToggleFloatingActionButton`, `ExtendedFloatingActionButton` | Added `ToolkitFabMenu` and SDUI `FabNode` / `FabMenuNode`. |
 | **Morphing Loading Indicator** *(Implemented — Batch 2)* | `LoadingIndicator` & `ContainedLoadingIndicator` | Added `ToolkitLoadingIndicator` + SDUI `LoadingIndicatorNode` (`CheckForUpdatesControl`, `DynamicUiRenderer`). |
 | **Wavy Progress Indicators** *(Implemented — Batch 2)* | `LinearWavyProgressIndicator` & `CircularWavyProgressIndicator` | Added `ToolkitLinearProgressIndicator` / `ToolkitCircularProgressIndicator` + SDUI `ProgressBarStyle.WAVY` (`JobExecutionInfoSection`, `JobResultCardComponents`). |
 | **Overflow-Capable ButtonGroup & Connected `ToggleButton`** *(Implemented — Batch 2)* | `ButtonGroup` (`overflowIndicator`) & `ToggleButton` (`ButtonGroupDefaults.connected*ButtonShapes()`) | Added `ToolkitConnectedToggleGroup` with M3 `ToggleButton` and `ButtonGroupDefaults.connected*ButtonShapes()`; `ButtonGroup` overflow remains for Batch 5/6. |
@@ -136,6 +136,6 @@ Auditing `shared/gui` against the project's `m3-*` skill suite (`m3-desktop-expr
 2. **Medium Priority (Workflows & Ergonomics)**
    - **SDUI:** *(Implemented — Batches 3–4)* `TreeViewNode`, `FlowRowNode`, `MultiSelectDropdownNode`, `FilePickerNode`, `ColorPickerNode`, `BreadcrumbsNode`, `PaginationNode`, `RangeSliderNode`, `MarkdownTextNode`.
    - **Host:** *(Implemented — Batch 5)* Adopt `WideNavigationRail` + `NavigationSuiteScaffoldLayout` (`WindowSizeClass`), `ListDetailPaneScaffold` / `SupportingPaneScaffold`, `AppBarRow` overflow toolbars, and `ContextMenuArea` wrappers.
-3. **Low Priority / Specialized**
+3. **Low Priority / Specialized** *(Implemented — Batch 6)*
    - **SDUI:** `DatePickerNode` / `TimePickerNode`, `StepperNode`, `SideSheetNode`, `ImageCompareNode`, `MediaPlayerNode`, `FloatingToolbarNode`, `FabMenuNode`.
-   - **Host:** `FloatingActionButtonMenu`, `MaterialShapes` morphing accents (e.g. badges/avatars/empty states).
+   - **Host:** `ToolkitFabMenu`, `HorizontalFloatingToolbar` adoption in `FlowFloatingAppBar` and `BoardNodeRenderer`, and restrained `MaterialShapes` accents in `ToolkitEmptyState`.

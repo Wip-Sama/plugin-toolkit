@@ -16,19 +16,24 @@ import org.wip.plugintoolkit.api.ExecutionResult
 import org.wip.plugintoolkit.api.HttpMethod
 import org.wip.plugintoolkit.api.HttpRequest
 import org.wip.plugintoolkit.api.PluginNotificationType
+import org.wip.plugintoolkit.api.sdui.ActionMenuItem
 import org.wip.plugintoolkit.api.sdui.AssetReference
 import org.wip.plugintoolkit.api.sdui.CapabilityJobSnapshot
 import org.wip.plugintoolkit.api.sdui.CapabilityJobStatus
 import org.wip.plugintoolkit.api.sdui.ChipItem
 import org.wip.plugintoolkit.api.sdui.ControlSize
+import org.wip.plugintoolkit.api.sdui.FabSize
 import org.wip.plugintoolkit.api.sdui.FilePickerMode
 import org.wip.plugintoolkit.api.sdui.ImageScale
+import org.wip.plugintoolkit.api.sdui.MediaKind
 import org.wip.plugintoolkit.api.sdui.ProgressBarStyle
 import org.wip.plugintoolkit.api.sdui.SemanticColor
 import org.wip.plugintoolkit.api.sdui.ShapeRole
+import org.wip.plugintoolkit.api.sdui.SideSheetAttachPoint
 import org.wip.plugintoolkit.api.sdui.SpacingSize
 import org.wip.plugintoolkit.api.sdui.StepStatus
 import org.wip.plugintoolkit.api.sdui.TabItem
+import org.wip.plugintoolkit.api.sdui.ToolbarOrientation
 import org.wip.plugintoolkit.api.sdui.TypographyRole
 import org.wip.plugintoolkit.api.sdui.UiContainerBuilder
 import org.wip.plugintoolkit.api.sdui.UiDropTarget
@@ -96,6 +101,11 @@ private data class ChapterPublisherState(
     val readerAccentHex: String = "#6750A4",
     val catalogPage: Int = 1,
     val catalogPageSize: Int = 10,
+    val scheduledReleaseDate: String = "2026-12-01",
+    val scheduledReleaseHour: Int = 14,
+    val scheduledReleaseMinute: Int = 30,
+    val showPreviewSideSheet: Boolean = false,
+    val compareSplitPosition: Float = 0.5f,
     val isLoading: Boolean = true,
     val showConfirmDialog: Boolean = false,
     val pendingPushIds: List<String> = emptyList(),
@@ -485,6 +495,26 @@ internal fun runChapterPublisherSession(
                         "insp_title_input" -> stateFlow.update { it.copy(draftTitle = event.text) }
                         "insp_notes_input" -> stateFlow.update { it.copy(draftNotes = event.text) }
                         "cfg_secret_token_input" -> stateFlow.update { it.copy(draftSecretToken = event.text) }
+                        "cfg_release_date_picker" -> stateFlow.update {
+                            it.copy(
+                                scheduledReleaseDate = event.text,
+                                bannerMessage = "Scheduled release date updated to ${event.text}.",
+                                bannerSeverity = SemanticColor.INFO
+                            )
+                        }
+                        "cfg_release_time_picker" -> {
+                            val parts = event.text.split(":")
+                            val parsedHour = parts.getOrNull(0)?.toIntOrNull()?.coerceIn(0, 23) ?: 9
+                            val parsedMinute = parts.getOrNull(1)?.toIntOrNull()?.coerceIn(0, 59) ?: 0
+                            stateFlow.update {
+                                it.copy(
+                                    scheduledReleaseHour = parsedHour,
+                                    scheduledReleaseMinute = parsedMinute,
+                                    bannerMessage = "Scheduled release time updated to ${event.text}.",
+                                    bannerSeverity = SemanticColor.INFO
+                                )
+                            }
+                        }
                         "cfg_api_key_input" -> {
                             context.updateSetting("apiKey", event.text)
                             stateFlow.update {
@@ -505,6 +535,9 @@ internal fun runChapterPublisherSession(
                         "cfg_batch_size_input" -> {
                             val clamped = event.value.toInt().coerceIn(1, 20)
                             stateFlow.update { it.copy(batchSize = clamped) }
+                        }
+                        "cfg_image_compare" -> {
+                            stateFlow.update { it.copy(compareSplitPosition = event.value.toFloat().coerceIn(0f, 1f)) }
                         }
                     }
                 }
@@ -591,6 +624,9 @@ internal fun runChapterPublisherSession(
                     }
                 }
                 is UiEvent.DialogAction -> {
+                    if (event.nodeId == "cfg_preview_side_sheet" && !event.isConfirmed) {
+                        stateFlow.update { it.copy(showPreviewSideSheet = false) }
+                    }
                     if (event.nodeId == "pub_confirm_dialog") {
                         val pendingIds = stateFlow.value.pendingPushIds
                         val env = stateFlow.value.environment
@@ -610,6 +646,21 @@ internal fun runChapterPublisherSession(
                 is UiEvent.Click -> {
                     val action = event.action ?: event.nodeId
                     when {
+                        action == "toolbar_toggle_sheet" -> {
+                            stateFlow.update { it.copy(showPreviewSideSheet = !it.showPreviewSideSheet) }
+                        }
+                        action == "close_preview_sheet" -> {
+                            stateFlow.update { it.copy(showPreviewSideSheet = false) }
+                        }
+                        action == "fab_quick_schedule" || action == "fab_menu_stage" -> {
+                            stateFlow.update {
+                                it.copy(
+                                    showPreviewSideSheet = true,
+                                    bannerMessage = "Scheduled window ${it.scheduledReleaseDate} ${it.scheduledReleaseHour.toString().padStart(2, '0')}:${it.scheduledReleaseMinute.toString().padStart(2, '0')} staged.",
+                                    bannerSeverity = SemanticColor.SUCCESS
+                                )
+                            }
+                        }
                         action == "nav_series" -> {
                             stateFlow.update { it.copy(navLevel = PublisherNavLevel.SERIES) }
                         }
@@ -2555,6 +2606,98 @@ private fun UiContainerBuilder.renderSettingsTab(
                 pageSize = state.catalogPageSize,
                 pageSizeOptions = listOf(10, 25, 50)
             )
+        }
+
+        card(id = "cfg_release_schedule_media_card", title = "Release Schedule, Quick Actions & Media") {
+            floatingToolbar(
+                id = "cfg_floating_toolbar",
+                orientation = ToolbarOrientation.HORIZONTAL,
+                vibrant = true,
+                expanded = true,
+                primaryAction = ActionMenuItem(
+                    key = "stage",
+                    label = "Stage Release",
+                    action = "fab_quick_schedule",
+                    iconName = "play_arrow"
+                )
+            ) {
+                item(key = "sheet", label = "Inspect Side Sheet", action = "toolbar_toggle_sheet", iconName = "info")
+                item(key = "refresh", label = "Sync Now", action = "refresh_all", iconName = "refresh")
+            }
+
+            row(id = "cfg_schedule_pickers_row", spacing = SpacingSize.MEDIUM) {
+                datePicker(
+                    id = "cfg_release_date_picker",
+                    selectedDateIso = state.scheduledReleaseDate,
+                    label = "Scheduled Publish Date"
+                )
+                timePicker(
+                    id = "cfg_release_time_picker",
+                    hour = state.scheduledReleaseHour,
+                    minute = state.scheduledReleaseMinute,
+                    is24Hour = true,
+                    label = "Scheduled Publish Time (UTC)"
+                )
+            }
+
+            row(id = "cfg_fab_actions_row", spacing = SpacingSize.MEDIUM) {
+                fab(
+                    id = "cfg_stage_fab",
+                    iconName = "add",
+                    action = "fab_quick_schedule",
+                    label = "Stage Release",
+                    size = FabSize.EXTENDED,
+                    tooltip = "Stage scheduled release"
+                )
+                fabMenu(
+                    id = "cfg_release_fab_menu",
+                    iconName = "bolt",
+                    label = "Quick release actions",
+                    tooltip = "Open quick release actions"
+                ) {
+                    item(key = "stage", label = "Open Preview Sheet", action = "fab_menu_stage", iconName = "check")
+                    item(key = "push", label = "Push Selected", action = "push_selected", iconName = "bolt")
+                }
+            }
+
+            val sampleBefore = state.seriesList.getOrNull(0)?.coverAsset
+                ?: AssetReference.Uri("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==")
+            val sampleAfter = state.seriesList.getOrNull(1)?.coverAsset ?: sampleBefore
+            imageCompare(
+                id = "cfg_image_compare",
+                beforeAsset = sampleBefore,
+                afterAsset = sampleAfter,
+                beforeLabel = "Raw Scan",
+                afterLabel = "Mastered",
+                splitPosition = state.compareSplitPosition
+            )
+
+            mediaPlayer(
+                id = "cfg_trailer_audio_player",
+                asset = AssetReference.Relative("sample_preview.wav"),
+                title = "Chapter Teaser Voiceover Track",
+                kind = MediaKind.AUDIO
+            )
+
+            sideSheet(
+                id = "cfg_preview_side_sheet",
+                title = "Scheduled Release Inspector",
+                isOpen = state.showPreviewSideSheet,
+                attachPoint = SideSheetAttachPoint.END,
+                dismissAction = "close_preview_sheet"
+            ) {
+                text(
+                    id = "sheet_date_summary",
+                    text = "Release window: ${state.scheduledReleaseDate} ${state.scheduledReleaseHour.toString().padStart(2, '0')}:${state.scheduledReleaseMinute.toString().padStart(2, '0')} UTC",
+                    role = TypographyRole.BODY_MEDIUM
+                )
+                button(
+                    id = "sheet_close_btn",
+                    label = "Close Inspector",
+                    action = "close_preview_sheet",
+                    isTonal = true
+                )
+            }
         }
     }
 }

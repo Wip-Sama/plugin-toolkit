@@ -1006,6 +1006,172 @@ data class MenuNode @JvmOverloads constructor(
     override val modifier: UiModifier = UiModifier.None
 ) : UiNode
 
+// ── Expressive Actions, Pickers & Media Nodes (Batch 6) ─────────────────────
+
+/**
+ * Axis orientation for [FloatingToolbarNode].
+ */
+@Serializable
+enum class ToolbarOrientation {
+    HORIZONTAL,
+    VERTICAL
+}
+
+/**
+ * Material 3 Expressive Floating Toolbar container presenting compact icon/text actions
+ * with an optional attached primary FAB action. Emits [UiEvent.Click].
+ */
+@Serializable
+@SerialName("floating_toolbar")
+data class FloatingToolbarNode @JvmOverloads constructor(
+    override val id: String,
+    val items: List<ActionMenuItem> = emptyList(),
+    val orientation: ToolbarOrientation = ToolbarOrientation.HORIZONTAL,
+    val vibrant: Boolean = false,
+    val expanded: Boolean = true,
+    val primaryAction: ActionMenuItem? = null,
+    override val modifier: UiModifier = UiModifier.None
+) : UiNode
+
+/**
+ * Size variants for Material 3 Expressive [FabNode].
+ */
+@Serializable
+enum class FabSize {
+    SMALL,
+    STANDARD,
+    LARGE,
+    EXTENDED
+}
+
+/**
+ * Floating Action Button node emitting [UiEvent.Click] with [action].
+ */
+@Serializable
+@SerialName("fab")
+data class FabNode @JvmOverloads constructor(
+    override val id: String,
+    val iconName: String,
+    val action: String,
+    val label: String? = null,
+    val size: FabSize = FabSize.STANDARD,
+    val tooltip: String? = null,
+    override val modifier: UiModifier = UiModifier.None
+) : UiNode
+
+/**
+ * Expandable Material 3 Expressive Floating Action Button Menu displaying child [ActionMenuItem]s
+ * and emitting [UiEvent.Click] when any item is triggered.
+ */
+@Serializable
+@SerialName("fab_menu")
+data class FabMenuNode @JvmOverloads constructor(
+    override val id: String,
+    val items: List<ActionMenuItem> = emptyList(),
+    val iconName: String = "add",
+    val expanded: Boolean = false,
+    val label: String? = null,
+    val tooltip: String? = null,
+    override val modifier: UiModifier = UiModifier.None
+) : UiNode
+
+/**
+ * Edge attachment side for [SideSheetNode].
+ */
+@Serializable
+enum class SideSheetAttachPoint {
+    START,
+    END
+}
+
+/**
+ * Co-planar desktop side sheet overlay hosting arbitrary [children] and emitting
+ * [UiEvent.DialogAction] (confirm = false) or [UiEvent.Click] on dismissal.
+ */
+@Serializable
+@SerialName("side_sheet")
+data class SideSheetNode @JvmOverloads constructor(
+    override val id: String,
+    val title: String,
+    val isOpen: Boolean = false,
+    val attachPoint: SideSheetAttachPoint = SideSheetAttachPoint.END,
+    val children: List<UiNode> = emptyList(),
+    val dismissAction: String? = null,
+    override val modifier: UiModifier = UiModifier.None
+) : UiNode
+
+/**
+ * Calendar date selection control emitting [UiEvent.TextChanged] with an ISO-8601 (`YYYY-MM-DD`) string.
+ */
+@Serializable
+@SerialName("date_picker")
+data class DatePickerNode @JvmOverloads constructor(
+    override val id: String,
+    val selectedDateIso: String? = null,
+    val minDateIso: String? = null,
+    val maxDateIso: String? = null,
+    val label: String? = null,
+    val inline: Boolean = false,
+    override val modifier: UiModifier = UiModifier.None
+) : UiNode
+
+/**
+ * Clock/time selection control emitting [UiEvent.TextChanged] with zero-padded `HH:mm` values.
+ */
+@Serializable
+@SerialName("time_picker")
+data class TimePickerNode @JvmOverloads constructor(
+    override val id: String,
+    val hour: Int = 9,
+    val minute: Int = 0,
+    val is24Hour: Boolean = true,
+    val label: String? = null,
+    val inline: Boolean = false,
+    override val modifier: UiModifier = UiModifier.None
+) : UiNode
+
+/**
+ * Interactive before/after split-handle comparison viewer for two [AssetReference] images.
+ * Emits [UiEvent.ValueChanged] when the split divider moves.
+ */
+@Serializable
+@SerialName("image_compare")
+data class ImageCompareNode @JvmOverloads constructor(
+    override val id: String,
+    val beforeAsset: AssetReference,
+    val afterAsset: AssetReference,
+    val beforeLabel: String? = null,
+    val afterLabel: String? = null,
+    val splitPosition: Float = 0.5f,
+    override val modifier: UiModifier = UiModifier.None
+) : UiNode
+
+/**
+ * Media kind hint for [MediaPlayerNode].
+ */
+@Serializable
+enum class MediaKind {
+    AUTO,
+    AUDIO,
+    VIDEO
+}
+
+/**
+ * Desktop media playback control displaying transport actions, scrub slider, duration,
+ * and optional audio playback for [AssetReference] payloads.
+ */
+@Serializable
+@SerialName("media_player")
+data class MediaPlayerNode @JvmOverloads constructor(
+    override val id: String,
+    val asset: AssetReference,
+    val title: String? = null,
+    val kind: MediaKind = MediaKind.AUTO,
+    val autoPlay: Boolean = false,
+    val showControls: Boolean = true,
+    override val modifier: UiModifier = UiModifier.None
+) : UiNode
+
 /**
  * Error boundary node injected by the Pre-Composition AST Sanitizer when a subtree
  * violates tree constraints (e.g. max nesting depth, max node count, NaN ranges).
@@ -1079,6 +1245,14 @@ object UiNodeSerializer : KSerializer<UiNode> {
             is PaginationNode -> "pagination"
             is StepperNode -> "stepper"
             is MenuNode -> "menu"
+            is FloatingToolbarNode -> "floating_toolbar"
+            is FabNode -> "fab"
+            is FabMenuNode -> "fab_menu"
+            is SideSheetNode -> "side_sheet"
+            is DatePickerNode -> "date_picker"
+            is TimePickerNode -> "time_picker"
+            is ImageCompareNode -> "image_compare"
+            is MediaPlayerNode -> "media_player"
             is BoardNode -> "board"
             is ErrorBoundaryNode -> "error_boundary"
             is UnknownNode -> value.rawType
@@ -1135,6 +1309,14 @@ object UiNodeSerializer : KSerializer<UiNode> {
             is PaginationNode -> jsonEncoder.json.encodeToJsonElement(PaginationNode.serializer(), value)
             is StepperNode -> jsonEncoder.json.encodeToJsonElement(StepperNode.serializer(), value)
             is MenuNode -> jsonEncoder.json.encodeToJsonElement(MenuNode.serializer(), value)
+            is FloatingToolbarNode -> jsonEncoder.json.encodeToJsonElement(FloatingToolbarNode.serializer(), value)
+            is FabNode -> jsonEncoder.json.encodeToJsonElement(FabNode.serializer(), value)
+            is FabMenuNode -> jsonEncoder.json.encodeToJsonElement(FabMenuNode.serializer(), value)
+            is SideSheetNode -> jsonEncoder.json.encodeToJsonElement(SideSheetNode.serializer(), value)
+            is DatePickerNode -> jsonEncoder.json.encodeToJsonElement(DatePickerNode.serializer(), value)
+            is TimePickerNode -> jsonEncoder.json.encodeToJsonElement(TimePickerNode.serializer(), value)
+            is ImageCompareNode -> jsonEncoder.json.encodeToJsonElement(ImageCompareNode.serializer(), value)
+            is MediaPlayerNode -> jsonEncoder.json.encodeToJsonElement(MediaPlayerNode.serializer(), value)
             is LoadingIndicatorNode -> jsonEncoder.json.encodeToJsonElement(LoadingIndicatorNode.serializer(), value)
             is BoardNode -> jsonEncoder.json.encodeToJsonElement(BoardNode.serializer(), value)
             is ErrorBoundaryNode -> jsonEncoder.json.encodeToJsonElement(ErrorBoundaryNode.serializer(), value)
@@ -1205,6 +1387,14 @@ object UiNodeSerializer : KSerializer<UiNode> {
             "pagination" -> PaginationNode.serializer()
             "stepper" -> StepperNode.serializer()
             "menu" -> MenuNode.serializer()
+            "floating_toolbar" -> FloatingToolbarNode.serializer()
+            "fab" -> FabNode.serializer()
+            "fab_menu" -> FabMenuNode.serializer()
+            "side_sheet" -> SideSheetNode.serializer()
+            "date_picker" -> DatePickerNode.serializer()
+            "time_picker" -> TimePickerNode.serializer()
+            "image_compare" -> ImageCompareNode.serializer()
+            "media_player" -> MediaPlayerNode.serializer()
             "board" -> BoardNode.serializer()
             "error_boundary" -> ErrorBoundaryNode.serializer()
             "unknown" -> UnknownNodeCustomSerializer

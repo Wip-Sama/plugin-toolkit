@@ -10,16 +10,22 @@ import org.wip.plugintoolkit.api.sdui.CardNode
 import org.wip.plugintoolkit.api.sdui.CodeBlockNode
 import org.wip.plugintoolkit.api.sdui.ColorPickerNode
 import org.wip.plugintoolkit.api.sdui.ColumnNode
+import org.wip.plugintoolkit.api.sdui.DatePickerNode
 import org.wip.plugintoolkit.api.sdui.DialogNode
 import org.wip.plugintoolkit.api.sdui.ErrorBoundaryNode
+import org.wip.plugintoolkit.api.sdui.FabMenuNode
+import org.wip.plugintoolkit.api.sdui.FabNode
 import org.wip.plugintoolkit.api.sdui.FilePickerNode
 import org.wip.plugintoolkit.api.sdui.FloatingPanelNode
+import org.wip.plugintoolkit.api.sdui.FloatingToolbarNode
 import org.wip.plugintoolkit.api.sdui.FlowRowNode
 import org.wip.plugintoolkit.api.sdui.GridNode
+import org.wip.plugintoolkit.api.sdui.ImageCompareNode
 import org.wip.plugintoolkit.api.sdui.KeyValueListNode
 import org.wip.plugintoolkit.api.sdui.ListItemNode
 import org.wip.plugintoolkit.api.sdui.LoadingIndicatorNode
 import org.wip.plugintoolkit.api.sdui.MarkdownTextNode
+import org.wip.plugintoolkit.api.sdui.MediaPlayerNode
 import org.wip.plugintoolkit.api.sdui.MenuNode
 import org.wip.plugintoolkit.api.sdui.MultiSelectDropdownNode
 import org.wip.plugintoolkit.api.sdui.NumberInputNode
@@ -31,6 +37,7 @@ import org.wip.plugintoolkit.api.sdui.RowNode
 import org.wip.plugintoolkit.api.sdui.ScaffoldNode
 import org.wip.plugintoolkit.api.sdui.ScrollableColumnNode
 import org.wip.plugintoolkit.api.sdui.ScrollableRowNode
+import org.wip.plugintoolkit.api.sdui.SideSheetNode
 import org.wip.plugintoolkit.api.sdui.SidebarNode
 import org.wip.plugintoolkit.api.sdui.SliderNode
 import org.wip.plugintoolkit.api.sdui.SplitButtonNode
@@ -39,6 +46,7 @@ import org.wip.plugintoolkit.api.sdui.StepperNode
 import org.wip.plugintoolkit.api.sdui.TableNode
 import org.wip.plugintoolkit.api.sdui.TabsNode
 import org.wip.plugintoolkit.api.sdui.TextNode
+import org.wip.plugintoolkit.api.sdui.TimePickerNode
 import org.wip.plugintoolkit.api.sdui.TreeNodeItem
 import org.wip.plugintoolkit.api.sdui.TreeViewNode
 import org.wip.plugintoolkit.api.sdui.UiNode
@@ -497,6 +505,61 @@ object UiAstSanitizer {
                 }
             }
 
+            if (node is FloatingToolbarNode) {
+                for (item in node.items) {
+                    if (item.key.isBlank() || item.label.isBlank()) {
+                        return ErrorBoundaryNode(
+                            id = node.id,
+                            errorMessage = "Invalid FloatingToolbarNode item '${item.key}' in '${node.id}': key and label must not be blank",
+                            failedNodeType = "FloatingToolbarNode"
+                        )
+                    }
+                }
+                val primary = node.primaryAction
+                if (primary != null && (primary.key.isBlank() || primary.label.isBlank())) {
+                    return ErrorBoundaryNode(
+                        id = node.id,
+                        errorMessage = "Invalid FloatingToolbarNode primaryAction in '${node.id}': key and label must not be blank",
+                        failedNodeType = "FloatingToolbarNode"
+                    )
+                }
+            }
+
+            if (node is FabNode && (node.iconName.isBlank() || node.action.isBlank())) {
+                return ErrorBoundaryNode(
+                    id = node.id,
+                    errorMessage = "Invalid FabNode '${node.id}': iconName and action must not be blank",
+                    failedNodeType = "FabNode"
+                )
+            }
+
+            if (node is FabMenuNode) {
+                if (node.iconName.isBlank()) {
+                    return ErrorBoundaryNode(
+                        id = node.id,
+                        errorMessage = "Invalid FabMenuNode '${node.id}': iconName must not be blank",
+                        failedNodeType = "FabMenuNode"
+                    )
+                }
+                for (item in node.items) {
+                    if (item.key.isBlank() || item.label.isBlank()) {
+                        return ErrorBoundaryNode(
+                            id = node.id,
+                            errorMessage = "Invalid FabMenuNode item '${item.key}' in '${node.id}': key and label must not be blank",
+                            failedNodeType = "FabMenuNode"
+                        )
+                    }
+                }
+            }
+
+            if (node is SideSheetNode && node.title.isBlank()) {
+                return ErrorBoundaryNode(
+                    id = node.id,
+                    errorMessage = "Invalid SideSheetNode '${node.id}': title must not be blank",
+                    failedNodeType = "SideSheetNode"
+                )
+            }
+
             if (node is FilePickerNode && node.defaultFileName.isBlank()) {
                 return node.copy(defaultFileName = "export")
             }
@@ -534,6 +597,25 @@ object UiAstSanitizer {
                 is TabsNode -> node.copy(content = sanitizeNode(node.content, depth + 1))
                 is ListItemNode -> node.copy(trailingContent = node.trailingContent.map { sanitizeNode(it, depth + 1) })
                 is DialogNode -> node.copy(children = node.children.map { sanitizeNode(it, depth + 1) })
+                is SideSheetNode -> node.copy(children = node.children.map { sanitizeNode(it, depth + 1) })
+                is DatePickerNode -> node.copy(
+                    selectedDateIso = sanitizeIsoDateOrNull(node.selectedDateIso),
+                    minDateIso = sanitizeIsoDateOrNull(node.minDateIso),
+                    maxDateIso = sanitizeIsoDateOrNull(node.maxDateIso)
+                )
+                is TimePickerNode -> node.copy(
+                    hour = node.hour.coerceIn(0, 23),
+                    minute = node.minute.coerceIn(0, 59)
+                )
+                is ImageCompareNode -> {
+                    val safeSplit = if (node.splitPosition.isNaN() || node.splitPosition.isInfinite()) {
+                        0.5f
+                    } else {
+                        node.splitPosition.coerceIn(0f, 1f)
+                    }
+                    node.copy(splitPosition = safeSplit)
+                }
+                is MediaPlayerNode -> node
                 is SplitPaneNode -> {
                     val safeFraction = if (node.splitFraction.isNaN() || node.splitFraction.isInfinite()) {
                         0.35f
@@ -623,6 +705,16 @@ object UiAstSanitizer {
     private fun sanitizeUnitFraction(value: Float?): Float? {
         if (value == null) return null
         return if (value.isNaN() || value.isInfinite()) null else value.coerceIn(0f, 1f)
+    }
+
+    private fun sanitizeIsoDateOrNull(value: String?): String? {
+        if (value.isNullOrBlank()) return null
+        val trimmed = value.trim()
+        val isoRegex = Regex("^\\d{4}-\\d{2}-\\d{2}$")
+        if (!isoRegex.matches(trimmed)) return null
+        val month = trimmed.substring(5, 7).toIntOrNull() ?: return null
+        val day = trimmed.substring(8, 10).toIntOrNull() ?: return null
+        return if (month in 1..12 && day in 1..31) trimmed else null
     }
 }
 

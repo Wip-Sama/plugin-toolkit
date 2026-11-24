@@ -33,10 +33,12 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalMinimumInteractiveComponentSize
+import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -62,8 +64,10 @@ import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import org.jetbrains.compose.resources.stringResource
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
+import org.wip.plugintoolkit.core.theme.rememberMorphShape
 import org.wip.plugintoolkit.core.utils.PlatformVerticalScrollbar
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.action_close
@@ -122,9 +126,13 @@ fun ToolkitStatusBadge(
     }
 }
 
+private val EMPTY_STATE_SHAPE_BADGE_SIZE = 72.dp
+
 /**
- * Standardized empty state view for desktop screens and panes.
+ * Standardized empty state view for desktop screens and panes with a restrained Material Shape
+ * container backing its hero icon.
  */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun ToolkitEmptyState(
     title: String,
@@ -134,6 +142,11 @@ fun ToolkitEmptyState(
     actionLabel: String? = null,
     onAction: (() -> Unit)? = null
 ) {
+    val badgeShape = rememberMorphShape(
+        from = MaterialShapes.Cookie7Sided,
+        to = MaterialShapes.Cookie7Sided,
+        progress = 0f
+    )
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -141,12 +154,20 @@ fun ToolkitEmptyState(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.sm)
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = title,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = ToolkitTheme.opacity.disabled),
-            modifier = Modifier.size(ToolkitTheme.dimensions.emptyStateIconSize)
-        )
+        Surface(
+            modifier = Modifier.size(EMPTY_STATE_SHAPE_BADGE_SIZE),
+            shape = badgeShape,
+            color = MaterialTheme.colorScheme.surfaceContainerHigh
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = title,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = ToolkitTheme.opacity.disabled),
+                    modifier = Modifier.size(ToolkitTheme.dimensions.emptyStateIconSize)
+                )
+            }
+        }
         Text(
             text = title,
             style = ToolkitTheme.typography.titleMedium,

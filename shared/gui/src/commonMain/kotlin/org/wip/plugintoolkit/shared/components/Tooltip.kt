@@ -52,6 +52,28 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 /**
+ * Non-experimental positioning hint mapped internally to Material 3 [TooltipAnchorPosition].
+ */
+enum class ToolkitTooltipPosition {
+    Above,
+    Below,
+    Left,
+    Right,
+    Start,
+    End
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+private fun ToolkitTooltipPosition.toAnchorPosition(): TooltipAnchorPosition = when (this) {
+    ToolkitTooltipPosition.Above -> TooltipAnchorPosition.Above
+    ToolkitTooltipPosition.Below -> TooltipAnchorPosition.Below
+    ToolkitTooltipPosition.Left -> TooltipAnchorPosition.Left
+    ToolkitTooltipPosition.Right -> TooltipAnchorPosition.Right
+    ToolkitTooltipPosition.Start -> TooltipAnchorPosition.Start
+    ToolkitTooltipPosition.End -> TooltipAnchorPosition.End
+}
+
+/**
  * Standard Material 3 TooltipBox wrapper supporting plain text hints on hover and keyboard focus.
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -59,7 +81,7 @@ import kotlinx.coroutines.launch
 fun ToolkitTooltipBox(
     tooltip: String?,
     modifier: Modifier = Modifier,
-    position: TooltipAnchorPosition = TooltipAnchorPosition.Above,
+    position: ToolkitTooltipPosition = ToolkitTooltipPosition.Above,
     content: @Composable () -> Unit
 ) {
     if (tooltip.isNullOrBlank()) {
@@ -67,7 +89,7 @@ fun ToolkitTooltipBox(
         return
     }
     TooltipBox(
-        positionProvider = TooltipDefaults.rememberTooltipPositionProvider(position),
+        positionProvider = TooltipDefaults.rememberTooltipPositionProvider(position.toAnchorPosition()),
         tooltip = {
             PlainTooltip(
                 shape = ToolkitTheme.shapes.small,
@@ -95,11 +117,11 @@ fun ToolkitTooltipBox(
 fun ToolkitRichTooltipBox(
     tooltipContent: @Composable () -> Unit,
     modifier: Modifier = Modifier,
-    position: TooltipAnchorPosition = TooltipAnchorPosition.Above,
+    position: ToolkitTooltipPosition = ToolkitTooltipPosition.Above,
     content: @Composable () -> Unit
 ) {
     TooltipBox(
-        positionProvider = TooltipDefaults.rememberTooltipPositionProvider(position),
+        positionProvider = TooltipDefaults.rememberTooltipPositionProvider(position.toAnchorPosition()),
         tooltip = {
             RichTooltip(
                 shape = ToolkitTheme.shapes.medium

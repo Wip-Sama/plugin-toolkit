@@ -42,8 +42,11 @@ import androidx.compose.material.icons.filled.OpenInFull
 import androidx.compose.material.icons.filled.OpenWith
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Title
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.FloatingToolbarDefaults
+import androidx.compose.material3.HorizontalFloatingToolbar
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
@@ -1232,6 +1235,7 @@ private fun BoardToolbar(
     }
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun BoardZoomControlsPill(
     scale: Float,
@@ -1240,22 +1244,16 @@ private fun BoardZoomControlsPill(
     onReset: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Surface(
+    HorizontalFloatingToolbar(
+        expanded = true,
         modifier = modifier,
-        shape = ToolkitTheme.shapes.pill,
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        tonalElevation = ToolkitTheme.dimensions.menuElevation,
-        border = BorderStroke(
-            ToolkitTheme.dimensions.borderUnselected,
-            MaterialTheme.colorScheme.outlineVariant.copy(alpha = ToolkitTheme.opacity.divider)
-        )
+        colors = FloatingToolbarDefaults.standardFloatingToolbarColors(
+            toolbarContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+        ),
+        expandedShadowElevation = ToolkitTheme.dimensions.menuElevation
     ) {
         CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides Dp.Unspecified) {
             Row(
-                modifier = Modifier.padding(
-                    horizontal = ToolkitTheme.spacing.sm,
-                    vertical = ToolkitTheme.spacing.xxs
-                ),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.xs)
             ) {

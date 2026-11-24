@@ -1,5 +1,7 @@
 package org.wip.plugintoolkit.shared.components.settings
 
+import androidx.compose.material3.ExposedDropdownMenu
+
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -103,7 +105,7 @@ fun <T> ExpressiveMenu(
             tonalElevation = ToolkitTheme.spacing.none,
             shadowElevation = ToolkitTheme.dimensions.menuElevation,
             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-            matchTextFieldWidth = false
+            matchAnchorWidth = false
         ) {
             Column(
                 modifier = Modifier.padding(
@@ -248,7 +250,7 @@ fun <T> MultiSelectExpressiveMenu(
             tonalElevation = ToolkitTheme.spacing.none,
             shadowElevation = ToolkitTheme.dimensions.menuElevation,
             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-            matchTextFieldWidth = false
+            matchAnchorWidth = false
         ) {
             Column(
                 modifier = Modifier.padding(

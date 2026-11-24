@@ -1133,4 +1133,20 @@
     <string name="dialog_select_file">Select File</string>
     <string name="dialog_select_files">Select Files</string>
     <string name="dialog_save_file">Save File</string>
+    <string name="sdui_date_picker_select">Choose date</string>
+    <string name="sdui_date_picker_placeholder">YYYY-MM-DD</string>
+    <string name="sdui_date_picker_confirm">Apply</string>
+    <string name="sdui_time_picker_select">Choose time</string>
+    <string name="sdui_time_picker_hour">Hour</string>
+    <string name="sdui_time_picker_minute">Minute</string>
+    <string name="sdui_fab_menu_toggle">Toggle quick actions</string>
+    <string name="sdui_image_compare_before">Before</string>
+    <string name="sdui_image_compare_after">After</string>
+    <string name="sdui_image_compare_slider_desc">Comparison split ratio</string>
+    <string name="sdui_media_play">Play</string>
+    <string name="sdui_media_pause">Pause</string>
+    <string name="sdui_media_mute">Mute audio</string>
+    <string name="sdui_media_unmute">Unmute audio</string>
+    <string name="sdui_media_video_preview_only">Embedded desktop preview</string>
+    <string name="sdui_media_audio_unavailable">Unsupported audio stream</string>
 </resources>

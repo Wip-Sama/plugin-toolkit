@@ -23,7 +23,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TooltipAnchorPosition
 import androidx.compose.material3.WideNavigationRail
 import androidx.compose.material3.WideNavigationRailDefaults
 import androidx.compose.material3.WideNavigationRailItem
@@ -63,6 +62,7 @@ import org.wip.plugintoolkit.features.settings.model.AppSettings
 import org.wip.plugintoolkit.features.settings.model.SidebarStartMode
 import org.wip.plugintoolkit.shared.components.ToastHost
 import org.wip.plugintoolkit.shared.components.ToolkitTooltipBox
+import org.wip.plugintoolkit.shared.components.ToolkitTooltipPosition
 import org.wip.plugintoolkit.shared.components.sidebar.SidebarElement
 import org.wip.plugintoolkit.shared.components.sidebar.SidebarSectionData
 import org.wip.plugintoolkit.ui.titlebar.CustomTitleBar
@@ -222,7 +222,7 @@ fun AppScaffold(
                                     )
                                     ToolkitTooltipBox(
                                         tooltip = toggleTooltip,
-                                        position = TooltipAnchorPosition.Right
+                                        position = ToolkitTooltipPosition.Right
                                     ) {
                                         IconButton(
                                             onClick = {
@@ -355,7 +355,7 @@ private fun AdaptiveRailNavigationItem(
     val labelText = element.title.resolve()
     ToolkitTooltipBox(
         tooltip = if (!railExpanded) labelText else null,
-        position = TooltipAnchorPosition.Right
+        position = ToolkitTooltipPosition.Right
     ) {
         WideNavigationRailItem(
             selected = selected,

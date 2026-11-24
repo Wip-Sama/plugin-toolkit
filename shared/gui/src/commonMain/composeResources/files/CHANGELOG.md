@@ -1,3 +1,11 @@
+Version: 4.1.0-alpha06
+Date: 24-11-2026
+Added:
+	- Adapted Compose Multiplatform & Material 3 callers to 1.13.0-rc01 (`ToolkitTooltipPosition`, top-level `ExposedDropdownMenu` with `matchAnchorWidth`, `ToggleButtonDefaults.shapesFor`, and `SliderState` in `ColorSlideBar`)
+	- Added Batch 6 SDUI expressive, date/time & media nodes: `FloatingToolbarNode`, `FabNode`, `FabMenuNode`, `SideSheetNode`, `DatePickerNode`, `TimePickerNode`, `ImageCompareNode`, and `MediaPlayerNode` with DSL builders and Pre-Composition AST sanitization
+	- Added host `ToolkitFabMenu`, `ToolkitImageCompare`, `ToolkitMediaPlayer`, Material 3 `DatePicker` / `TimePicker`, `HorizontalFloatingToolbar` in `FlowFloatingAppBar` and `BoardNodeRenderer`, and restrained `MaterialShapes` accents
+	- Showcased all Batch 6 components in `completeExample`
+------------------------------------------------------------------------
 Version: 4.1.0-alpha05
 Date: 23-11-2026
 Added:

@@ -59,7 +59,7 @@ fun ToolkitConnectedToggleGroup(
         options.forEachIndexed { index, option ->
             val isSelected = selectedKey == option.key
             val shapes = when {
-                options.size == 1 -> ToggleButtonDefaults.shapes()
+                options.size == 1 -> ToggleButtonDefaults.shapesFor(ToggleButtonDefaults.MinHeight)
                 index == 0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
                 index == options.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
                 else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
