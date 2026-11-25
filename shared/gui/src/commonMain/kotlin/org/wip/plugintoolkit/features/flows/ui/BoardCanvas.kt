@@ -306,7 +306,7 @@ fun BoardCanvas(
             .onPointerEvent(PointerEventType.Exit) {
                 shortcutManager?.setPointerSituation(null)
             }
-            .background(MaterialTheme.colorScheme.background)
+            .background(MaterialTheme.colorScheme.surfaceContainerLowest)
             .focusRequester(focusRequester)
             .focusable()
             .boardKeyboardHandler(

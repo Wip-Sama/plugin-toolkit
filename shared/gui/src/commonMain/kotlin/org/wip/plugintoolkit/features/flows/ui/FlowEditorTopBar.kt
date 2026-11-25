@@ -1,12 +1,12 @@
 package org.wip.plugintoolkit.features.flows.ui
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -29,6 +29,8 @@ import androidx.compose.ui.text.font.FontWeight
 import org.jetbrains.compose.resources.stringResource
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.flows.viewmodel.ReadOnlyReason
+import org.wip.plugintoolkit.shared.components.ToolkitTooltipBox
+import org.wip.plugintoolkit.shared.components.ToolkitTooltipPosition
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.flow_export_image_tooltip
 import plugintoolkit.composeapp.generated.resources.flow_editor_btn_exit
@@ -56,10 +58,13 @@ internal fun FlowEditorTopBar(
 ) {
     Surface(
         modifier = modifier.padding(ToolkitTheme.spacing.medium),
-        shape = RoundedCornerShape(ToolkitTheme.spacing.large),
-        color = MaterialTheme.colorScheme.surface.copy(alpha = ToolkitTheme.opacity.almostOpaque),
-        tonalElevation = ToolkitTheme.spacing.small,
-        shadowElevation = ToolkitTheme.spacing.extraSmall
+        shape = ToolkitTheme.shapes.large,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        border = BorderStroke(
+            ToolkitTheme.dimensions.borderUnselected,
+            MaterialTheme.colorScheme.outlineVariant.copy(alpha = ToolkitTheme.opacity.divider)
+        ),
+        shadowElevation = ToolkitTheme.dimensions.elevationMedium
     ) {
         Row(
             modifier = Modifier.padding(
@@ -162,15 +167,21 @@ internal fun FlowEditorTopBar(
             }
 
             if (onExportImage != null) {
-                IconButton(
-                    onClick = onExportImage,
-                    modifier = Modifier.testTag("topbar_export_image")
+                val exportTooltip = stringResource(Res.string.flow_export_image_tooltip)
+                ToolkitTooltipBox(
+                    tooltip = exportTooltip,
+                    position = ToolkitTooltipPosition.Below
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Image,
-                        contentDescription = stringResource(Res.string.flow_export_image_tooltip),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    IconButton(
+                        onClick = onExportImage,
+                        modifier = Modifier.testTag("topbar_export_image")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Image,
+                            contentDescription = exportTooltip,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
 

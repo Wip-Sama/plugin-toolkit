@@ -293,7 +293,7 @@ private fun ParameterGroup(
     )
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.surface,
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
         shape = ToolkitTheme.shapes.small,
         border = BorderStroke(ToolkitTheme.dimensions.borderUnselected, MaterialTheme.colorScheme.outlineVariant)
     ) {

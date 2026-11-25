@@ -17,8 +17,11 @@ import org.wip.plugintoolkit.shared.components.AdaptiveConstrainedContent
 import org.wip.plugintoolkit.shared.components.AdaptivePaneHeader
 import org.wip.plugintoolkit.shared.components.DesktopPaneDragHandle
 import org.wip.plugintoolkit.shared.components.adaptiveOuterHorizontalPadding
+import org.wip.plugintoolkit.shared.components.adaptiveWorkspacePadding
 import org.wip.plugintoolkit.shared.components.rememberAdaptivePaneScaffoldDirective
 import org.wip.plugintoolkit.shared.components.rememberSupportingPaneExpansionState
+import org.wip.plugintoolkit.core.utils.PlatformVerticalScrollbar
+import androidx.compose.foundation.layout.fillMaxHeight
 import plugintoolkit.composeapp.generated.resources.plugin_folders_toggle
 import plugintoolkit.composeapp.generated.resources.plugin_manager_subtitle
 import plugintoolkit.composeapp.generated.resources.plugin_manager_title
@@ -285,10 +288,7 @@ fun PluginManagerView(
         value = navigator.scaffoldValue,
         modifier = modifier
             .fillMaxSize()
-            .padding(
-                horizontal = adaptiveOuterHorizontalPadding(),
-                vertical = ToolkitTheme.spacing.medium
-            ),
+            .padding(adaptiveWorkspacePadding()),
         paneExpansionState = paneExpansionState,
         paneExpansionDragHandle = { state ->
             DesktopPaneDragHandle(paneExpansionState = state)
@@ -466,20 +466,23 @@ fun PluginManagerView(
                 )
             }
         } else {
-            LazyColumn(
-                state = lazyListState,
-                modifier = Modifier
-                    .verticalFadingEdges(
-                        lazyListState = lazyListState,
-                        topFadeLength = ToolkitTheme.spacing.medium,
-                        bottomFadeLength = ToolkitTheme.spacing.medium
-                    )
-                    .weight(1f),
-                contentPadding = PaddingValues(
-                    vertical = ToolkitTheme.spacing.small
-                ),
-                verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.medium)
-            ) {
+            Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                LazyColumn(
+                    state = lazyListState,
+                    modifier = Modifier
+                        .verticalFadingEdges(
+                            lazyListState = lazyListState,
+                            topFadeLength = ToolkitTheme.spacing.medium,
+                            bottomFadeLength = ToolkitTheme.spacing.medium
+                        )
+                        .fillMaxSize(),
+                    contentPadding = PaddingValues(
+                        top = ToolkitTheme.spacing.small,
+                        bottom = ToolkitTheme.spacing.small,
+                        end = ToolkitTheme.dimensions.sduiScrollbarEndPadding
+                    ),
+                    verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.medium)
+                ) {
                 items(filteredPlugins, key = { it.pkg }) { plugin ->
                     val hasUpdate = remember(plugin.pkg, plugin.version) {
                         viewModel.getUpdate(plugin.pkg) != null
@@ -520,6 +523,13 @@ fun PluginManagerView(
                     )
                 }
             }
+                PlatformVerticalScrollbar(
+                    lazyListState = lazyListState,
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .fillMaxHeight()
+                )
+            }
         }
                     }
                 }
@@ -530,7 +540,7 @@ fun PluginManagerView(
                 modifier = Modifier.preferredWidth(ToolkitTheme.dimensions.adaptiveSupportingPaneWidth)
             ) {
                 Surface(
-                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    color = MaterialTheme.colorScheme.surfaceContainer,
                     shape = ToolkitTheme.shapes.large,
                     modifier = Modifier.fillMaxSize()
                 ) {

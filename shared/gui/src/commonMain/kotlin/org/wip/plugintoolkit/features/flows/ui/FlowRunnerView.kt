@@ -33,6 +33,8 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
+import androidx.compose.material3.adaptive.layout.ListDetailPaneScaffoldRole
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -40,6 +42,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -53,6 +56,7 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonPrimitive
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
@@ -61,6 +65,7 @@ import org.wip.plugintoolkit.api.SemanticType
 import org.wip.plugintoolkit.api.format
 import org.wip.plugintoolkit.core.model.localized
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
+import org.wip.plugintoolkit.core.utils.PlatformVerticalScrollbar
 import org.wip.plugintoolkit.features.flows.model.Node
 import org.wip.plugintoolkit.features.flows.viewmodel.FlowViewModel
 import org.wip.plugintoolkit.features.navigation.model.Screen
@@ -68,12 +73,17 @@ import org.wip.plugintoolkit.features.job.model.JobStatus
 import org.wip.plugintoolkit.features.job.model.JobType
 import org.wip.plugintoolkit.features.job.viewmodel.JobViewModel
 import org.wip.plugintoolkit.features.plugin.utils.SettingsUtils
+import org.wip.plugintoolkit.shared.components.AdaptiveBackNavigationButton
+import org.wip.plugintoolkit.shared.components.ToolkitAdaptiveListDetailWorkspace
+import org.wip.plugintoolkit.shared.components.ToolkitEmptyState
 import org.wip.plugintoolkit.shared.components.ToolkitTextField
 import org.wip.plugintoolkit.shared.components.plugin.DynamicParameterInput
 import org.wip.plugintoolkit.shared.components.plugin.JobResultCard
-import org.wip.plugintoolkit.shared.components.sidebar.NavigationSidebar
 import org.wip.plugintoolkit.shared.components.sidebar.SidebarElement
+import org.wip.plugintoolkit.shared.components.sidebar.SidebarSection
 import org.wip.plugintoolkit.shared.components.sidebar.SidebarSectionData
+import org.wip.plugintoolkit.shared.components.sidebar.ToolkitFloatingSidebar
+import org.wip.plugintoolkit.shared.components.sidebar.ToolkitFloatingSidebarScaffold
 import org.wip.plugintoolkit.features.navigation.LocalGlobalRouter
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.action_edit
@@ -117,7 +127,7 @@ enum class ParameterType {
     INPUT, LOAD, SAVE, OUTPUT
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3AdaptiveApi::class)
 @Composable
 fun FlowRunnerView(
     viewModel: FlowViewModel,
@@ -126,6 +136,7 @@ fun FlowRunnerView(
     modifier: Modifier = Modifier
 ) {
     val router = LocalGlobalRouter.current
+    val scope = rememberCoroutineScope()
     var searchQuery by remember { mutableStateOf("") }
     val searchFocusRequester = remember { FocusRequester() }
 
@@ -193,7 +204,18 @@ fun FlowRunnerView(
         else executableFlows.filter { it.name.contains(searchQuery, ignoreCase = true) }
     }
 
-    Row(
+    val flowElements = filteredFlows.map { flow ->
+        SidebarElement(
+            id = flow,
+            icon = Icons.Default.PlayArrow,
+            title = flow.name.localized
+        )
+    }
+    val flowSection = remember(flowElements) {
+        SidebarSectionData(title = null, elements = flowElements)
+    }
+
+    ToolkitAdaptiveListDetailWorkspace<String>(
         modifier = modifier
             .fillMaxSize()
             .onPreviewKeyEvent { event ->
@@ -201,76 +223,124 @@ fun FlowRunnerView(
                     searchFocusRequester.requestFocus()
                     true
                 } else false
-            }
-    ) {
-        // Sidebar: Select Flow to Run (Standard NavigationSidebar)
-        val flowElements = filteredFlows.map { flow ->
-            SidebarElement(
-                id = flow,
-                icon = Icons.Default.PlayArrow,
-                title = flow.name.localized
-            )
-        }
-
-        NavigationSidebar(
-            title = Res.string.flow_select_title.localized,
-            bodySections = listOf(SidebarSectionData(title = null, elements = flowElements)),
-            currentScreen = selectedFlowToRun,
-            onScreenSelected = { selectedFlowToRun = it },
-            isNavbarCollapsed = false,
-            onToggleNavbar = {},
-            canCollapse = false,
-            headerContent = {
-                ToolkitTextField(
-                    value = searchQuery,
-                    onValueChange = { searchQuery = it },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = ToolkitTheme.spacing.medium)
-                        .focusRequester(searchFocusRequester),
-                    placeholder = {
-                        Text(
-                            stringResource(Res.string.flow_search_placeholder),
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                    },
-                    leadingIcon = {
-                        Icon(
-                            Icons.Default.Search,
-                            contentDescription = stringResource(Res.string.flow_search_placeholder),
-                            modifier = Modifier.size(ToolkitTheme.dimensions.iconMediumSmall)
-                        )
-                    },
-                    trailingIcon = if (searchQuery.isNotEmpty()) {
-                        {
-                            IconButton(onClick = { searchQuery = "" }) {
-                                Icon(
-                                    Icons.Default.Close,
-                                    contentDescription = "Clear",
-                                    modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
+            },
+        listPane = { navigator ->
+            ToolkitFloatingSidebar(
+                navigationKey = Unit,
+                animateNavigation = false,
+                modifier = Modifier.fillMaxSize()
+            ) {
+                ToolkitFloatingSidebarScaffold(
+                    title = stringResource(Res.string.flow_select_title),
+                    headerExtraContent = {
+                        ToolkitTextField(
+                            value = searchQuery,
+                            onValueChange = { searchQuery = it },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = ToolkitTheme.spacing.medium)
+                                .focusRequester(searchFocusRequester),
+                            placeholder = {
+                                Text(
+                                    stringResource(Res.string.flow_search_placeholder),
+                                    style = MaterialTheme.typography.bodySmall
                                 )
-                            }
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    Icons.Default.Search,
+                                    contentDescription = stringResource(Res.string.flow_search_placeholder),
+                                    modifier = Modifier.size(ToolkitTheme.dimensions.iconMediumSmall)
+                                )
+                            },
+                            trailingIcon = if (searchQuery.isNotEmpty()) {
+                                {
+                                    IconButton(onClick = { searchQuery = "" }) {
+                                        Icon(
+                                            Icons.Default.Close,
+                                            contentDescription = "Clear",
+                                            modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
+                                        )
+                                    }
+                                }
+                            } else null,
+                            singleLine = true
+                        )
+                    }
+                ) {
+                    val sidebarScroll = rememberScrollState()
+                    val sidebarScrollbarReserve = if (sidebarScroll.maxValue > 0) {
+                        ToolkitTheme.dimensions.sduiScrollbarEndPadding
+                    } else {
+                        ToolkitTheme.spacing.none
+                    }
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .verticalScroll(sidebarScroll)
+                                .padding(end = sidebarScrollbarReserve)
+                        ) {
+                            SidebarSection(
+                                section = flowSection,
+                                currentSelection = selectedFlowToRun,
+                                onItemSelected = { flow ->
+                                    selectedFlowToRun = flow
+                                    if (flow != null) {
+                                        scope.launch {
+                                            navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, flow.name)
+                                        }
+                                    }
+                                }
+                            )
                         }
-                    } else null,
-                    singleLine = true
-                )
+                        if (sidebarScroll.maxValue > 0) {
+                            PlatformVerticalScrollbar(
+                                scrollState = sidebarScroll,
+                                modifier = Modifier
+                                    .align(Alignment.CenterEnd)
+                                    .fillMaxHeight()
+                            )
+                        }
+                    }
+                }
             }
-        )
-
-        // Main Area: Run and History
-        Column(
-            modifier = Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState())
-                .padding(ToolkitTheme.spacing.extraLarge)
-        ) {
+        },
+        detailPane = { navigator ->
             val currentFlow = selectedFlowToRun
             if (currentFlow == null) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(
-                        stringResource(Res.string.flow_select_hint),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    ToolkitEmptyState(
+                        title = stringResource(Res.string.flow_select_hint),
+                        icon = Icons.Default.PlayArrow
                     )
                 }
             } else {
+                val mainScrollState = rememberScrollState()
+                val mainScrollbarReserve = if (mainScrollState.maxValue > 0) {
+                    ToolkitTheme.dimensions.sduiScrollbarEndPadding
+                } else {
+                    ToolkitTheme.spacing.none
+                }
+                Box(modifier = Modifier.fillMaxSize()) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .verticalScroll(mainScrollState)
+                            .padding(
+                                start = ToolkitTheme.spacing.large,
+                                top = ToolkitTheme.spacing.large,
+                                bottom = ToolkitTheme.spacing.large,
+                                end = ToolkitTheme.spacing.large + mainScrollbarReserve
+                            )
+                    ) {
+                        if (navigator.canNavigateBack()) {
+                            Box(modifier = Modifier.padding(bottom = ToolkitTheme.spacing.small)) {
+                                AdaptiveBackNavigationButton(
+                                    onClick = { scope.launch { navigator.navigateBack() } }
+                                )
+                            }
+                        }
                 // Parse parameters
                 val flowParameters = remember(currentFlow) {
                     currentFlow.nodes.flatMap { node ->
@@ -808,7 +878,17 @@ fun FlowRunnerView(
                         }
                     }
                 }
+                    }
+                    if (mainScrollState.maxValue > 0) {
+                        PlatformVerticalScrollbar(
+                            scrollState = mainScrollState,
+                            modifier = Modifier
+                                .align(Alignment.CenterEnd)
+                                .fillMaxHeight()
+                        )
+                    }
+                }
             }
         }
-    }
+    )
 }

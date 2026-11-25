@@ -69,6 +69,8 @@ import org.wip.plugintoolkit.features.colorpicker.utils.toHex
 import org.wip.plugintoolkit.features.flows.ui.components.FlowControlsInfoCard
 import org.wip.plugintoolkit.features.settings.model.ConnectionCurveStyle
 import org.wip.plugintoolkit.shared.components.LocalTooltipState
+import org.wip.plugintoolkit.shared.components.ToolkitTooltipBox
+import org.wip.plugintoolkit.shared.components.ToolkitTooltipPosition
 import org.wip.plugintoolkit.shared.components.ZoomControls
 import org.wip.plugintoolkit.shared.components.plugin.inputs.parseColorString
 import org.wip.plugintoolkit.shared.components.tooltip
@@ -160,6 +162,7 @@ fun FlowFloatingAppBar(
         modifier = modifier
             .padding(spacing.medium)
             .testTag("flow_floating_app_bar"),
+        shape = shapes.large,
         colors = FloatingToolbarDefaults.standardFloatingToolbarColors(
             toolbarContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh
         ),
@@ -167,33 +170,39 @@ fun FlowFloatingAppBar(
     ) {
             if (!isReadOnly) {
                 // 1. Add Group button
-                IconButton(
-                    onClick = onAddGroup,
-                    modifier = Modifier
-                        .size(dimensions.standardButtonHeight)
-                        .testTag("toolbar_add_group")
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Layers,
-                        contentDescription = stringResource(Res.string.flow_toolbar_add_group),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(dimensions.iconSmall)
-                    )
+                val addGroupLabel = stringResource(Res.string.flow_toolbar_add_group)
+                ToolkitTooltipBox(tooltip = addGroupLabel, position = ToolkitTooltipPosition.Above) {
+                    IconButton(
+                        onClick = onAddGroup,
+                        modifier = Modifier
+                            .size(dimensions.standardButtonHeight)
+                            .testTag("toolbar_add_group")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Layers,
+                            contentDescription = addGroupLabel,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(dimensions.iconSmall)
+                        )
+                    }
                 }
 
                 // 2. Add Label button
-                IconButton(
-                    onClick = onAddLabel,
-                    modifier = Modifier
-                        .size(dimensions.standardButtonHeight)
-                        .testTag("toolbar_add_label")
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.TextFields,
-                        contentDescription = stringResource(Res.string.flow_toolbar_add_label),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(dimensions.iconSmall)
-                    )
+                val addLabelText = stringResource(Res.string.flow_toolbar_add_label)
+                ToolkitTooltipBox(tooltip = addLabelText, position = ToolkitTooltipPosition.Above) {
+                    IconButton(
+                        onClick = onAddLabel,
+                        modifier = Modifier
+                            .size(dimensions.standardButtonHeight)
+                            .testTag("toolbar_add_label")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.TextFields,
+                            contentDescription = addLabelText,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(dimensions.iconSmall)
+                        )
+                    }
                 }
 
                 ToolbarDivider()
@@ -203,21 +212,24 @@ fun FlowFloatingAppBar(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
-                    IconButton(
-                        onClick = onTogglePaintTool,
-                        colors = IconButtonDefaults.iconButtonColors(
-                            containerColor = if (isPaintToolActive) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
-                            contentColor = if (isPaintToolActive) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
-                        ),
-                        modifier = Modifier
-                            .size(dimensions.standardButtonHeight)
-                            .testTag("toolbar_paint_tool")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Palette,
-                            contentDescription = stringResource(Res.string.flow_toolbar_paint),
-                            modifier = Modifier.size(dimensions.iconSmall)
-                        )
+                    val paintLabel = stringResource(Res.string.flow_toolbar_paint)
+                    ToolkitTooltipBox(tooltip = paintLabel, position = ToolkitTooltipPosition.Above) {
+                        IconButton(
+                            onClick = onTogglePaintTool,
+                            colors = IconButtonDefaults.iconButtonColors(
+                                containerColor = if (isPaintToolActive) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+                                contentColor = if (isPaintToolActive) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+                            ),
+                            modifier = Modifier
+                                .size(dimensions.standardButtonHeight)
+                                .testTag("toolbar_paint_tool")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Palette,
+                                contentDescription = paintLabel,
+                                modifier = Modifier.size(dimensions.iconSmall)
+                            )
+                        }
                     }
 
                     // Color swatch indicator with hover/click Quick Palette popup
@@ -265,61 +277,70 @@ fun FlowFloatingAppBar(
                     )
 
                     // Eyedropper Tool button
-                    IconButton(
-                        onClick = onToggleEyedropper,
-                        colors = IconButtonDefaults.iconButtonColors(
-                            containerColor = if (isEyedropperActive) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
-                            contentColor = if (isEyedropperActive) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
-                        ),
-                        modifier = Modifier
-                            .size(dimensions.standardButtonHeight)
-                            .testTag("toolbar_eyedropper_tool")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Colorize,
-                            contentDescription = stringResource(Res.string.flow_toolbar_eyedropper),
-                            modifier = Modifier.size(dimensions.iconSmall)
-                        )
+                    val eyedropperLabel = stringResource(Res.string.flow_toolbar_eyedropper)
+                    ToolkitTooltipBox(tooltip = eyedropperLabel, position = ToolkitTooltipPosition.Above) {
+                        IconButton(
+                            onClick = onToggleEyedropper,
+                            colors = IconButtonDefaults.iconButtonColors(
+                                containerColor = if (isEyedropperActive) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+                                contentColor = if (isEyedropperActive) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+                            ),
+                            modifier = Modifier
+                                .size(dimensions.standardButtonHeight)
+                                .testTag("toolbar_eyedropper_tool")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Colorize,
+                                contentDescription = eyedropperLabel,
+                                modifier = Modifier.size(dimensions.iconSmall)
+                            )
+                        }
                     }
                 }
 
                 // 4. Wash Brush tool
-                IconButton(
-                    onClick = onToggleWashTool,
-                    colors = IconButtonDefaults.iconButtonColors(
-                        containerColor = if (isWashToolActive) MaterialTheme.colorScheme.tertiaryContainer else Color.Transparent,
-                        contentColor = if (isWashToolActive) MaterialTheme.colorScheme.onTertiaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
-                    ),
-                    modifier = Modifier
-                        .size(dimensions.standardButtonHeight)
-                        .testTag("toolbar_wash_tool")
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Refresh,
-                        contentDescription = stringResource(Res.string.flow_toolbar_wash),
-                        modifier = Modifier.size(dimensions.iconSmall)
-                    )
+                val washLabel = stringResource(Res.string.flow_toolbar_wash)
+                ToolkitTooltipBox(tooltip = washLabel, position = ToolkitTooltipPosition.Above) {
+                    IconButton(
+                        onClick = onToggleWashTool,
+                        colors = IconButtonDefaults.iconButtonColors(
+                            containerColor = if (isWashToolActive) MaterialTheme.colorScheme.tertiaryContainer else Color.Transparent,
+                            contentColor = if (isWashToolActive) MaterialTheme.colorScheme.onTertiaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+                        ),
+                        modifier = Modifier
+                            .size(dimensions.standardButtonHeight)
+                            .testTag("toolbar_wash_tool")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = washLabel,
+                            modifier = Modifier.size(dimensions.iconSmall)
+                        )
+                    }
                 }
 
                 ToolbarDivider()
 
                 // 5. Spline & Roundness settings button
                 Box {
-                    IconButton(
-                        onClick = { showSplineSettings = !showSplineSettings },
-                        colors = IconButtonDefaults.iconButtonColors(
-                            containerColor = if (showSplineSettings) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
-                            contentColor = if (showSplineSettings) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
-                        ),
-                        modifier = Modifier
-                            .size(dimensions.standardButtonHeight)
-                            .testTag("toolbar_spline_settings")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Tune,
-                            contentDescription = stringResource(Res.string.flow_toolbar_spline_style),
-                            modifier = Modifier.size(dimensions.iconSmall)
-                        )
+                    val splineLabel = stringResource(Res.string.flow_toolbar_spline_style)
+                    ToolkitTooltipBox(tooltip = splineLabel, position = ToolkitTooltipPosition.Above) {
+                        IconButton(
+                            onClick = { showSplineSettings = !showSplineSettings },
+                            colors = IconButtonDefaults.iconButtonColors(
+                                containerColor = if (showSplineSettings) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
+                                contentColor = if (showSplineSettings) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+                            ),
+                            modifier = Modifier
+                                .size(dimensions.standardButtonHeight)
+                                .testTag("toolbar_spline_settings")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Tune,
+                                contentDescription = splineLabel,
+                                modifier = Modifier.size(dimensions.iconSmall)
+                            )
+                        }
                     }
 
                     if (showSplineSettings) {
@@ -345,39 +366,45 @@ fun FlowFloatingAppBar(
                 }
 
                 // 5.1 Advanced Connection Mode toggle
-                IconButton(
-                    onClick = onToggleAdvancedConnectionMode,
-                    colors = IconButtonDefaults.iconButtonColors(
-                        containerColor = if (isAdvancedConnectionMode) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
-                        contentColor = if (isAdvancedConnectionMode) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
-                    ),
-                    modifier = Modifier
-                        .size(dimensions.standardButtonHeight)
-                        .testTag("toolbar_advanced_connection_mode")
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Hub,
-                        contentDescription = stringResource(Res.string.flow_toolbar_advanced_connections),
-                        modifier = Modifier.size(dimensions.iconSmall)
-                    )
+                val advancedConnLabel = stringResource(Res.string.flow_toolbar_advanced_connections)
+                ToolkitTooltipBox(tooltip = advancedConnLabel, position = ToolkitTooltipPosition.Above) {
+                    IconButton(
+                        onClick = onToggleAdvancedConnectionMode,
+                        colors = IconButtonDefaults.iconButtonColors(
+                            containerColor = if (isAdvancedConnectionMode) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
+                            contentColor = if (isAdvancedConnectionMode) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+                        ),
+                        modifier = Modifier
+                            .size(dimensions.standardButtonHeight)
+                            .testTag("toolbar_advanced_connection_mode")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Hub,
+                            contentDescription = advancedConnLabel,
+                            modifier = Modifier.size(dimensions.iconSmall)
+                        )
+                    }
                 }
 
                 // 5.2 Port Auto-Hide toggle
-                IconButton(
-                    onClick = onToggleHideConnectionPoints,
-                    colors = IconButtonDefaults.iconButtonColors(
-                        containerColor = if (hideConnectionPointsUnlessHovered) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
-                        contentColor = if (hideConnectionPointsUnlessHovered) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
-                    ),
-                    modifier = Modifier
-                        .size(dimensions.standardButtonHeight)
-                        .testTag("toolbar_hide_connection_points")
-                ) {
-                    Icon(
-                        imageVector = if (hideConnectionPointsUnlessHovered) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                        contentDescription = stringResource(Res.string.flow_toolbar_hide_connection_points),
-                        modifier = Modifier.size(dimensions.iconSmall)
-                    )
+                val hidePortsLabel = stringResource(Res.string.flow_toolbar_hide_connection_points)
+                ToolkitTooltipBox(tooltip = hidePortsLabel, position = ToolkitTooltipPosition.Above) {
+                    IconButton(
+                        onClick = onToggleHideConnectionPoints,
+                        colors = IconButtonDefaults.iconButtonColors(
+                            containerColor = if (hideConnectionPointsUnlessHovered) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
+                            contentColor = if (hideConnectionPointsUnlessHovered) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+                        ),
+                        modifier = Modifier
+                            .size(dimensions.standardButtonHeight)
+                            .testTag("toolbar_hide_connection_points")
+                    ) {
+                        Icon(
+                            imageVector = if (hideConnectionPointsUnlessHovered) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                            contentDescription = hidePortsLabel,
+                            modifier = Modifier.size(dimensions.iconSmall)
+                        )
+                    }
                 }
 
                 ToolbarDivider()

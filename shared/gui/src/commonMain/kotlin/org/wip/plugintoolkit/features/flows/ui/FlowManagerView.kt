@@ -14,8 +14,10 @@ import org.wip.plugintoolkit.shared.components.AdaptiveConstrainedContent
 import org.wip.plugintoolkit.shared.components.AdaptivePaneHeader
 import org.wip.plugintoolkit.shared.components.DesktopPaneDragHandle
 import org.wip.plugintoolkit.shared.components.adaptiveOuterHorizontalPadding
+import org.wip.plugintoolkit.shared.components.adaptiveWorkspacePadding
 import org.wip.plugintoolkit.shared.components.rememberAdaptivePaneScaffoldDirective
 import org.wip.plugintoolkit.shared.components.rememberSupportingPaneExpansionState
+import org.wip.plugintoolkit.core.utils.PlatformVerticalScrollbar
 import plugintoolkit.composeapp.generated.resources.flow_manager_subtitle
 import plugintoolkit.composeapp.generated.resources.flow_summary_issues_count
 import plugintoolkit.composeapp.generated.resources.flow_summary_pane_title
@@ -268,10 +270,7 @@ fun FlowManagerView(
         value = navigator.scaffoldValue,
         modifier = modifier
             .fillMaxSize()
-            .padding(
-                horizontal = adaptiveOuterHorizontalPadding(),
-                vertical = ToolkitTheme.spacing.medium
-            ),
+            .padding(adaptiveWorkspacePadding()),
         paneExpansionState = paneExpansionState,
         paneExpansionDragHandle = { state ->
             DesktopPaneDragHandle(paneExpansionState = state)
@@ -391,10 +390,21 @@ fun FlowManagerView(
 
         Spacer(modifier = Modifier.height(ToolkitTheme.spacing.medium))
 
-        Column(
-            modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.medium)
-        ) {
+        val flowListScrollState = rememberScrollState()
+        val flowListScrollbarReserve = if (flowListScrollState.maxValue > 0) {
+            ToolkitTheme.dimensions.sduiScrollbarEndPadding
+        } else {
+            ToolkitTheme.spacing.none
+        }
+
+        Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(flowListScrollState)
+                    .padding(end = flowListScrollbarReserve),
+                verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.medium)
+            ) {
             if (filteredFlows.isEmpty()) {
                 Box(
                     Modifier.fillMaxSize().padding(vertical = ToolkitTheme.spacing.extraLarge),
@@ -475,6 +485,15 @@ fun FlowManagerView(
                     )
                 }
             }
+            }
+            if (flowListScrollState.maxValue > 0) {
+                PlatformVerticalScrollbar(
+                    scrollState = flowListScrollState,
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .fillMaxHeight()
+                )
+            }
         }
                     }
                 }
@@ -485,7 +504,7 @@ fun FlowManagerView(
                 modifier = Modifier.preferredWidth(ToolkitTheme.dimensions.adaptiveSupportingPaneWidth)
             ) {
                 Surface(
-                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    color = MaterialTheme.colorScheme.surfaceContainer,
                     shape = ToolkitTheme.shapes.large,
                     modifier = Modifier.fillMaxSize()
                 ) {

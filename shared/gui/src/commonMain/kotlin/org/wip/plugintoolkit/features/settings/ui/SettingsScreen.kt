@@ -34,8 +34,6 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
-import androidx.compose.material3.adaptive.layout.AnimatedPane
-import androidx.compose.material3.adaptive.layout.ListDetailPaneScaffold
 import androidx.compose.material3.adaptive.layout.ListDetailPaneScaffoldRole
 import androidx.compose.material3.adaptive.navigation.rememberListDetailPaneScaffoldNavigator
 import androidx.compose.runtime.Composable
@@ -45,16 +43,18 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.ui.unit.Dp
 import kotlinx.coroutines.launch
+import org.wip.plugintoolkit.core.utils.PlatformVerticalScrollbar
 import org.wip.plugintoolkit.shared.components.AdaptiveAppBarOverflowButton
 import org.wip.plugintoolkit.shared.components.AdaptiveBackNavigationButton
 import org.wip.plugintoolkit.shared.components.AdaptiveConstrainedContent
 import org.wip.plugintoolkit.shared.components.AdaptivePaneHeader
-import org.wip.plugintoolkit.shared.components.DesktopPaneDragHandle
+import org.wip.plugintoolkit.shared.components.ToolkitAdaptiveListDetailWorkspace
 import org.wip.plugintoolkit.shared.components.adaptiveOuterHorizontalPadding
 import org.wip.plugintoolkit.shared.components.rememberAdaptivePaneScaffoldDirective
-import org.wip.plugintoolkit.shared.components.rememberFixedListPaneExpansionState
+import org.wip.plugintoolkit.shared.components.sidebar.SidebarSection
+import org.wip.plugintoolkit.shared.components.sidebar.ToolkitFloatingSidebar
+import org.wip.plugintoolkit.shared.components.sidebar.ToolkitFloatingSidebarScaffold
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -249,236 +249,217 @@ fun SettingsScreen(
     val scope = rememberCoroutineScope()
     val directive = rememberAdaptivePaneScaffoldDirective()
     val navigator = rememberListDetailPaneScaffoldNavigator<SettingNavKey>(scaffoldDirective = directive)
-    val paneExpansionState = rememberFixedListPaneExpansionState(
-        initialWidth = ToolkitTheme.dimensions.adaptiveListPaneWidth
-    )
+    val detailSurfaceColor = MaterialTheme.colorScheme.surfaceContainerLowest
 
-    ListDetailPaneScaffold(
-        directive = navigator.scaffoldDirective,
-        value = navigator.scaffoldValue,
-        modifier = modifier
-            .fillMaxSize()
-            .padding(
-                horizontal = adaptiveOuterHorizontalPadding(),
-                vertical = ToolkitTheme.spacing.medium
-            )
-            .onPreviewKeyEvent { event ->
-                if (event.isCtrlPressed && event.key == Key.F && event.type == KeyEventType.KeyDown) {
-                    searchFocusRequester.requestFocus()
-                    true
-                } else false
-            },
-        paneExpansionState = paneExpansionState,
-        paneExpansionDragHandle = { state ->
-            DesktopPaneDragHandle(paneExpansionState = state)
+    ToolkitAdaptiveListDetailWorkspace(
+        navigator = navigator,
+        listPaneWidth = ToolkitTheme.dimensions.floatingSidebarDefaultWidth,
+        modifier = modifier.onPreviewKeyEvent { event ->
+            if (event.isCtrlPressed && event.key == Key.F && event.type == KeyEventType.KeyDown) {
+                searchFocusRequester.requestFocus()
+                true
+            } else false
         },
         listPane = {
-            AnimatedPane(
-                modifier = Modifier.preferredWidth(ToolkitTheme.dimensions.adaptiveListPaneWidth)
+            ToolkitFloatingSidebar(
+                navigationKey = Unit,
+                animateNavigation = false,
+                modifier = Modifier.fillMaxSize()
             ) {
-                Surface(
-                    color = MaterialTheme.colorScheme.surfaceContainerLow,
-                    shape = ToolkitTheme.shapes.large,
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    NavigationSidebar(
-                        title = Res.string.settings.localized,
-                        bodySections = listOf(applicationSection),
-                        bottomSections = listOf(aboutSection),
-                        currentScreen = currentKey,
-                        onScreenSelected = { route ->
-                            if (backStack.lastOrNull() != route) {
-                                backStack.add(route)
-                            }
-                            if (route is SettingNavKey) {
-                                scope.launch {
-                                    navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, route)
+                val sidebarScrollState = rememberScrollState()
+                ToolkitFloatingSidebarScaffold(
+                    title = stringResource(Res.string.settings),
+                    headerExtraContent = {
+                        org.wip.plugintoolkit.shared.components.ToolkitTextField(
+                            value = searchQuery,
+                            onValueChange = { searchViewModel.searchQuery = it },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = ToolkitTheme.spacing.medium)
+                                .focusRequester(searchFocusRequester),
+                            placeholder = { Text(stringResource(Res.string.settings_search_placeholder)) },
+                            leadingIcon = {
+                                Icon(
+                                    Icons.Default.Search,
+                                    contentDescription = stringResource(Res.string.settings_search_placeholder)
+                                )
+                            },
+                            singleLine = true
+                        )
+                    },
+                    bottomContent = {
+                        SidebarSection(
+                            section = aboutSection,
+                            currentSelection = currentKey,
+                            onItemSelected = { route ->
+                                if (backStack.lastOrNull() != route) {
+                                    backStack.add(route)
                                 }
-                            }
-                        },
-                        isNavbarCollapsed = false,
-                        onToggleNavbar = {},
-                        canCollapse = false,
-                        expandedWidth = Dp.Unspecified,
-                        headerContent = {
-                            org.wip.plugintoolkit.shared.components.ToolkitTextField(
-                                value = searchQuery,
-                                onValueChange = { searchViewModel.searchQuery = it },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(bottom = ToolkitTheme.spacing.medium)
-                                    .focusRequester(searchFocusRequester),
-                                placeholder = { Text(stringResource(Res.string.settings_search_placeholder)) },
-                                leadingIcon = {
-                                    Icon(
-                                        Icons.Default.Search,
-                                        contentDescription = stringResource(Res.string.settings_search_placeholder)
-                                    )
-                                },
-                                singleLine = true
+                                if (route is SettingNavKey) {
+                                    scope.launch {
+                                        navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, route)
+                                    }
+                                }
+                            },
+                            isExpanded = true
+                        )
+                    }
+                ) {
+                    val scrollbarReserve = if (sidebarScrollState.maxValue > 0) {
+                        ToolkitTheme.dimensions.sduiScrollbarEndPadding
+                    } else {
+                        ToolkitTheme.spacing.none
+                    }
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .verticalFadingEdges(
+                                scrollState = sidebarScrollState,
+                                topFadeLength = ToolkitTheme.spacing.large,
+                                bottomFadeLength = ToolkitTheme.spacing.large,
+                                almostOpaque = ToolkitTheme.opacity.almostOpaque
                             )
-                        }
-                    )
+                            .verticalScroll(sidebarScrollState)
+                            .padding(end = scrollbarReserve)
+                    ) {
+                        SidebarSection(
+                            section = applicationSection,
+                            currentSelection = currentKey,
+                            onItemSelected = { route ->
+                                if (backStack.lastOrNull() != route) {
+                                    backStack.add(route)
+                                }
+                                if (route is SettingNavKey) {
+                                    scope.launch {
+                                        navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, route)
+                                    }
+                                }
+                            },
+                            isExpanded = true
+                        )
+                    }
+                    if (sidebarScrollState.maxValue > 0) {
+                        PlatformVerticalScrollbar(
+                            scrollState = sidebarScrollState,
+                            modifier = Modifier
+                                .align(Alignment.CenterEnd)
+                                .fillMaxHeight()
+                        )
+                    }
                 }
             }
         },
         detailPane = {
-            AnimatedPane {
-                Surface(
-                    color = MaterialTheme.colorScheme.surfaceContainerLowest,
-                    shape = ToolkitTheme.shapes.large,
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(bottom = ToolkitTheme.spacing.large)
-                    ) {
-                        val titleText = when (currentKey) {
-                            SettingNavKey.Appearance -> stringResource(Res.string.setting_appearance)
-                            SettingNavKey.SystemSettings -> stringResource(Res.string.section_system)
-                            SettingNavKey.Shortcuts -> stringResource(Res.string.shortcuts_title)
-                            SettingNavKey.NotificationHistory -> stringResource(Res.string.nav_notification_history)
-                            SettingNavKey.PluginRepo -> stringResource(Res.string.section_plugins_repositories)
-                            SettingNavKey.PluginManager -> stringResource(Res.string.section_plugins_manager)
-                            SettingNavKey.About -> stringResource(Res.string.section_about)
-                            SettingNavKey.BroadSearch -> stringResource(Res.string.settings)
-                            else -> "Error"
-                        }
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(bottom = ToolkitTheme.spacing.large)
+            ) {
+                val titleText = when (currentKey) {
+                    SettingNavKey.Appearance -> stringResource(Res.string.setting_appearance)
+                    SettingNavKey.SystemSettings -> stringResource(Res.string.section_system)
+                    SettingNavKey.Shortcuts -> stringResource(Res.string.shortcuts_title)
+                    SettingNavKey.NotificationHistory -> stringResource(Res.string.nav_notification_history)
+                    SettingNavKey.PluginRepo -> stringResource(Res.string.section_plugins_repositories)
+                    SettingNavKey.PluginManager -> stringResource(Res.string.section_plugins_manager)
+                    SettingNavKey.About -> stringResource(Res.string.section_about)
+                    SettingNavKey.BroadSearch -> stringResource(Res.string.settings)
+                    else -> "Error"
+                }
 
-                        AdaptivePaneHeader(
-                            title = titleText,
-                            navigationIcon = if (navigator.canNavigateBack()) {
-                                {
-                                    AdaptiveBackNavigationButton(
-                                        onClick = { scope.launch { navigator.navigateBack() } }
-                                    )
+                AdaptivePaneHeader(
+                    title = titleText,
+                    navigationIcon = if (navigator.canNavigateBack()) {
+                        {
+                            AdaptiveBackNavigationButton(
+                                onClick = { scope.launch { navigator.navigateBack() } }
+                            )
+                        }
+                    } else null,
+                    actions = {
+                        if (currentKey == SettingNavKey.Shortcuts) {
+                            val resetTitle = stringResource(Res.string.shortcuts_reset_all)
+                            val resetMsg = stringResource(Res.string.shortcuts_reset_all_confirm)
+                            val hasCustomBindings = settings.shortcuts.customBindings.isNotEmpty() ||
+                                settings.shortcuts.customRelativePriorities.isNotEmpty()
+                            AppBarRow(
+                                maxItemCount = 1,
+                                overflowIndicator = { menuState ->
+                                    AdaptiveAppBarOverflowButton(menuState = menuState)
                                 }
-                            } else null,
-                            actions = {
-                                if (currentKey == SettingNavKey.Shortcuts) {
-                                    val resetTitle = stringResource(Res.string.shortcuts_reset_all)
-                                    val resetMsg = stringResource(Res.string.shortcuts_reset_all_confirm)
-                                    val hasCustomBindings = settings.shortcuts.customBindings.isNotEmpty() ||
-                                        settings.shortcuts.customRelativePriorities.isNotEmpty()
-                                    AppBarRow(
-                                        maxItemCount = 1,
-                                        overflowIndicator = { menuState ->
-                                            AdaptiveAppBarOverflowButton(menuState = menuState)
-                                        }
+                            ) {
+                                clickableItem(
+                                    onClick = {
+                                        dialogService.showConfirmation(
+                                            title = resetTitle,
+                                            message = resetMsg,
+                                            onConfirm = { shortcutManager.resetAllToDefaults() }
+                                        )
+                                    },
+                                    enabled = hasCustomBindings,
+                                    icon = {
+                                        Icon(
+                                            imageVector = Icons.Default.Restore,
+                                            contentDescription = resetTitle,
+                                            modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
+                                        )
+                                    },
+                                    label = resetTitle
+                                )
+                            }
+                        }
+                    }
+                )
+                Spacer(modifier = Modifier.height(ToolkitTheme.spacing.medium))
+
+                AdaptiveConstrainedContent(
+                    maxWidth = ToolkitTheme.dimensions.settingsContentMaxWidth,
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(horizontal = adaptiveOuterHorizontalPadding())
+                ) {
+                    CompositionLocalProvider(
+                        LocalSettingsSearchQuery provides searchQuery,
+                        LocalSettingsRegistry provides allDefinitions,
+                        LocalSettingsResolvedStrings provides resolvedStrings
+                    ) {
+                        val currentSettingKey = currentKey as? SettingNavKey ?: SettingNavKey.BroadSearch
+                        val hasLocalMatches =
+                            searchViewModel.hasLocalMatches(currentSettingKey, allDefinitions, resolvedStrings)
+
+                        if (!hasLocalMatches && currentKey != SettingNavKey.BroadSearch) {
+                            Column(
+                                modifier = Modifier.fillMaxSize()
+                            ) {
+                                Surface(
+                                    shape = ToolkitTheme.shapes.medium,
+                                    color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(bottom = ToolkitTheme.spacing.medium)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(
+                                            horizontal = ToolkitTheme.spacing.medium,
+                                            vertical = ToolkitTheme.spacing.small
+                                        ),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
                                     ) {
-                                        clickableItem(
-                                            onClick = {
-                                                dialogService.showConfirmation(
-                                                    title = resetTitle,
-                                                    message = resetMsg,
-                                                    onConfirm = { shortcutManager.resetAllToDefaults() }
-                                                )
-                                            },
-                                            enabled = hasCustomBindings,
-                                            icon = {
-                                                Icon(
-                                                    imageVector = Icons.Default.Restore,
-                                                    contentDescription = resetTitle,
-                                                    modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
-                                                )
-                                            },
-                                            label = resetTitle
+                                        Icon(
+                                            imageVector = Icons.Default.Search,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
+                                        )
+                                        Text(
+                                            text = stringResource(Res.string.settings_global_search_notice, titleText),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSecondaryContainer
                                         )
                                     }
                                 }
-                            }
-                        )
-                        Spacer(modifier = Modifier.height(ToolkitTheme.spacing.medium))
 
-                        AdaptiveConstrainedContent(
-                            maxWidth = ToolkitTheme.dimensions.sduiFormMaxWidth,
-                            modifier = Modifier
-                                .weight(1f)
-                                .padding(horizontal = adaptiveOuterHorizontalPadding())
-                        ) {
-                            CompositionLocalProvider(
-                LocalSettingsSearchQuery provides searchQuery,
-                LocalSettingsRegistry provides allDefinitions,
-                LocalSettingsResolvedStrings provides resolvedStrings
-            ) {
-                val currentSettingKey = currentKey as? SettingNavKey ?: SettingNavKey.BroadSearch
-                val hasLocalMatches =
-                    searchViewModel.hasLocalMatches(currentSettingKey, allDefinitions, resolvedStrings)
-
-                if (!hasLocalMatches && currentKey != SettingNavKey.BroadSearch) {
-                    Column(
-                        modifier = Modifier.fillMaxSize()
-                    ) {
-                        Surface(
-                            shape = ToolkitTheme.shapes.medium,
-                            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(bottom = ToolkitTheme.spacing.medium)
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(
-                                    horizontal = ToolkitTheme.spacing.medium,
-                                    vertical = ToolkitTheme.spacing.small
-                                ),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Search,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
-                                )
-                                Text(
-                                    text = stringResource(Res.string.settings_global_search_notice, titleText),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSecondaryContainer
-                                )
-                            }
-                        }
-
-                        BroadSearchResultsView(
-                            searchQuery = searchQuery,
-                            allDefinitions = allDefinitions,
-                            searchViewModel = searchViewModel,
-                            resolvedStrings = resolvedStrings,
-                            onNavigate = { targetKey ->
-                                if (backStack.lastOrNull() != targetKey) {
-                                    backStack.add(targetKey)
-                                }
-                            }
-                        )
-                    }
-                } else {
-                    NavDisplay(
-                        backStack = backStack,
-                        modifier = Modifier.fillMaxSize(),
-                        onBack = { if (backStack.size > 1) backStack.removeLast() },
-                        transitionSpec = desktopNavTransitionSpec(),
-                        popTransitionSpec = desktopNavTransitionSpec()
-                    ) { key ->
-                        when (key) {
-                            SettingNavKey.Appearance -> opaqueNavEntry(key) {
-                                AutoSettingsView(key as SettingNavKey, viewModel, registry)
-                            }
-
-                            SettingNavKey.SystemSettings -> opaqueNavEntry(key) {
-                                AutoSettingsView(key as SettingNavKey, viewModel, registry)
-                            }
-
-                            SettingNavKey.Shortcuts -> opaqueNavEntry(key) {
-                                ShortcutsSettingsView(
-                                    shortcutManager = shortcutManager,
-                                    settingsViewModel = viewModel,
-                                    dialogService = dialogService
-                                )
-                            }
-
-                            SettingNavKey.NotificationHistory -> opaqueNavEntry(key) { NotificationHistoryView() }
-                            SettingNavKey.About -> opaqueNavEntry(key) { AboutView() }
-                            SettingNavKey.BroadSearch -> opaqueNavEntry(key) {
                                 BroadSearchResultsView(
                                     searchQuery = searchQuery,
                                     allDefinitions = allDefinitions,
@@ -488,17 +469,62 @@ fun SettingsScreen(
                                         if (backStack.lastOrNull() != targetKey) {
                                             backStack.add(targetKey)
                                         }
-                                        scope.launch {
-                                            navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, targetKey)
-                                        }
-                                    })
+                                    }
+                                )
                             }
+                        } else {
+                            NavDisplay(
+                                backStack = backStack,
+                                modifier = Modifier.fillMaxSize(),
+                                onBack = { if (backStack.size > 1) backStack.removeLast() },
+                                transitionSpec = desktopNavTransitionSpec(),
+                                popTransitionSpec = desktopNavTransitionSpec()
+                            ) { key ->
+                                when (key) {
+                                    SettingNavKey.Appearance -> opaqueNavEntry(key, containerColor = detailSurfaceColor) {
+                                        AutoSettingsView(key as SettingNavKey, viewModel, registry)
+                                    }
 
-                            else -> opaqueNavEntry(key) { PlaceholderView("Error") }
-                        }
-                    }
-                }
-                        }
+                                    SettingNavKey.SystemSettings -> opaqueNavEntry(key, containerColor = detailSurfaceColor) {
+                                        AutoSettingsView(key as SettingNavKey, viewModel, registry)
+                                    }
+
+                                    SettingNavKey.Shortcuts -> opaqueNavEntry(key, containerColor = detailSurfaceColor) {
+                                        ShortcutsSettingsView(
+                                            shortcutManager = shortcutManager,
+                                            settingsViewModel = viewModel,
+                                            dialogService = dialogService
+                                        )
+                                    }
+
+                                    SettingNavKey.NotificationHistory -> opaqueNavEntry(key, containerColor = detailSurfaceColor) {
+                                        NotificationHistoryView()
+                                    }
+
+                                    SettingNavKey.About -> opaqueNavEntry(key, containerColor = detailSurfaceColor) {
+                                        AboutView()
+                                    }
+
+                                    SettingNavKey.BroadSearch -> opaqueNavEntry(key, containerColor = detailSurfaceColor) {
+                                        BroadSearchResultsView(
+                                            searchQuery = searchQuery,
+                                            allDefinitions = allDefinitions,
+                                            searchViewModel = searchViewModel,
+                                            resolvedStrings = resolvedStrings,
+                                            onNavigate = { targetKey ->
+                                                if (backStack.lastOrNull() != targetKey) {
+                                                    backStack.add(targetKey)
+                                                }
+                                                scope.launch {
+                                                    navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, targetKey)
+                                                }
+                                            }
+                                        )
+                                    }
+
+                                    else -> opaqueNavEntry(key, containerColor = detailSurfaceColor) { PlaceholderView("Error") }
+                                }
+                            }
                         }
                     }
                 }
@@ -524,30 +550,46 @@ fun BroadSearchResultsView(
     }
 
     val scrollState = rememberScrollState()
+    val scrollbarReserve = if (scrollState.maxValue > 0) {
+        ToolkitTheme.dimensions.sduiScrollbarEndPadding
+    } else {
+        ToolkitTheme.spacing.none
+    }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalFadingEdges(
-                scrollState = scrollState,
-                topFadeLength = ToolkitTheme.spacing.medium,
-                bottomFadeLength = ToolkitTheme.spacing.medium
-            )
-            .verticalScroll(scrollState)
-    ) {
-        grouped.forEach { (sectionName, items) ->
-            SettingsGroup(title = sectionName) {
-                items.forEachIndexed { index, definition ->
-                    SettingsItem(
-                        title = resolvedStrings[definition.title] ?: (definition.title as? SettingText.Raw)?.text ?: "",
-                        subtitle = definition.subtitle?.let { resolvedStrings[it] ?: (it as? SettingText.Raw)?.text },
-                        icon = definition.icon,
-                        shape = getGroupedShape(index, items.size),
-                        onClick = {
-                            onNavigate(definition.navKey)
-                        })
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalFadingEdges(
+                    scrollState = scrollState,
+                    topFadeLength = ToolkitTheme.spacing.medium,
+                    bottomFadeLength = ToolkitTheme.spacing.medium
+                )
+                .verticalScroll(scrollState)
+                .padding(end = scrollbarReserve)
+        ) {
+            grouped.forEach { (sectionName, items) ->
+                SettingsGroup(title = sectionName) {
+                    items.forEachIndexed { index, definition ->
+                        SettingsItem(
+                            title = resolvedStrings[definition.title] ?: (definition.title as? SettingText.Raw)?.text ?: "",
+                            subtitle = definition.subtitle?.let { resolvedStrings[it] ?: (it as? SettingText.Raw)?.text },
+                            icon = definition.icon,
+                            shape = getGroupedShape(index, items.size),
+                            onClick = {
+                                onNavigate(definition.navKey)
+                            })
+                    }
                 }
             }
+        }
+        if (scrollState.maxValue > 0) {
+            PlatformVerticalScrollbar(
+                scrollState = scrollState,
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .fillMaxHeight()
+            )
         }
     }
 }

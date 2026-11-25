@@ -195,6 +195,8 @@ fun FlowEditorView(
     var dragStartPosition by remember { mutableStateOf(Offset.Zero) }
     var dragGrabOffset by remember { mutableStateOf(Offset.Zero) }
     var draggingNodeScale by remember { mutableStateOf(1f) }
+    var isDraggingOverBoard by remember { mutableStateOf(false) }
+    var paletteBoundsInRoot by remember { mutableStateOf<Rect?>(null) }
     var replacingNodeId by remember { mutableStateOf<Long?>(null) }
 
     val availablePlugins = viewModel.plugins.collectAsState().value
@@ -1035,28 +1037,33 @@ fun FlowEditorView(
             }
         }
 
-        // 2. Left Sidebar (Overlay Layer)
+        // 2. Left Floating Palette Sidebar (Overlay Layer above BoardCanvas)
         if (!state.isReadOnly) {
             PaletteSidebar(
                 flows = state.flows,
                 currentFlowName = flow.name,
                 plugins = viewModel.plugins.collectAsState().value,
                 rootLayoutCoordinates = rootLayoutCoordinates,
+                onPaletteBoundsChanged = { bounds -> paletteBoundsInRoot = bounds },
                 onDragStart = { paletteNode, initialPos, grabOffset ->
                     draggingNodeFromPalette = paletteNode
                     dragStartPosition = initialPos
                     dragGrabOffset = grabOffset
                     draggingNodeScale = 1.0f
-                    draggingNodePos = initialPos
+                    draggingNodePos = initialPos - grabOffset
+                    isDraggingOverBoard = false
                 },
                 onDrag = { cumulativeDrag ->
                     val cursorPos = dragStartPosition + cumulativeDrag
                     val boardOffset = boardLayoutCoordinates?.positionInParent() ?: Offset.Zero
                     val relativeToBoard = cursorPos - boardOffset
-                    val isOverBoard = boardSize != IntSize.Zero &&
-                            relativeToBoard.x >= 0 && relativeToBoard.y >= 0 &&
-                            relativeToBoard.x <= boardSize.width && relativeToBoard.y <= boardSize.height
+                    val insideBoard = boardSize != IntSize.Zero &&
+                        relativeToBoard.x >= 0 && relativeToBoard.y >= 0 &&
+                        relativeToBoard.x <= boardSize.width && relativeToBoard.y <= boardSize.height
+                    val overPalette = paletteBoundsInRoot?.contains(cursorPos) == true
+                    val isOverBoard = insideBoard && !overPalette
 
+                    isDraggingOverBoard = isOverBoard
                     draggingNodeScale = if (isOverBoard) state.scale else 1.0f
                     draggingNodePos = cursorPos - dragGrabOffset * draggingNodeScale
                 },
@@ -1064,8 +1071,12 @@ fun FlowEditorView(
                     val position = draggingNodePos
                     val boardOffset = boardLayoutCoordinates?.positionInParent() ?: Offset.Zero
                     val relativeToBoard = position - boardOffset
-                    val isOverBoard =
-                        relativeToBoard.x >= 0 && relativeToBoard.y >= 0 && relativeToBoard.x <= boardSize.width && relativeToBoard.y <= boardSize.height
+                    val cursorPos = position + dragGrabOffset * draggingNodeScale
+                    val insideBoard = boardSize != IntSize.Zero &&
+                        relativeToBoard.x >= 0 && relativeToBoard.y >= 0 &&
+                        relativeToBoard.x <= boardSize.width && relativeToBoard.y <= boardSize.height
+                    val overPalette = paletteBoundsInRoot?.contains(cursorPos) == true
+                    val isOverBoard = insideBoard && !overPalette
 
                     if (isOverBoard) {
                         val dropPos = (relativeToBoard - state.offset) / state.scale
@@ -1102,10 +1113,18 @@ fun FlowEditorView(
                         }
                     }
                     draggingNodeFromPalette = null
+                    isDraggingOverBoard = false
                 },
                 onClick = handlePaletteClick,
                 hasUnsavedChanges = state.hasUnsavedChanges,
-                onNavigateToPluginSetting = onNavigateToPluginSetting
+                onNavigateToPluginSetting = onNavigateToPluginSetting,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(
+                        start = ToolkitTheme.dimensions.workspaceStartPadding,
+                        top = ToolkitTheme.dimensions.workspaceVerticalPadding,
+                        bottom = ToolkitTheme.dimensions.workspaceVerticalPadding
+                    )
             )
         }
 
@@ -1130,7 +1149,7 @@ fun FlowEditorView(
             modifier = Modifier.align(Alignment.TopEnd)
         )
 
-        // 4. Global Dragging Preview (Highest Layer)
+        // 4. Global Dragging Preview (Highest Layer above Floating Palette & TopBar)
         draggingNodeFromPalette?.let { node ->
             Box(
                 modifier = Modifier
@@ -1140,9 +1159,12 @@ fun FlowEditorView(
                         scaleY = draggingNodeScale,
                         transformOrigin = TransformOrigin(0f, 0f)
                     )
-                    .alpha(0.7f)
+                    .alpha(if (isDraggingOverBoard) 0.94f else 0.72f)
             ) {
-                PaletteItemPreview(node)
+                PaletteItemPreview(
+                    node = node,
+                    isOverBoard = isDraggingOverBoard
+                )
             }
         }
 

@@ -6,9 +6,11 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -16,6 +18,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -66,6 +69,7 @@ import androidx.compose.ui.unit.Dp
 import org.jetbrains.compose.resources.stringResource
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.core.utils.PlatformUtils
+import org.wip.plugintoolkit.core.utils.PlatformVerticalScrollbar
 import org.wip.plugintoolkit.features.repository.model.ExtensionRepo
 import org.wip.plugintoolkit.features.repository.viewmodel.RepoTypeTab
 import org.wip.plugintoolkit.shared.components.ToolkitTextField
@@ -109,6 +113,8 @@ fun PluginRepoSidebar(
         runCatching { searchFocusRequester.requestFocus() }
     }
 
+    val repoListState = rememberLazyListState()
+
     SidebarContainer(
         modifier = modifier.onPreviewKeyEvent { event ->
             if (event.isCtrlPressed && event.key == Key.F && event.type == KeyEventType.KeyDown) {
@@ -118,6 +124,7 @@ fun PluginRepoSidebar(
         },
         width = if (fillPaneWidth) Dp.Unspecified else ToolkitTheme.dimensions.sidebarExpandedWidth,
         containerColor = MaterialTheme.colorScheme.surfaceContainer,
+        shape = if (fillPaneWidth) ToolkitTheme.shapes.large else androidx.compose.ui.graphics.RectangleShape,
         topContent = {
             Column(
                 modifier = Modifier.fillMaxWidth(),
@@ -177,10 +184,13 @@ fun PluginRepoSidebar(
         },
         bodyContent = {
             // Repository List
-            LazyColumn(
-                modifier = Modifier.weight(1f).fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
-            ) {
+            Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                LazyColumn(
+                    state = repoListState,
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(end = ToolkitTheme.dimensions.sduiScrollbarEndPadding),
+                    verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
+                ) {
                 items(repositories) { repo ->
                     val isSelected = selectedRepo?.url == repo.url
                     var showMenu by remember { mutableStateOf(false) }
@@ -337,6 +347,13 @@ fun PluginRepoSidebar(
                         }
                     }
                 }
+                }
+                PlatformVerticalScrollbar(
+                    lazyListState = repoListState,
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .fillMaxHeight()
+                )
             }
         },
         bottomContent = {

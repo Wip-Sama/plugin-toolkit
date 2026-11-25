@@ -2,15 +2,15 @@ package org.wip.plugintoolkit.features.plugin.ui
 
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
-import androidx.compose.material3.adaptive.layout.AnimatedPane
-import androidx.compose.material3.adaptive.layout.ListDetailPaneScaffold
 import androidx.compose.material3.adaptive.layout.ListDetailPaneScaffoldRole
 import androidx.compose.material3.adaptive.navigation.rememberListDetailPaneScaffoldNavigator
 import org.wip.plugintoolkit.shared.components.AdaptiveBackNavigationButton
-import org.wip.plugintoolkit.shared.components.DesktopPaneDragHandle
-import org.wip.plugintoolkit.shared.components.adaptiveOuterHorizontalPadding
+import org.wip.plugintoolkit.shared.components.ToolkitAdaptiveListDetailWorkspace
 import org.wip.plugintoolkit.shared.components.rememberAdaptivePaneScaffoldDirective
-import org.wip.plugintoolkit.shared.components.rememberFixedListPaneExpansionState
+import org.wip.plugintoolkit.shared.components.sidebar.SequelSidebarMode
+import org.wip.plugintoolkit.shared.components.sidebar.isLargeAdaptiveWidth
+import org.wip.plugintoolkit.shared.components.sidebar.resolveSequelExpanded
+import org.wip.plugintoolkit.shared.components.sidebar.toggleSequelSidebarMode
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
@@ -168,171 +168,155 @@ fun InteractiveToolsScreen(
     val navigator = rememberListDetailPaneScaffoldNavigator<String>(
         scaffoldDirective = directive
     )
-    val paneExpansionState = rememberFixedListPaneExpansionState(
-        initialWidth = ToolkitTheme.dimensions.adaptiveCompactListPaneWidth
-    )
+    var sequelMode by remember { mutableStateOf(SequelSidebarMode.Auto) }
+    val isLargeWidth = isLargeAdaptiveWidth()
+    val isSequelExpanded = resolveSequelExpanded(sequelMode, isLargeWidth) &&
+        (selectedPluginId != null || sequelMode == SequelSidebarMode.ForcedExpanded)
+    val listPaneWidth = if (isSequelExpanded) {
+        ToolkitTheme.dimensions.floatingSidebarSplitTotalWidth
+    } else {
+        ToolkitTheme.dimensions.floatingSidebarDefaultWidth
+    }
 
-    ListDetailPaneScaffold(
-        directive = navigator.scaffoldDirective,
-        value = navigator.scaffoldValue,
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(
-                horizontal = adaptiveOuterHorizontalPadding(),
-                vertical = ToolkitTheme.spacing.medium
-            ),
-        paneExpansionState = paneExpansionState,
-        paneExpansionDragHandle = { state ->
-            DesktopPaneDragHandle(paneExpansionState = state)
-        },
+    ToolkitAdaptiveListDetailWorkspace(
+        navigator = navigator,
+        listPaneWidth = listPaneWidth,
         listPane = {
-            AnimatedPane(
-                modifier = Modifier.preferredWidth(ToolkitTheme.dimensions.adaptiveCompactListPaneWidth)
-            ) {
-                Surface(
-                    color = MaterialTheme.colorScheme.surfaceContainerLow,
-                    shape = ToolkitTheme.shapes.large,
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    DirectExecutionSidebar(
-                        loadedPlugins = loadedPlugins,
-                        selectedPluginId = selectedPluginId,
-                        onPluginSelected = { pluginId ->
-                            selectedPluginId = pluginId
-                            val matching = tools.find { it.plugin.getManifest().getOrNull()?.plugin?.id == pluginId }
-                            if (matching != null && selectedTool == null) {
-                                viewModel.selectTool(matching)
-                                scope.launch {
-                                    navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, pluginId)
-                                }
-                            }
-                        },
-                        onBackToPlugins = {
-                            selectedPluginId = null
-                        },
-                        selectedCapability = if (selectedTool?.plugin?.getManifest()?.getOrNull()?.plugin?.id == selectedPluginId) {
-                            selectedTool?.capability
-                        } else null,
-                        onCapabilitySelected = { capability ->
-                            val matching = tools.find {
-                                it.plugin.getManifest().getOrNull()?.plugin?.id == selectedPluginId &&
-                                    it.capability.name == capability.name
-                            }
-                            if (matching != null) {
-                                viewModel.selectTool(matching)
-                                scope.launch {
-                                    navigator.navigateTo(
-                                        ListDetailPaneScaffoldRole.Detail,
-                                        "${selectedPluginId ?: ""}:${capability.name}"
-                                    )
-                                }
-                            }
-                        },
-                        isInteractiveOnly = true,
-                        fillPaneWidth = true
-                    )
-                }
-            }
+            DirectExecutionSidebar(
+                loadedPlugins = loadedPlugins,
+                selectedPluginId = selectedPluginId,
+                onPluginSelected = { pluginId ->
+                    selectedPluginId = pluginId
+                    val matching = tools.find { it.plugin.getManifest().getOrNull()?.plugin?.id == pluginId }
+                    if (matching != null && selectedTool == null) {
+                        viewModel.selectTool(matching)
+                        scope.launch {
+                            navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, pluginId)
+                        }
+                    }
+                },
+                onBackToPlugins = {
+                    selectedPluginId = null
+                },
+                selectedCapability = if (selectedTool?.plugin?.getManifest()?.getOrNull()?.plugin?.id == selectedPluginId) {
+                    selectedTool?.capability
+                } else null,
+                onCapabilitySelected = { capability ->
+                    val matching = tools.find {
+                        it.plugin.getManifest().getOrNull()?.plugin?.id == selectedPluginId &&
+                            it.capability.name == capability.name
+                    }
+                    if (matching != null) {
+                        viewModel.selectTool(matching)
+                        scope.launch {
+                            navigator.navigateTo(
+                                ListDetailPaneScaffoldRole.Detail,
+                                "${selectedPluginId ?: ""}:${capability.name}"
+                            )
+                        }
+                    }
+                },
+                isInteractiveOnly = true,
+                isSequelExpanded = isSequelExpanded,
+                onToggleSequelMode = {
+                    sequelMode = toggleSequelSidebarMode(isSequelExpanded)
+                },
+                fillPaneWidth = true
+            )
         },
         detailPane = {
-            AnimatedPane {
-                Surface(
-                    color = MaterialTheme.colorScheme.surfaceContainerLowest,
-                    shape = ToolkitTheme.shapes.large,
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .clipToBounds()
-                    ) {
-            val currentTool = selectedTool
-            if (currentTool == null) {
-                if (tools.isEmpty()) {
-                    EmptyState(stringResource(Res.string.interactive_tools_empty))
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clipToBounds()
+            ) {
+                val currentTool = selectedTool
+                if (currentTool == null) {
+                    if (tools.isEmpty()) {
+                        EmptyState(stringResource(Res.string.interactive_tools_empty))
+                    } else {
+                        EmptyState(stringResource(Res.string.interactive_tools_hint))
+                    }
                 } else {
-                    EmptyState(stringResource(Res.string.interactive_tools_hint))
-                }
-            } else {
-                val handle = activeSessionHandle
-                if (handle != null && handle.isActive) {
-                    // Full section addressable viewport
-                    PluginCustomUiCard(
-                        handle = handle,
-                        modifier = Modifier.fillMaxSize(),
-                        onClose = { viewModel.closeSession() }
-                    )
+                    val handle = activeSessionHandle
+                    if (handle != null && handle.isActive) {
+                        // Full section addressable viewport
+                        PluginCustomUiCard(
+                            handle = handle,
+                            modifier = Modifier.fillMaxSize(),
+                            onClose = { viewModel.closeSession() }
+                        )
 
-                    // Hidden floating pill bar with low presence that animates on hover (as in Image 4)
-                    val pluginMeta = currentTool.plugin.getManifest().getOrNull()?.plugin
-                    val pluginLabel = if (pluginMeta != null) "${pluginMeta.name} v${pluginMeta.version}" else ""
+                        // Hidden floating pill bar with low presence that animates on hover
+                        val pluginMeta = currentTool.plugin.getManifest().getOrNull()?.plugin
+                        val pluginLabel = if (pluginMeta != null) "${pluginMeta.name} v${pluginMeta.version}" else ""
 
-                    InteractiveFloatingBottomBar(
-                        toolName = currentTool.capability.name,
-                        pluginName = pluginLabel,
-                        onRestart = { viewModel.restartSession() },
-                        onClose = { viewModel.closeSession() },
-                        modifier = Modifier.align(Alignment.BottomCenter)
-                    )
-                } else {
-                    // Centered idle state launcher card
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(ToolkitTheme.spacing.large),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Card(
+                        InteractiveFloatingBottomBar(
+                            toolName = currentTool.capability.name,
+                            pluginName = pluginLabel,
+                            onRestart = { viewModel.restartSession() },
+                            onClose = { viewModel.closeSession() },
+                            modifier = Modifier.align(Alignment.BottomCenter)
+                        )
+                    } else {
+                        // Centered idle state launcher card
+                        Box(
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .widthIn(max = ToolkitTheme.dimensions.adaptiveListPaneWidth)
-                                .border(
-                                    width = ToolkitTheme.dimensions.borderThin,
-                                    color = MaterialTheme.colorScheme.outlineVariant,
-                                    shape = RoundedCornerShape(ToolkitTheme.dimensions.expressiveCardCornerRadius)
-                                ),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                            shape = RoundedCornerShape(ToolkitTheme.dimensions.expressiveCardCornerRadius)
+                                .fillMaxSize()
+                                .padding(ToolkitTheme.spacing.large),
+                            contentAlignment = Alignment.Center
                         ) {
-                            Column(
+                            Card(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(ToolkitTheme.spacing.extraLarge),
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.medium)
+                                    .widthIn(max = ToolkitTheme.dimensions.adaptiveListPaneWidth)
+                                    .border(
+                                        width = ToolkitTheme.dimensions.borderThin,
+                                        color = MaterialTheme.colorScheme.outlineVariant,
+                                        shape = RoundedCornerShape(ToolkitTheme.dimensions.expressiveCardCornerRadius)
+                                    ),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+                                shape = RoundedCornerShape(ToolkitTheme.dimensions.expressiveCardCornerRadius)
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.TouchApp,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(ToolkitTheme.dimensions.iconLarge)
-                                )
-                                Text(
-                                    text = currentTool.capability.name,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Text(
-                                    text = currentTool.capability.description ?: stringResource(Res.string.interactive_tools_hint),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Button(
-                                    onClick = { viewModel.startSession(currentTool) }
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(ToolkitTheme.spacing.extraLarge),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.medium)
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Default.PlayArrow,
+                                        imageVector = Icons.Default.TouchApp,
                                         contentDescription = null,
-                                        modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(ToolkitTheme.dimensions.iconLarge)
                                     )
-                                    Spacer(Modifier.width(ToolkitTheme.spacing.extraSmall))
-                                    Text(stringResource(Res.string.action_launch_session))
+                                    Text(
+                                        text = currentTool.capability.name,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = currentTool.capability.description ?: stringResource(Res.string.interactive_tools_hint),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Button(
+                                        onClick = { viewModel.startSession(currentTool) }
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.PlayArrow,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
+                                        )
+                                        Spacer(Modifier.width(ToolkitTheme.spacing.extraSmall))
+                                        Text(stringResource(Res.string.action_launch_session))
+                                    }
                                 }
                             }
                         }
                     }
                 }
-            }
 
                 if (navigator.canNavigateBack()) {
                     Box(
@@ -346,8 +330,6 @@ fun InteractiveToolsScreen(
                     }
                 }
             }
-        }
-    }
         }
     )
 }

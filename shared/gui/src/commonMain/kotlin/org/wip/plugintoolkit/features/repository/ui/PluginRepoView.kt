@@ -3,14 +3,8 @@ package org.wip.plugintoolkit.features.repository.ui
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
-import androidx.compose.material3.adaptive.layout.AnimatedPane
-import androidx.compose.material3.adaptive.layout.ListDetailPaneScaffold
 import androidx.compose.material3.adaptive.layout.ListDetailPaneScaffoldRole
-import androidx.compose.material3.adaptive.navigation.rememberListDetailPaneScaffoldNavigator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -31,10 +25,7 @@ import org.wip.plugintoolkit.features.repository.ui.components.PluginRepoDetails
 import org.wip.plugintoolkit.features.repository.ui.components.PluginRepoSidebar
 import org.wip.plugintoolkit.features.repository.viewmodel.PluginRepoViewModel
 import org.wip.plugintoolkit.shared.components.AdaptiveBackNavigationButton
-import org.wip.plugintoolkit.shared.components.DesktopPaneDragHandle
-import org.wip.plugintoolkit.shared.components.adaptiveOuterHorizontalPadding
-import org.wip.plugintoolkit.shared.components.rememberAdaptivePaneScaffoldDirective
-import org.wip.plugintoolkit.shared.components.rememberFixedListPaneExpansionState
+import org.wip.plugintoolkit.shared.components.ToolkitAdaptiveListDetailWorkspace
 
 /**
  * Adaptive repository browser screen using Material 3 `ListDetailPaneScaffold` with a
@@ -76,109 +67,78 @@ fun PluginRepoView(
         }
     }
 
-    val directive = rememberAdaptivePaneScaffoldDirective()
-    val navigator = rememberListDetailPaneScaffoldNavigator<String>(scaffoldDirective = directive)
-    val paneExpansionState = rememberFixedListPaneExpansionState(
-        initialWidth = ToolkitTheme.dimensions.adaptiveListPaneWidth
-    )
-
     Box(modifier = Modifier.fillMaxSize()) {
-        ListDetailPaneScaffold(
-            directive = navigator.scaffoldDirective,
-            value = navigator.scaffoldValue,
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = adaptiveOuterHorizontalPadding(), vertical = ToolkitTheme.spacing.medium),
-            paneExpansionState = paneExpansionState,
-            paneExpansionDragHandle = { state ->
-                DesktopPaneDragHandle(paneExpansionState = state)
+        ToolkitAdaptiveListDetailWorkspace<String>(
+            listPaneWidth = ToolkitTheme.dimensions.adaptiveListPaneWidth,
+            listPane = { navigator ->
+                PluginRepoSidebar(
+                    repositories = filteredRepos,
+                    selectedRepo = selectedRepo,
+                    isRefreshing = isRefreshing,
+                    repoTypeTab = viewModel.repoTypeTab,
+                    totalRepoCount = totalRepoCount,
+                    remoteRepoCount = remoteRepoCount,
+                    localRepoCount = localRepoCount,
+                    repoSearchQuery = viewModel.repoSearchQuery,
+                    onRepoTypeTabChange = { viewModel.repoTypeTab = it },
+                    onRepoSearchQueryChange = { viewModel.repoSearchQuery = it },
+                    onRepoSelected = { repo ->
+                        selectedRepo = repo
+                        scope.launch {
+                            navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, repo.url)
+                        }
+                    },
+                    onRemoveRepo = { viewModel.removeRepository(it.url) },
+                    onCopyLink = { viewModel.copyRepositoryLink(it) },
+                    onRefreshRepo = { viewModel.refreshRepository(it.url) },
+                    onRefreshAll = { viewModel.refreshAll() },
+                    onOpenAddDialog = { viewModel.openAddRepoDialog() },
+                    onOpenLocalFolder = { viewModel.openLocalFolder(it) },
+                    fillPaneWidth = true,
+                    modifier = Modifier.fillMaxSize()
+                )
             },
-            listPane = {
-                AnimatedPane(
-                    modifier = Modifier.preferredWidth(ToolkitTheme.dimensions.adaptiveListPaneWidth)
-                ) {
-                    Surface(
-                        color = MaterialTheme.colorScheme.surfaceContainerLow,
-                        shape = ToolkitTheme.shapes.large,
-                        modifier = Modifier.fillMaxSize()
-                    ) {
-                        PluginRepoSidebar(
-                            repositories = filteredRepos,
-                            selectedRepo = selectedRepo,
-                            isRefreshing = isRefreshing,
-                            repoTypeTab = viewModel.repoTypeTab,
-                            totalRepoCount = totalRepoCount,
-                            remoteRepoCount = remoteRepoCount,
-                            localRepoCount = localRepoCount,
-                            repoSearchQuery = viewModel.repoSearchQuery,
-                            onRepoTypeTabChange = { viewModel.repoTypeTab = it },
-                            onRepoSearchQueryChange = { viewModel.repoSearchQuery = it },
-                            onRepoSelected = { repo ->
-                                selectedRepo = repo
-                                scope.launch {
-                                    navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, repo.url)
-                                }
-                            },
-                            onRemoveRepo = { viewModel.removeRepository(it.url) },
-                            onCopyLink = { viewModel.copyRepositoryLink(it) },
-                            onRefreshRepo = { viewModel.refreshRepository(it.url) },
-                            onRefreshAll = { viewModel.refreshAll() },
-                            onOpenAddDialog = { viewModel.openAddRepoDialog() },
-                            onOpenLocalFolder = { viewModel.openLocalFolder(it) },
-                            fillPaneWidth = true
+            detailPane = { navigator ->
+                Column(modifier = Modifier.fillMaxSize()) {
+                    if (navigator.canNavigateBack()) {
+                        AdaptiveBackNavigationButton(
+                            onClick = { scope.launch { navigator.navigateBack() } }
                         )
                     }
-                }
-            },
-            detailPane = {
-                AnimatedPane {
-                    Surface(
-                        color = MaterialTheme.colorScheme.surfaceContainerLowest,
-                        shape = ToolkitTheme.shapes.large,
-                        modifier = Modifier.fillMaxSize()
-                    ) {
-                        Column(modifier = Modifier.fillMaxSize()) {
-                            if (navigator.canNavigateBack()) {
-                                AdaptiveBackNavigationButton(
-                                    onClick = { scope.launch { navigator.navigateBack() } }
-                                )
-                            }
-                            selectedRepo?.let { currentRepo ->
-                                key(currentRepo.url) {
-                                    val rawPlugins = pluginsMap[currentRepo.url] ?: emptyList()
-                                    val sortedFilteredPlugins = viewModel.filterAndSortPlugins(rawPlugins)
+                    selectedRepo?.let { currentRepo ->
+                        key(currentRepo.url) {
+                            val rawPlugins = pluginsMap[currentRepo.url] ?: emptyList()
+                            val sortedFilteredPlugins = viewModel.filterAndSortPlugins(rawPlugins)
 
-                                    PluginRepoDetails(
-                                        modifier = Modifier.fillMaxSize(),
-                                        currentRepo = currentRepo,
-                                        selectedTab = selectedTab,
-                                        onTabSelected = { selectedTab = it },
-                                        searchQuery = viewModel.pluginSearchQuery,
-                                        onSearchQueryChange = { viewModel.pluginSearchQuery = it },
-                                        sortMode = viewModel.pluginSortMode,
-                                        onSortModeChange = { viewModel.pluginSortMode = it },
-                                        chipFilter = viewModel.pluginChipFilter,
-                                        onChipFilterChange = { viewModel.pluginChipFilter = it },
-                                        plugins = sortedFilteredPlugins,
-                                        flows = viewModel.filterAndSortFlows(flowsMap[currentRepo.url] ?: emptyList()),
-                                        installedPlugins = installedPlugins,
-                                        flowState = flowState,
-                                        activeJobs = activeJobs,
-                                        conflicts = conflicts,
-                                        packageSourceOverrides = packageSourceOverrides,
-                                        pluginsMap = pluginsMap,
-                                        isRefreshing = isRefreshing,
-                                        clipboard = clipboard,
-                                        onRefreshRepo = { viewModel.refreshRepository(it.url) },
-                                        onOpenLocalFolder = { viewModel.openLocalFolder(it) },
-                                        onInstallPlugin = { viewModel.installPlugin(it) },
-                                        onCancelPlugin = { viewModel.cancelPluginInstall(it) },
-                                        onInstallFlow = { viewModel.installFlow(it) },
-                                        onSetPackageSource = { pkg, url -> viewModel.setPackageSource(pkg, url) },
-                                        onShowChangelog = { viewModel.showChangelog(it) }
-                                    )
-                                }
-                            }
+                            PluginRepoDetails(
+                                modifier = Modifier.fillMaxSize(),
+                                currentRepo = currentRepo,
+                                selectedTab = selectedTab,
+                                onTabSelected = { selectedTab = it },
+                                searchQuery = viewModel.pluginSearchQuery,
+                                onSearchQueryChange = { viewModel.pluginSearchQuery = it },
+                                sortMode = viewModel.pluginSortMode,
+                                onSortModeChange = { viewModel.pluginSortMode = it },
+                                chipFilter = viewModel.pluginChipFilter,
+                                onChipFilterChange = { viewModel.pluginChipFilter = it },
+                                plugins = sortedFilteredPlugins,
+                                flows = viewModel.filterAndSortFlows(flowsMap[currentRepo.url] ?: emptyList()),
+                                installedPlugins = installedPlugins,
+                                flowState = flowState,
+                                activeJobs = activeJobs,
+                                conflicts = conflicts,
+                                packageSourceOverrides = packageSourceOverrides,
+                                pluginsMap = pluginsMap,
+                                isRefreshing = isRefreshing,
+                                clipboard = clipboard,
+                                onRefreshRepo = { viewModel.refreshRepository(it.url) },
+                                onOpenLocalFolder = { viewModel.openLocalFolder(it) },
+                                onInstallPlugin = { viewModel.installPlugin(it) },
+                                onCancelPlugin = { viewModel.cancelPluginInstall(it) },
+                                onInstallFlow = { viewModel.installFlow(it) },
+                                onSetPackageSource = { pkg, url -> viewModel.setPackageSource(pkg, url) },
+                                onShowChangelog = { viewModel.showChangelog(it) }
+                            )
                         }
                     }
                 }

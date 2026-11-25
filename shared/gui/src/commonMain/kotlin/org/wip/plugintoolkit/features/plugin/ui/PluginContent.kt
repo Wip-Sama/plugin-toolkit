@@ -69,6 +69,7 @@ import plugintoolkit.composeapp.generated.resources.plugin_no_parameters
 import plugintoolkit.composeapp.generated.resources.plugin_select_capability_hint
 import plugintoolkit.composeapp.generated.resources.plugin_tester_title
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
+import org.wip.plugintoolkit.core.utils.PlatformVerticalScrollbar
 
 @Composable
 fun PluginContent(
@@ -140,12 +141,24 @@ fun PluginContent(
         if (selectedCapability == null) {
             EmptyState(stringResource(Res.string.plugin_select_capability_hint))
         } else {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(ToolkitTheme.spacing.extraLarge)
-            ) {
+            val contentScrollState = rememberScrollState()
+            val scrollbarReserve = if (contentScrollState.maxValue > 0) {
+                ToolkitTheme.dimensions.sduiScrollbarEndPadding
+            } else {
+                ToolkitTheme.spacing.none
+            }
+            Box(modifier = Modifier.fillMaxSize()) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(contentScrollState)
+                        .padding(
+                            start = ToolkitTheme.spacing.large,
+                            top = ToolkitTheme.spacing.large,
+                            bottom = ToolkitTheme.spacing.large,
+                            end = ToolkitTheme.spacing.large + scrollbarReserve
+                        )
+                ) {
                 // Tester Area
                 CapabilityTester(
                     capability = selectedCapability,
@@ -210,6 +223,15 @@ fun PluginContent(
                             }
                         }
                     }
+                }
+            }
+                if (contentScrollState.maxValue > 0) {
+                    PlatformVerticalScrollbar(
+                        scrollState = contentScrollState,
+                        modifier = Modifier
+                            .align(Alignment.CenterEnd)
+                            .fillMaxHeight()
+                    )
                 }
             }
         }

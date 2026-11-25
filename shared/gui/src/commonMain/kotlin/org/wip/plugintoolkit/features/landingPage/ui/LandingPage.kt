@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -27,6 +28,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SettingsInputComponent
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -45,11 +47,13 @@ import androidx.compose.ui.unit.dp
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
+import org.wip.plugintoolkit.core.utils.PlatformVerticalScrollbar
 import org.wip.plugintoolkit.features.job.logic.JobManager
 import org.wip.plugintoolkit.features.job.model.JobStatus
 import org.wip.plugintoolkit.features.navigation.model.Screen
 import org.wip.plugintoolkit.features.plugin.viewmodel.PluginViewModel
 import org.wip.plugintoolkit.shared.components.ToolkitCard
+import org.wip.plugintoolkit.shared.components.adaptiveWorkspacePadding
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.landing_active_jobs
 import plugintoolkit.composeapp.generated.resources.landing_link_docs
@@ -80,12 +84,32 @@ fun LandingPage(
     val activeJobsCount = jobs.count { it.status == JobStatus.Running }
     val queuedJobsCount = jobs.count { it.status == JobStatus.Queued }
 
-    Column(
+    val scrollState = rememberScrollState()
+    val scrollbarReserve = if (scrollState.maxValue > 0) {
+        ToolkitTheme.dimensions.sduiScrollbarEndPadding
+    } else {
+        ToolkitTheme.spacing.none
+    }
+
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceContainerLowest,
+        shape = ToolkitTheme.shapes.large,
         modifier = modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(ToolkitTheme.spacing.extraLarge)
+            .padding(adaptiveWorkspacePadding())
     ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(scrollState)
+                    .padding(
+                        start = ToolkitTheme.spacing.extraLarge,
+                        top = ToolkitTheme.spacing.extraLarge,
+                        bottom = ToolkitTheme.spacing.extraLarge,
+                        end = ToolkitTheme.spacing.extraLarge + scrollbarReserve
+                    )
+            ) {
         // Hero Section
         DashboardHero()
 
@@ -213,6 +237,16 @@ fun LandingPage(
                         )
                     }
                 }
+            }
+        }
+            }
+            if (scrollState.maxValue > 0) {
+                PlatformVerticalScrollbar(
+                    scrollState = scrollState,
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .fillMaxHeight()
+                )
             }
         }
     }
