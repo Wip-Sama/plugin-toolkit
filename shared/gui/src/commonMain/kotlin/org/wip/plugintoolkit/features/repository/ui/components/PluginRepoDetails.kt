@@ -9,6 +9,7 @@ import org.wip.plugintoolkit.shared.components.adaptiveOuterHorizontalPadding
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -50,6 +51,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.Clipboard
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
@@ -208,6 +210,8 @@ fun PluginRepoDetails(
                             text = currentRepo.url,
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f)
                         )
                         IconButton(
@@ -272,12 +276,24 @@ fun PluginRepoDetails(
             Tab(
                 selected = selectedTab == 0,
                 onClick = { onTabSelected(0) },
-                text = { Text(stringResource(Res.string.repo_tab_plugins, plugins.size)) }
+                text = {
+                    Text(
+                        text = stringResource(Res.string.repo_tab_plugins, plugins.size),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             )
             Tab(
                 selected = selectedTab == 1,
                 onClick = { onTabSelected(1) },
-                text = { Text(stringResource(Res.string.repo_tab_flows, flows.size)) }
+                text = {
+                    Text(
+                        text = stringResource(Res.string.repo_tab_flows, flows.size),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             )
         }
 
@@ -311,18 +327,17 @@ fun PluginRepoDetails(
                 singleLine = true
             )
 
-            Row(
+            FlowRow(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small),
+                itemVerticalAlignment = Alignment.CenterVertically
             ) {
                 PluginFilterChipsRow(
                     selectedFilter = chipFilter,
                     onFilterSelected = onChipFilterChange,
                     modifier = Modifier.weight(1f, fill = false)
                 )
-
-                Spacer(modifier = Modifier.width(ToolkitTheme.spacing.medium))
 
                 SortDropdownChip(
                     sortMode = sortMode,

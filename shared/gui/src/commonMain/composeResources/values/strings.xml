@@ -1158,4 +1158,8 @@
     <string name="flow_palette_drag_to_board">Drag onto board to place</string>
     <string name="setting_compact_panels_default">Compact Sidebars &amp; Collapsible Panels</string>
     <string name="setting_compact_panels_default_subtitle">Start secondary sidebars and collapsible supporting panes in their minimum/compact state to maximize workspace area</string>
+    <string name="pane_collapse_sidebar">Hide sidebar</string>
+    <string name="pane_expand_sidebar">Show sidebar</string>
+    <string name="pane_collapse_bottom_panel">Collapse panel</string>
+    <string name="pane_expand_bottom_panel">Expand panel</string>
 </resources>

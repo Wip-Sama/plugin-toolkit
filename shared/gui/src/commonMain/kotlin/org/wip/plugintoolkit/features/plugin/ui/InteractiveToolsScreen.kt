@@ -166,10 +166,6 @@ fun InteractiveToolsScreen(
     val scope = rememberCoroutineScope()
     val settingsRepository: org.wip.plugintoolkit.features.settings.logic.SettingsRepository = koinInject()
     val appSettings by settingsRepository.settings.collectAsState()
-    val directive = rememberAdaptivePaneScaffoldDirective()
-    val navigator = rememberListDetailPaneScaffoldNavigator<String>(
-        scaffoldDirective = directive
-    )
     var sequelMode by remember(appSettings.appearance.compactPanelsByDefault) {
         mutableStateOf(
             if (appSettings.appearance.compactPanelsByDefault) SequelSidebarMode.ForcedCompact else SequelSidebarMode.Auto
@@ -184,18 +180,18 @@ fun InteractiveToolsScreen(
         ToolkitTheme.dimensions.floatingSidebarDefaultWidth
     }
 
-    ToolkitAdaptiveListDetailWorkspace(
-        navigator = navigator,
+    ToolkitAdaptiveListDetailWorkspace<String>(
         listPaneWidth = listPaneWidth,
-        listPane = {
+        listPane = { navigator ->
             DirectExecutionSidebar(
                 loadedPlugins = loadedPlugins,
                 selectedPluginId = selectedPluginId,
                 onPluginSelected = { pluginId ->
                     selectedPluginId = pluginId
-                    val matching = tools.find { it.plugin.getManifest().getOrNull()?.plugin?.id == pluginId }
-                    if (matching != null && selectedTool == null) {
-                        viewModel.selectTool(matching)
+                    val pluginTools = tools.filter { it.plugin.getManifest().getOrNull()?.plugin?.id == pluginId }
+                    if (pluginTools.size == 1 && selectedTool == null) {
+                        val singleTool = pluginTools.first()
+                        viewModel.selectTool(singleTool)
                         scope.launch {
                             navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, pluginId)
                         }
@@ -230,7 +226,7 @@ fun InteractiveToolsScreen(
                 fillPaneWidth = true
             )
         },
-        detailPane = {
+        detailPane = { navigator ->
             Box(
                 modifier = Modifier
                     .fillMaxSize()

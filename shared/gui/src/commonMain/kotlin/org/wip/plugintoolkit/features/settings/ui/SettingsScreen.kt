@@ -35,7 +35,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
 import androidx.compose.material3.adaptive.layout.ListDetailPaneScaffoldRole
-import androidx.compose.material3.adaptive.navigation.rememberListDetailPaneScaffoldNavigator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -51,7 +50,6 @@ import org.wip.plugintoolkit.shared.components.AdaptiveConstrainedContent
 import org.wip.plugintoolkit.shared.components.AdaptivePaneHeader
 import org.wip.plugintoolkit.shared.components.ToolkitAdaptiveListDetailWorkspace
 import org.wip.plugintoolkit.shared.components.adaptiveOuterHorizontalPadding
-import org.wip.plugintoolkit.shared.components.rememberAdaptivePaneScaffoldDirective
 import org.wip.plugintoolkit.shared.components.sidebar.SidebarSection
 import org.wip.plugintoolkit.shared.components.sidebar.ToolkitFloatingSidebar
 import org.wip.plugintoolkit.shared.components.sidebar.ToolkitFloatingSidebarScaffold
@@ -247,12 +245,9 @@ fun SettingsScreen(
     )
 
     val scope = rememberCoroutineScope()
-    val directive = rememberAdaptivePaneScaffoldDirective()
-    val navigator = rememberListDetailPaneScaffoldNavigator<SettingNavKey>(scaffoldDirective = directive)
     val detailSurfaceColor = MaterialTheme.colorScheme.surfaceContainerLowest
 
-    ToolkitAdaptiveListDetailWorkspace(
-        navigator = navigator,
+    ToolkitAdaptiveListDetailWorkspace<SettingNavKey>(
         listPaneWidth = ToolkitTheme.dimensions.floatingSidebarDefaultWidth,
         modifier = modifier.onPreviewKeyEvent { event ->
             if (event.isCtrlPressed && event.key == Key.F && event.type == KeyEventType.KeyDown) {
@@ -260,7 +255,7 @@ fun SettingsScreen(
                 true
             } else false
         },
-        listPane = {
+        listPane = { navigator ->
             ToolkitFloatingSidebar(
                 navigationKey = Unit,
                 animateNavigation = false,
@@ -349,7 +344,7 @@ fun SettingsScreen(
                 }
             }
         },
-        detailPane = {
+        detailPane = { navigator ->
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -468,6 +463,9 @@ fun SettingsScreen(
                                     onNavigate = { targetKey ->
                                         if (backStack.lastOrNull() != targetKey) {
                                             backStack.add(targetKey)
+                                        }
+                                        scope.launch {
+                                            navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, targetKey)
                                         }
                                     }
                                 )

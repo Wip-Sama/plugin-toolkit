@@ -354,7 +354,7 @@ private fun OverheadBreakdownCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Text(
-                text = "${formatDurationMs(overheadMs)} ($percent%)",
+                text = "${formatDuration(overheadMs)} ($percent%)",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -466,10 +466,10 @@ private fun CapabilityBreakdownCard(
         val hasMetrics = peakMemory != null || totalMemory != null || peakVram != null || avgCpu != null || peakCpu != null || totalBytesRead != null || totalBytesWritten != null || totalNetRead != null || totalNetWritten != null || avgThroughput != null
         if (hasMetrics) {
             Spacer(modifier = Modifier.height(ToolkitTheme.spacing.small))
-            Row(
+            FlowRow(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.smallMedium),
-                verticalAlignment = Alignment.CenterVertically
+                verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.extraSmall)
             ) {
                 if (peakMemory != null) {
                     Text(

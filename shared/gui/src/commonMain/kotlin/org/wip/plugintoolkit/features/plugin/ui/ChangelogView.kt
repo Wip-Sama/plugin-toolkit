@@ -79,38 +79,101 @@ fun ChangelogView(
     onClose: () -> Unit
 ) {
     Column(
-        modifier = Modifier.fillMaxSize()
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(ToolkitTheme.spacing.large),
+        verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.medium)
     ) {
-        // Header
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(ToolkitTheme.spacing.medium)
+        // Header matching UpdateDialog
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.History, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
+            Surface(
+                modifier = Modifier.size(ToolkitTheme.dimensions.updateIconContainerSize),
+                shape = ToolkitTheme.shapes.large,
+                color = MaterialTheme.colorScheme.primaryContainer
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        Icons.Default.History,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.size(ToolkitTheme.dimensions.iconMediumLarge)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.width(ToolkitTheme.spacing.medium))
+
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    stringResource(Res.string.changelog_title_prefix, pluginName),
+                    text = stringResource(Res.string.changelog_title_prefix, pluginName),
                     style = MaterialTheme.typography.headlineSmall,
-                    color = MaterialTheme.colorScheme.primary,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.Bold
                 )
-                Spacer(modifier = Modifier.weight(1f))
-                val closeLabel = stringResource(Res.string.action_close)
-                ToolkitTooltipBox(tooltip = closeLabel) {
-                    IconButton(onClick = onClose) {
-                        Icon(Icons.Default.Close, contentDescription = closeLabel, tint = MaterialTheme.colorScheme.primary)
+                versions.firstOrNull()?.let { latest ->
+                    Spacer(modifier = Modifier.height(ToolkitTheme.spacing.extraSmall))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
+                    ) {
+                        Text(
+                            text = stringResource(Res.string.changelog_version_title, latest.version),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        if (latest.date.isNotBlank()) {
+                            Surface(
+                                color = MaterialTheme.colorScheme.secondaryContainer,
+                                shape = ToolkitTheme.shapes.small
+                            ) {
+                                Text(
+                                    text = latest.date,
+                                    modifier = Modifier.padding(
+                                        horizontal = ToolkitTheme.spacing.small,
+                                        vertical = ToolkitTheme.spacing.extraSmall
+                                    ),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
                     }
+                }
+            }
+
+            val closeLabel = stringResource(Res.string.action_close)
+            ToolkitTooltipBox(tooltip = closeLabel) {
+                IconButton(onClick = onClose) {
+                    Icon(
+                        Icons.Default.Close,
+                        contentDescription = closeLabel,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
         }
 
-        ChangelogContent(
-            versions = versions,
-            modifier = Modifier.fillMaxSize(),
-            showLevelFilter = true
-        )
+        // Tonal well containing filters & changelog release cards
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f),
+            shape = ToolkitTheme.shapes.large,
+            color = MaterialTheme.colorScheme.surfaceContainerLowest
+        ) {
+            ChangelogContent(
+                versions = versions,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(top = ToolkitTheme.spacing.small),
+                showLevelFilter = true
+            )
+        }
     }
 }
 
@@ -321,6 +384,11 @@ fun ChangelogContent(
             label = "changelogContentFilter"
         ) {
             val listState = rememberLazyListState()
+            val scrollbarReserve = if (listState.canScrollForward || listState.canScrollBackward) {
+                ToolkitTheme.dimensions.sduiScrollbarEndPadding
+            } else {
+                ToolkitTheme.spacing.none
+            }
             Box(modifier = Modifier.fillMaxSize()) {
                 SelectionContainer(modifier = Modifier.fillMaxSize()) {
                     val horizontalPadding = if (useCards) ToolkitTheme.spacing.medium else ToolkitTheme.spacing.none
@@ -329,13 +397,13 @@ fun ChangelogContent(
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(
                             start = horizontalPadding,
-                            end = horizontalPadding + ToolkitTheme.dimensions.sduiScrollbarEndPadding,
+                            end = horizontalPadding + scrollbarReserve,
                             top = ToolkitTheme.spacing.medium,
                             bottom = ToolkitTheme.spacing.large
                         ),
                         verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.medium)
                     ) {
-                        items(displayVersions) { version ->
+                        items(displayVersions, key = { it.version }) { version ->
                             if (useCards) {
                                 VersionCard(version, selectedCategory)
                             } else {

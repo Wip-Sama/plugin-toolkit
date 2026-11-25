@@ -1,10 +1,30 @@
 package org.wip.plugintoolkit.ui
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material3.Button
+import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
+import androidx.compose.material3.adaptive.layout.ListDetailPaneScaffoldRole
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.layout.SubcomposeLayout
+import androidx.compose.ui.unit.Constraints
+import kotlinx.coroutines.launch
+import org.wip.plugintoolkit.core.utils.PlatformHorizontalScrollbar
+import org.wip.plugintoolkit.core.utils.PlatformVerticalScrollbar
+import org.wip.plugintoolkit.shared.components.AdaptiveBackNavigationButton
+import org.wip.plugintoolkit.shared.components.ToolkitAdaptiveListDetailWorkspace
+import org.wip.plugintoolkit.shared.components.ToolkitAdaptiveSupportingWorkspace
+import plugintoolkit.composeapp.generated.resources.pane_collapse_bottom_panel
+import plugintoolkit.composeapp.generated.resources.pane_collapse_sidebar
+import plugintoolkit.composeapp.generated.resources.pane_expand_bottom_panel
+import plugintoolkit.composeapp.generated.resources.pane_expand_sidebar
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Home
@@ -65,6 +85,7 @@ import org.wip.plugintoolkit.shared.components.rememberAdaptivePaneScaffoldDirec
 import org.wip.plugintoolkit.shared.components.sidebar.SidebarElement
 import org.wip.plugintoolkit.shared.components.sidebar.SidebarSectionData
 import plugintoolkit.composeapp.generated.resources.Res
+import plugintoolkit.composeapp.generated.resources.nav_back_to_list
 import plugintoolkit.composeapp.generated.resources.nav_collapse_rail
 import plugintoolkit.composeapp.generated.resources.nav_expand_rail
 import plugintoolkit.composeapp.generated.resources.nav_more_options
@@ -454,5 +475,167 @@ class AdaptiveLayoutAndNavigationTest {
         composeTestRule.mainClock.advanceTimeBy(350L)
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithText("Main").assertIsDisplayed()
+    }
+
+    @Test
+    fun platformScrollbarsDoNotThrowUnderUnboundedConstraints() {
+        var measuredVerticalWidth = -1
+        var measuredVerticalHeight = -1
+        var measuredHorizontalWidth = -1
+        var measuredHorizontalHeight = -1
+
+        composeTestRule.setContent {
+            AppTheme(appearance = AppearanceSettings()) {
+                val verticalState = rememberScrollState()
+                val horizontalState = rememberScrollState()
+                Column {
+                    SubcomposeLayout { _ ->
+                        val vPlaceables = subcompose("v") {
+                            PlatformVerticalScrollbar(
+                                scrollState = verticalState,
+                                modifier = Modifier.fillMaxHeight()
+                            )
+                        }.map {
+                            it.measure(Constraints(maxWidth = 100, maxHeight = Constraints.Infinity))
+                        }
+                        measuredVerticalWidth = vPlaceables.firstOrNull()?.width ?: 0
+                        measuredVerticalHeight = vPlaceables.firstOrNull()?.height ?: 0
+                        layout(10, 10) {}
+                    }
+                    SubcomposeLayout { _ ->
+                        val hPlaceables = subcompose("h") {
+                            PlatformHorizontalScrollbar(
+                                scrollState = horizontalState,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }.map {
+                            it.measure(Constraints(maxWidth = Constraints.Infinity, maxHeight = 100))
+                        }
+                        measuredHorizontalWidth = hPlaceables.firstOrNull()?.width ?: 0
+                        measuredHorizontalHeight = hPlaceables.firstOrNull()?.height ?: 0
+                        layout(10, 10) {}
+                    }
+                }
+            }
+        }
+
+        assertEquals(0, measuredVerticalWidth)
+        assertEquals(0, measuredVerticalHeight)
+        assertEquals(0, measuredHorizontalWidth)
+        assertEquals(0, measuredHorizontalHeight)
+    }
+
+    @Test
+    fun adaptiveSupportingWorkspaceCollapsesAndRestoresBottomAndSidePanes() {
+        var showPane by mutableStateOf(false)
+        var wideWidth by mutableStateOf(500.dp)
+        var collapseSideLabel = ""
+        var expandSideLabel = ""
+        var expandBottomLabel = ""
+        var collapseBottomLabel = ""
+
+        composeTestRule.setContent {
+            AppTheme(appearance = AppearanceSettings()) {
+                collapseSideLabel = stringResource(Res.string.pane_collapse_sidebar)
+                expandSideLabel = stringResource(Res.string.pane_expand_sidebar)
+                expandBottomLabel = stringResource(Res.string.pane_expand_bottom_panel)
+                collapseBottomLabel = stringResource(Res.string.pane_collapse_bottom_panel)
+
+                CompositionLocalProvider(LocalDensity provides Density(1f)) {
+                    Box(modifier = Modifier.width(wideWidth).height(600.dp)) {
+                        ToolkitAdaptiveSupportingWorkspace(
+                            showSupportingPane = showPane,
+                            onShowSupportingPaneChange = { showPane = it },
+                            collapseTooltip = "",
+                            expandTooltip = "",
+                            mainPane = { Text("Main Content") },
+                            supportingPane = { Text("Bottom Supporting Content") }
+                        )
+                    }
+                }
+            }
+        }
+
+        // Initially collapsed on narrow width
+        composeTestRule.onNodeWithText("Main Content").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Bottom Supporting Content").assertDoesNotExist()
+
+        // Expand from bottom divider handle
+        composeTestRule.onNodeWithContentDescription(expandBottomLabel).performClick()
+        composeTestRule.waitForIdle()
+        assertTrue(showPane)
+        composeTestRule.onNodeWithText("Bottom Supporting Content").assertIsDisplayed()
+
+        // Collapse again from bottom divider handle
+        composeTestRule.onNodeWithContentDescription(collapseBottomLabel).performClick()
+        composeTestRule.waitForIdle()
+        assertEquals(false, showPane)
+
+        // Wide desktop layout: expand and collapse side supporting pane cleanly
+        showPane = true
+        wideWidth = 1100.dp
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithText("Bottom Supporting Content").assertIsDisplayed()
+
+        composeTestRule.onNodeWithContentDescription(collapseSideLabel).performClick()
+        composeTestRule.waitForIdle()
+        assertEquals(false, showPane)
+
+        // Retrieve via side divider handle
+        composeTestRule.onNodeWithContentDescription(expandSideLabel).performClick()
+        composeTestRule.waitForIdle()
+        assertTrue(showPane)
+        composeTestRule.onNodeWithText("Bottom Supporting Content").assertIsDisplayed()
+    }
+
+    @OptIn(ExperimentalMaterial3AdaptiveApi::class)
+    @Test
+    fun adaptiveListDetailWorkspaceShowsBackButtonWhenConstrainedToSinglePane() {
+        var selectedItem by mutableStateOf<String?>(null)
+        var backLabel = ""
+
+        composeTestRule.setContent {
+            AppTheme(appearance = AppearanceSettings()) {
+                backLabel = stringResource(Res.string.nav_back_to_list)
+                CompositionLocalProvider(LocalDensity provides Density(1f)) {
+                    Box(modifier = Modifier.width(650.dp).height(500.dp)) {
+                        val scope = rememberCoroutineScope()
+                        ToolkitAdaptiveListDetailWorkspace<String>(
+                            listPaneWidth = 300.dp,
+                            listPane = { navigator ->
+                                Button(onClick = {
+                                    selectedItem = "SelectedItem"
+                                    scope.launch {
+                                        navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, "SelectedItem")
+                                    }
+                                }) {
+                                    Text("Choose Item")
+                                }
+                            },
+                            detailPane = { navigator ->
+                                Column(modifier = Modifier.fillMaxSize()) {
+                                    if (navigator.canNavigateBack()) {
+                                        AdaptiveBackNavigationButton(
+                                            onClick = { scope.launch { navigator.navigateBack() } }
+                                        )
+                                    }
+                                    Text(selectedItem ?: "Empty Detail")
+                                }
+                            }
+                        )
+                    }
+                }
+            }
+        }
+
+        composeTestRule.onNodeWithText("Choose Item").performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithText("SelectedItem").assertIsDisplayed()
+        composeTestRule.onNodeWithContentDescription(backLabel).assertIsDisplayed()
+
+        // Clicking back button restores list pane in single-column mode
+        composeTestRule.onNodeWithContentDescription(backLabel).performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithText("Choose Item").assertIsDisplayed()
     }
 }

@@ -120,6 +120,7 @@ data class Dimensions(
     val menuMinWidth: Dp = 180.dp,
     val iconExtraLarge: Dp = 64.dp,
     val breakpointCompact: Dp = 750.dp,
+    val breakpointMedium: Dp = 600.dp,
     val breakpointWideToolbar: Dp = 900.dp,
     val titleBarHeight: Dp = 38.dp,
     val windowControlWidth: Dp = 46.dp,
@@ -176,6 +177,10 @@ data class Dimensions(
     val floatingSidebarMinWidth: Dp = 240.dp,
     val floatingSidebarSequelWidth: Dp = 260.dp,
     val floatingSidebarSplitTotalWidth: Dp = 540.dp,
+    val paneDividerHandleThickness: Dp = 14.dp,
+    val bottomSupportingPaneMinHeight: Dp = 140.dp,
+    val bottomSupportingPaneDefaultHeight: Dp = 240.dp,
+    val bottomSupportingPaneMaxHeight: Dp = 480.dp,
     val settingsContentMaxWidth: Dp = 1080.dp,
     val flowPaletteWidth: Dp = 276.dp,
     val loadingIndicatorSmallSize: Dp = 24.dp,
@@ -378,6 +383,7 @@ val LocalDimensions = staticCompositionLocalOf { Dimensions() }
 val LocalCustomColors = staticCompositionLocalOf { CustomColors() }
 val LocalOpacity = staticCompositionLocalOf { Opacity() }
 val LocalTypography = staticCompositionLocalOf { DesktopTypography }
+val LocalCompactPanelsByDefault = staticCompositionLocalOf { false }
 
 data class ToolkitShapes(
     val extraSmall: CornerBasedShape = RoundedCornerShape(4.dp),
@@ -524,7 +530,8 @@ fun AppTheme(
         ),
         LocalOpacity provides Opacity(),
         LocalShapes provides ToolkitShapes(),
-        LocalTypography provides DesktopTypography
+        LocalTypography provides DesktopTypography,
+        LocalCompactPanelsByDefault provides appearance.compactPanelsByDefault
     ) {
         MaterialExpressiveTheme(
             colorScheme = colorScheme,

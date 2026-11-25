@@ -3,6 +3,7 @@ package org.wip.plugintoolkit.features.flows.ui
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -12,6 +13,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -55,6 +57,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonPrimitive
@@ -694,9 +697,9 @@ fun FlowRunnerView(
                     viewModel.isFlowLocked(currentFlow.name)
                 }
 
-                androidx.compose.foundation.layout.FlowRow(
+                FlowRow(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.medium),
+                    horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.smallMedium),
                     verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
                 ) {
                     OutlinedButton(
@@ -710,7 +713,12 @@ fun FlowRunnerView(
                             modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
                         )
                         Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
-                        Text(stringResource(Res.string.action_set_as_default), maxLines = 1)
+                        Text(
+                            text = stringResource(Res.string.action_set_as_default),
+                            maxLines = 1,
+                            softWrap = false,
+                            overflow = TextOverflow.Ellipsis
+                        )
                     }
 
                     OutlinedButton(
@@ -730,7 +738,12 @@ fun FlowRunnerView(
                             modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
                         )
                         Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
-                        Text(stringResource(Res.string.action_reset_to_default), maxLines = 1)
+                        Text(
+                            text = stringResource(Res.string.action_reset_to_default),
+                            maxLines = 1,
+                            softWrap = false,
+                            overflow = TextOverflow.Ellipsis
+                        )
                     }
 
                     OutlinedButton(
@@ -749,19 +762,29 @@ fun FlowRunnerView(
                             modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
                         )
                         Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
-                        Text(stringResource(Res.string.action_edit), maxLines = 1)
+                        Text(
+                            text = stringResource(Res.string.action_edit),
+                            maxLines = 1,
+                            softWrap = false,
+                            overflow = TextOverflow.Ellipsis
+                        )
                     }
 
                     Button(
                         onClick = { viewModel.executeFlow(currentFlow, parameterValues.toMap()) },
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.widthIn(min = ToolkitTheme.dimensions.genericInputWidthLarge),
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                         shape = MaterialTheme.shapes.medium,
                         enabled = isFlowValid
                     ) {
                         Icon(Icons.Default.PlayArrow, contentDescription = null)
                         Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
-                        Text(stringResource(Res.string.flow_execute_button), maxLines = 1)
+                        Text(
+                            text = stringResource(Res.string.flow_execute_button),
+                            maxLines = 1,
+                            softWrap = false,
+                            overflow = TextOverflow.Ellipsis
+                        )
                     }
                 }
                 if (!isFlowValid) {
@@ -782,7 +805,7 @@ fun FlowRunnerView(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(
                             stringResource(Res.string.flow_max_concurrent_executions),
                             style = MaterialTheme.typography.bodyMedium,
@@ -794,6 +817,7 @@ fun FlowRunnerView(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
+                    Spacer(modifier = Modifier.width(ToolkitTheme.spacing.medium))
                     ToolkitTextField(
                         value = currentFlow.maxConcurrentExecutions?.toString() ?: "",
                         onValueChange = { input ->

@@ -1,7 +1,10 @@
 package org.wip.plugintoolkit.features.repository.ui.components
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -57,152 +60,217 @@ fun FlowListItem(
     ToolkitCard(
         modifier = Modifier.fillMaxWidth()
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Flow Icon
-            Surface(
-                shape = MaterialTheme.shapes.medium,
-                color = MaterialTheme.colorScheme.surfaceVariant,
-                modifier = Modifier.size(ToolkitTheme.dimensions.listIconSize)
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        Icons.Default.PlayCircle,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.secondary,
-                        modifier = Modifier.size(ToolkitTheme.dimensions.listIconContentSize)
-                    )
-                }
-            }
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            val stackVertically = maxWidth < ToolkitTheme.dimensions.breakpointCompact
 
-            Spacer(modifier = Modifier.width(ToolkitTheme.spacing.medium))
-
-            // Flow Information
-            Column(modifier = Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = flow.name,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-
-                    Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
-
-                    if (!isCompatible) {
-                        Surface(
-                            color = MaterialTheme.colorScheme.errorContainer,
-                            shape = CircleShape,
-                            modifier = Modifier.padding(vertical = ToolkitTheme.spacing.badgeVertical)
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.padding(
-                                    horizontal = ToolkitTheme.spacing.small,
-                                    vertical = ToolkitTheme.spacing.badgeVertical
-                                )
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Block,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(ToolkitTheme.dimensions.iconMicro),
-                                    tint = MaterialTheme.colorScheme.onErrorContainer
-                                )
-                                Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
-                                Text(
-                                    stringResource(Res.string.repo_incompatible_badge),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.onErrorContainer
-                                )
-                            }
-                        }
-                    } else if (isInstalled) {
-                        Surface(
-                            color = MaterialTheme.colorScheme.secondaryContainer,
-                            shape = CircleShape,
-                            modifier = Modifier.padding(vertical = ToolkitTheme.spacing.badgeVertical)
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.padding(horizontal = ToolkitTheme.spacing.small, vertical = ToolkitTheme.spacing.badgeVertical)
-                            ) {
-                                Icon(
-                                    Icons.Default.Check,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(ToolkitTheme.dimensions.iconMicro),
-                                    tint = MaterialTheme.colorScheme.onSecondaryContainer
-                                )
-                                Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
-                                Text(
-                                    stringResource(Res.string.plugin_status_installed),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSecondaryContainer
-                                )
-                            }
-                        }
-                    } else {
+            val actionButton: @Composable () -> Unit = {
+                if (hasUpdate) {
+                    Button(
+                        onClick = { onInstall(flow) },
+                        enabled = !isRefreshing && isCompatible,
+                        shape = CircleShape,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onTertiaryContainer
+                        )
+                    ) {
+                        Icon(
+                            Icons.Default.Download,
+                            contentDescription = null,
+                            modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
+                        )
+                        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
                         Text(
-                            stringResource(Res.string.repo_flow_filename_version_format, flow.fileName, flow.version),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            text = stringResource(Res.string.repo_action_update_version, flow.version),
+                            maxLines = 1,
+                            softWrap = false,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                } else if (!isInstalled) {
+                    Button(
+                        onClick = { onInstall(flow) },
+                        enabled = !isRefreshing && isCompatible,
+                        shape = CircleShape,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                    ) {
+                        Icon(
+                            Icons.Default.Download,
+                            contentDescription = null,
+                            modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
+                        )
+                        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
+                        Text(
+                            text = stringResource(Res.string.action_install),
+                            maxLines = 1,
+                            softWrap = false,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 }
+            }
 
-                if (!flow.description.isNullOrBlank()) {
-                    Spacer(modifier = Modifier.height(ToolkitTheme.spacing.small))
+            if (stackVertically) {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
+                ) {
+                    FlowListItemInfo(
+                        flow = flow,
+                        isCompatible = isCompatible,
+                        isInstalled = isInstalled,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    if (hasUpdate || !isInstalled) {
+                        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
+                            actionButton()
+                        }
+                    }
+                }
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    FlowListItemInfo(
+                        flow = flow,
+                        isCompatible = isCompatible,
+                        isInstalled = isInstalled,
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    if (hasUpdate || !isInstalled) {
+                        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.medium))
+                        actionButton()
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun FlowListItemInfo(
+    flow: ExtensionFlow,
+    isCompatible: Boolean,
+    isInstalled: Boolean,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier,
+        verticalAlignment = Alignment.Top
+    ) {
+        // Flow Icon
+        Surface(
+            shape = MaterialTheme.shapes.medium,
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            modifier = Modifier.size(ToolkitTheme.dimensions.listIconSize)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    Icons.Default.PlayCircle,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.secondary,
+                    modifier = Modifier.size(ToolkitTheme.dimensions.listIconContentSize)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.medium))
+
+        // Flow Information
+        Column(modifier = Modifier.weight(1f)) {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small),
+                verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.extraSmall),
+                itemVerticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = flow.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+
+                if (!isCompatible) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.errorContainer,
+                        shape = CircleShape,
+                        modifier = Modifier.padding(vertical = ToolkitTheme.spacing.badgeVertical)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(
+                                horizontal = ToolkitTheme.spacing.small,
+                                vertical = ToolkitTheme.spacing.badgeVertical
+                            )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Block,
+                                contentDescription = null,
+                                modifier = Modifier.size(ToolkitTheme.dimensions.iconMicro),
+                                tint = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                            Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
+                            Text(
+                                stringResource(Res.string.repo_incompatible_badge),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                                maxLines = 1
+                            )
+                        }
+                    }
+                } else if (isInstalled) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.secondaryContainer,
+                        shape = CircleShape,
+                        modifier = Modifier.padding(vertical = ToolkitTheme.spacing.badgeVertical)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = ToolkitTheme.spacing.small, vertical = ToolkitTheme.spacing.badgeVertical)
+                        ) {
+                            Icon(
+                                Icons.Default.Check,
+                                contentDescription = null,
+                                modifier = Modifier.size(ToolkitTheme.dimensions.iconMicro),
+                                tint = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                            Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
+                            Text(
+                                stringResource(Res.string.plugin_status_installed),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                maxLines = 1
+                            )
+                        }
+                    }
+                } else {
                     Text(
-                        text = flow.description ?: "",
-                        style = MaterialTheme.typography.bodyMedium,
+                        stringResource(Res.string.repo_flow_filename_version_format, flow.fileName, flow.version),
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 2,
+                        maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.width(ToolkitTheme.spacing.medium))
-
-            // Action Buttons
-            if (hasUpdate) {
-                Button(
-                    onClick = { onInstall(flow) },
-                    enabled = !isRefreshing && isCompatible,
-                    shape = CircleShape,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onTertiaryContainer
-                    )
-                ) {
-                    Icon(
-                        Icons.Default.Download,
-                        contentDescription = null,
-                        modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
-                    )
-                    Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
-                    Text(stringResource(Res.string.repo_action_update_version, flow.version))
-                }
-            } else if (!isInstalled) {
-                Button(
-                    onClick = { onInstall(flow) },
-                    enabled = !isRefreshing && isCompatible,
-                    shape = CircleShape,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                    )
-                ) {
-                    Icon(
-                        Icons.Default.Download,
-                        contentDescription = null,
-                        modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
-                    )
-                    Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
-                    Text(stringResource(Res.string.action_install))
-                }
+            if (!flow.description.isNullOrBlank()) {
+                Spacer(modifier = Modifier.height(ToolkitTheme.spacing.small))
+                Text(
+                    text = flow.description ?: "",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
         }
     }

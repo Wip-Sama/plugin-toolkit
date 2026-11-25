@@ -7,7 +7,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
 import androidx.compose.material3.adaptive.layout.ListDetailPaneScaffoldRole
-import androidx.compose.material3.adaptive.navigation.rememberListDetailPaneScaffoldNavigator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -27,11 +26,11 @@ import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.polymorphic
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
+import org.wip.plugintoolkit.core.theme.LocalCompactPanelsByDefault
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.plugin.viewmodel.PluginViewModel
 import org.wip.plugintoolkit.shared.components.AdaptiveBackNavigationButton
 import org.wip.plugintoolkit.shared.components.ToolkitAdaptiveListDetailWorkspace
-import org.wip.plugintoolkit.shared.components.rememberAdaptivePaneScaffoldDirective
 import org.wip.plugintoolkit.shared.components.sidebar.SequelSidebarMode
 import org.wip.plugintoolkit.shared.components.sidebar.isLargeAdaptiveWidth
 import org.wip.plugintoolkit.shared.components.sidebar.resolveSequelExpanded
@@ -79,13 +78,10 @@ fun PluginSectionScreen(
     val selectedPluginId = (currentKey as? PluginNavKey.PluginDetail)?.id
 
     val scope = rememberCoroutineScope()
-    val settingsRepository: org.wip.plugintoolkit.features.settings.logic.SettingsRepository = koinInject()
-    val appSettings by settingsRepository.settings.collectAsState()
-    val directive = rememberAdaptivePaneScaffoldDirective()
-    val navigator = rememberListDetailPaneScaffoldNavigator<String>(scaffoldDirective = directive)
-    var sequelMode by remember(appSettings.appearance.compactPanelsByDefault) {
+    val compactPanelsByDefault = LocalCompactPanelsByDefault.current
+    var sequelMode by remember(compactPanelsByDefault) {
         mutableStateOf(
-            if (appSettings.appearance.compactPanelsByDefault) SequelSidebarMode.ForcedCompact else SequelSidebarMode.Auto
+            if (compactPanelsByDefault) SequelSidebarMode.ForcedCompact else SequelSidebarMode.Auto
         )
     }
     val isLargeWidth = isLargeAdaptiveWidth()
@@ -98,10 +94,9 @@ fun PluginSectionScreen(
     }
     val detailSurfaceColor = MaterialTheme.colorScheme.surfaceContainerLowest
 
-    ToolkitAdaptiveListDetailWorkspace(
-        navigator = navigator,
+    ToolkitAdaptiveListDetailWorkspace<String>(
         listPaneWidth = listPaneWidth,
-        listPane = {
+        listPane = { navigator ->
             DirectExecutionSidebar(
                 loadedPlugins = loadedPlugins,
                 selectedPluginId = selectedPluginId,
@@ -137,7 +132,7 @@ fun PluginSectionScreen(
                 fillPaneWidth = true
             )
         },
-        detailPane = {
+        detailPane = { navigator ->
             Box(modifier = Modifier.fillMaxSize()) {
                 NavDisplay(
                     backStack = backStack,

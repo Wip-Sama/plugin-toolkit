@@ -8,12 +8,14 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
@@ -85,12 +87,17 @@ fun ExecutionParametersCard(
     var showAdvanced by rememberSaveable { mutableStateOf(false) }
 
     ToolkitCard(modifier = modifier.fillMaxWidth()) {
-        Row(
+        FlowRow(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small),
+            itemVerticalAlignment = Alignment.CenterVertically
         ) {
-            Column(modifier = Modifier.weight(1f)) {
+            Column(
+                modifier = Modifier
+                    .widthIn(min = ToolkitTheme.dimensions.sduiTextColumnMinWidth)
+                    .weight(1f, fill = false)
+            ) {
                 SectionHeader(
                     title = title,
                     icon = icon
@@ -105,7 +112,8 @@ fun ExecutionParametersCard(
                 Text(
                     stringResource(Res.string.plugin_save_results),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1
                 )
                 Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
                 Switch(

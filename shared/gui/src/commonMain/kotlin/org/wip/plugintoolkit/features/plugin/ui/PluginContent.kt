@@ -4,6 +4,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -43,6 +45,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlinx.serialization.json.JsonPrimitive
 import org.wip.plugintoolkit.api.DataType
@@ -439,9 +442,9 @@ fun CapabilityTester(
         }
     }
 
-    androidx.compose.foundation.layout.FlowRow(
+    FlowRow(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.medium),
+        horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.smallMedium),
         verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
     ) {
         OutlinedButton(
@@ -455,7 +458,12 @@ fun CapabilityTester(
                 modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
             )
             Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
-            Text(stringResource(Res.string.action_set_as_default), maxLines = 1)
+            Text(
+                text = stringResource(Res.string.action_set_as_default),
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis
+            )
         }
 
         OutlinedButton(
@@ -468,13 +476,18 @@ fun CapabilityTester(
                 modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
             )
             Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
-            Text(stringResource(Res.string.action_reset_to_default), maxLines = 1)
+            Text(
+                text = stringResource(Res.string.action_reset_to_default),
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis
+            )
         }
 
         Button(
             onClick = onExecute,
             modifier = Modifier
-                .weight(1f)
+                .widthIn(min = ToolkitTheme.dimensions.genericInputWidthLarge)
                 .then(
                     if (onNavigateToPluginSetting != null) {
                         Modifier.lockedClickInterceptor(
@@ -500,7 +513,12 @@ fun CapabilityTester(
                     color = MaterialTheme.colorScheme.onPrimary
                 )
                 Spacer(modifier = Modifier.width(ToolkitTheme.spacing.mediumSmall))
-                Text(stringResource(Res.string.plugin_execute_capability_running, activeJobs.size))
+                Text(
+                    text = stringResource(Res.string.plugin_execute_capability_running, activeJobs.size),
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Ellipsis
+                )
             } else {
                 Icon(
                     Icons.Default.PlayArrow,
@@ -508,7 +526,12 @@ fun CapabilityTester(
                     modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
                 )
                 Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
-                Text(stringResource(Res.string.plugin_execute_capability))
+                Text(
+                    text = stringResource(Res.string.plugin_execute_capability),
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
         }
     }

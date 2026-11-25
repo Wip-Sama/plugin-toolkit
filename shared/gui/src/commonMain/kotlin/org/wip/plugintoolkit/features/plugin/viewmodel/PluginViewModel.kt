@@ -172,8 +172,12 @@ class PluginViewModel(
 
 
     fun selectPlugin(plugin: PluginEntry?) {
+        val previousId = selectedPlugin?.getManifest()?.getOrNull()?.plugin?.id
+        val nextId = plugin?.getManifest()?.getOrNull()?.plugin?.id
         selectedPlugin = plugin
-        selectedCapability = null
+        if (plugin == null || previousId != nextId) {
+            selectedCapability = null
+        }
     }
 
     fun selectCapability(capability: Capability?) {

@@ -24,6 +24,7 @@ import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.movableContentOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -115,6 +116,9 @@ fun AppScaffold(
     )
 
     val shellColor = MaterialTheme.colorScheme.surfaceContainerLow
+    val persistentContent = remember(content) {
+        movableContentOf { content() }
+    }
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -174,7 +178,7 @@ fun AppScaffold(
                                 .fillMaxWidth(),
                             color = MaterialTheme.colorScheme.surface
                         ) {
-                            content()
+                            persistentContent()
                         }
                     }
 
@@ -217,7 +221,7 @@ fun AppScaffold(
                                 .clip(RoundedCornerShape(topStart = contentCornerRadius)),
                             color = MaterialTheme.colorScheme.surface
                         ) {
-                            content()
+                            persistentContent()
                         }
                     }
                 }

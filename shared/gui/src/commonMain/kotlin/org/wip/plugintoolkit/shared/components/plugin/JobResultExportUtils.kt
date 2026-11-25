@@ -34,7 +34,8 @@ internal fun buildJobExportReport(
     durationLabel: String,
     memoryLabel: String,
     capabilityBreakdownLabel: String,
-    totalMemoryLabel: String? = null
+    totalMemoryLabel: String? = null,
+    overheadLabel: String = "Application Overhead"
 ): String {
     val sb = StringBuilder()
     sb.appendLine("================================================================================")
@@ -168,6 +169,12 @@ internal fun buildJobExportReport(
                     sb.appendLine("    #${idx + 1}: ${exec.durationMs} ms (${formatDuration(exec.durationMs)})$runExtra")
                 }
             }
+        }
+        val totalCapMs = durations.values.sum()
+        if (durationMs != null && durationMs > 0L && durationMs > totalCapMs) {
+            val overheadMs = durationMs - totalCapMs
+            val overheadPct = ((overheadMs.toDouble() / durationMs) * 100.0).roundToInt()
+            sb.appendLine("- $overheadLabel: $overheadMs ms (${formatDuration(overheadMs)}) [$overheadPct%]")
         }
     }
 

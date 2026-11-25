@@ -76,6 +76,7 @@ import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 import org.wip.plugintoolkit.api.CapabilityContext
 import org.wip.plugintoolkit.api.PluginEntry
+import org.wip.plugintoolkit.core.theme.LocalCompactPanelsByDefault
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.core.utils.PlatformVerticalScrollbar
 import org.wip.plugintoolkit.features.flows.model.Flow
@@ -130,9 +131,10 @@ fun PaletteSidebar(
     onPaletteBoundsChanged: (Rect?) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val compactPanelsByDefault = LocalCompactPanelsByDefault.current
     var selectedTab by remember { mutableStateOf(0) }
     var searchQuery by remember { mutableStateOf("") }
-    var isExpanded by remember { mutableStateOf(true) }
+    var isExpanded by remember(compactPanelsByDefault) { mutableStateOf(!compactPanelsByDefault) }
     val motion = MaterialTheme.motionScheme
 
     DisposableEffect(Unit) {

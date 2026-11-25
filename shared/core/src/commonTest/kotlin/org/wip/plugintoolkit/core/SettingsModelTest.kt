@@ -41,6 +41,7 @@ class SettingsModelTest {
         val settings = org.wip.plugintoolkit.features.settings.model.AppearanceSettings()
         assertEquals(org.wip.plugintoolkit.features.settings.model.SidebarStartMode.Remember, settings.sidebarStartMode)
         assertEquals(false, settings.isSidebarCollapsed)
+        assertEquals(false, settings.compactPanelsByDefault)
         assertEquals(org.wip.plugintoolkit.features.settings.model.ConnectionCurveStyle.CardinalSpline, settings.connectionStyle)
         assertEquals(0.5f, settings.connectionRoundness)
     }
@@ -50,6 +51,7 @@ class SettingsModelTest {
         val original = org.wip.plugintoolkit.features.settings.model.AppearanceSettings(
             sidebarStartMode = org.wip.plugintoolkit.features.settings.model.SidebarStartMode.Collapsed,
             isSidebarCollapsed = true,
+            compactPanelsByDefault = true,
             connectionStyle = org.wip.plugintoolkit.features.settings.model.ConnectionCurveStyle.Straight,
             connectionRoundness = 0.8f
         )
@@ -60,6 +62,7 @@ class SettingsModelTest {
         assertEquals(original, deserialized)
         assertEquals(org.wip.plugintoolkit.features.settings.model.SidebarStartMode.Collapsed, deserialized.sidebarStartMode)
         assertEquals(true, deserialized.isSidebarCollapsed)
+        assertEquals(true, deserialized.compactPanelsByDefault)
         assertEquals(org.wip.plugintoolkit.features.settings.model.ConnectionCurveStyle.Straight, deserialized.connectionStyle)
         assertEquals(0.8f, deserialized.connectionRoundness)
     }

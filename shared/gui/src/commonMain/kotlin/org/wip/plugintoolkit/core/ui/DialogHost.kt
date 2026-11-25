@@ -1,18 +1,20 @@
 package org.wip.plugintoolkit.core.ui
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -20,6 +22,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import org.jetbrains.compose.resources.stringResource
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.plugin.ui.ChangelogView
@@ -111,14 +114,22 @@ fun DialogHost(dialogService: DialogService) {
             }
 
             is DialogData.Changelog -> {
-                Dialog(onDismissRequest = { dialogService.dismiss() }) {
-                    Card(
+                Dialog(
+                    onDismissRequest = { dialogService.dismiss() },
+                    properties = DialogProperties(usePlatformDefaultWidth = false)
+                ) {
+                    Surface(
                         modifier = Modifier
-                            .fillMaxWidth(0.9f)
-                            .fillMaxHeight(0.85f)
-                            .padding(vertical = ToolkitTheme.spacing.medium),
-                        shape = MaterialTheme.shapes.extraLarge,
-                        elevation = CardDefaults.cardElevation(defaultElevation = ToolkitTheme.spacing.small)
+                            .fillMaxWidth(0.90f)
+                            .widthIn(max = ToolkitTheme.dimensions.settingsContentMaxWidth)
+                            .fillMaxHeight(0.88f),
+                        shape = ToolkitTheme.shapes.extraLarge,
+                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        tonalElevation = ToolkitTheme.dimensions.elevationHigh,
+                        border = BorderStroke(
+                            width = ToolkitTheme.dimensions.borderThin,
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = ToolkitTheme.opacity.divider)
+                        )
                     ) {
                         ChangelogView(
                             pluginName = data.pluginName,

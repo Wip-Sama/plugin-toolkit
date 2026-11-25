@@ -163,7 +163,9 @@ internal fun PluginCardInfoSection(
                 Text(
                     text = plugin.name,
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
                 )
 
                 if (!plugin.isCompatible) {
@@ -314,8 +316,10 @@ internal fun PluginCardAlternateUpdateBanner(
             .clickable(onClick = onSwitchRepo)
             .padding(top = ToolkitTheme.spacing.extraSmall / 2)
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.extraSmall),
+            verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.extraSmall),
+            itemVerticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.padding(
                 horizontal = ToolkitTheme.spacing.small,
                 vertical = ToolkitTheme.spacing.extraExtraSmall
@@ -327,7 +331,6 @@ internal fun PluginCardAlternateUpdateBanner(
                 modifier = Modifier.size(ToolkitTheme.dimensions.iconMicro),
                 tint = MaterialTheme.colorScheme.primary
             )
-            Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
             Text(
                 text = stringResource(
                     Res.string.plugin_newer_version_in_other_repo,
@@ -335,20 +338,21 @@ internal fun PluginCardAlternateUpdateBanner(
                     alternateUpdate.repo.name
                 ),
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurface
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
             )
-            Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
             Text(
                 text = "•",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.outline
             )
-            Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
             Text(
                 text = stringResource(Res.string.plugin_switch_repo_action),
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
+                color = MaterialTheme.colorScheme.primary,
+                maxLines = 1
             )
         }
     }

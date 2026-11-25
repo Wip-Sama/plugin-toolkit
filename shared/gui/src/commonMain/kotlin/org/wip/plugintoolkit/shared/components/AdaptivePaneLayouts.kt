@@ -208,9 +208,9 @@ fun <T> ToolkitAdaptiveListDetailWorkspace(
             scaffoldDirective = contentDirective
         )
         val effectiveDirective = if (maxWidth < minTwoPaneWidth) {
-            effectiveNavigator.scaffoldDirective.copy(maxHorizontalPartitions = 1)
+            contentDirective.copy(maxHorizontalPartitions = 1)
         } else {
-            effectiveNavigator.scaffoldDirective
+            contentDirective
         }
         val paneExpansionState = rememberFixedListPaneExpansionState(
             initialWidth = listPaneWidth,

@@ -9,15 +9,16 @@ import androidx.compose.material3.adaptive.layout.SupportingPaneScaffold
 import androidx.compose.material3.adaptive.layout.SupportingPaneScaffoldRole
 import androidx.compose.material3.adaptive.navigation.rememberSupportingPaneScaffoldNavigator
 import org.wip.plugintoolkit.shared.components.AdaptiveAppBarOverflowButton
-import org.wip.plugintoolkit.shared.components.AdaptiveBackNavigationButton
 import org.wip.plugintoolkit.shared.components.AdaptiveConstrainedContent
 import org.wip.plugintoolkit.shared.components.AdaptivePaneHeader
-import org.wip.plugintoolkit.shared.components.DesktopPaneDragHandle
+import org.wip.plugintoolkit.shared.components.ToolkitAdaptiveSupportingWorkspace
 import org.wip.plugintoolkit.shared.components.adaptiveOuterHorizontalPadding
 import org.wip.plugintoolkit.shared.components.adaptiveWorkspacePadding
 import org.wip.plugintoolkit.shared.components.rememberAdaptivePaneScaffoldDirective
 import org.wip.plugintoolkit.shared.components.rememberSupportingPaneExpansionState
 import org.wip.plugintoolkit.core.utils.PlatformVerticalScrollbar
+import plugintoolkit.composeapp.generated.resources.pane_collapse_sidebar
+import plugintoolkit.composeapp.generated.resources.pane_expand_sidebar
 import plugintoolkit.composeapp.generated.resources.flow_manager_subtitle
 import plugintoolkit.composeapp.generated.resources.flow_summary_issues_count
 import plugintoolkit.composeapp.generated.resources.flow_summary_pane_title
@@ -32,6 +33,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -96,6 +98,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import kotlinx.coroutines.delay
 import androidx.compose.ui.unit.dp
 import org.jetbrains.compose.resources.stringResource
+import org.koin.compose.koinInject
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.core.utils.PlatformUtils
 import org.wip.plugintoolkit.features.flows.model.Flow
@@ -283,327 +286,290 @@ fun FlowManagerView(
         }
         val navigator = rememberSupportingPaneScaffoldNavigator<Unit>(scaffoldDirective = directive)
 
-        SupportingPaneScaffold(
-            directive = navigator.scaffoldDirective,
-            value = navigator.scaffoldValue,
+        ToolkitAdaptiveSupportingWorkspace(
+            showSupportingPane = showSummaryPane,
+            onShowSupportingPaneChange = { showSummaryPane = it },
+            collapseTooltip = stringResource(Res.string.pane_collapse_sidebar),
+            expandTooltip = stringResource(Res.string.pane_expand_sidebar),
+            applyWorkspacePadding = false,
             modifier = Modifier.fillMaxSize(),
-            paneExpansionState = paneExpansionState,
-            paneExpansionDragHandle = { state ->
-                DesktopPaneDragHandle(paneExpansionState = state)
-            },
-        mainPane = {
-            AnimatedPane {
-                Surface(
-                    color = MaterialTheme.colorScheme.surfaceContainerLowest,
-                    shape = ToolkitTheme.shapes.large,
-                    modifier = Modifier.fillMaxSize()
+            mainPane = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(
+                            horizontal = adaptiveOuterHorizontalPadding(),
+                            vertical = ToolkitTheme.spacing.medium
+                        )
+                        .onPreviewKeyEvent { event ->
+                            if (event.isCtrlPressed && event.key == Key.F && event.type == KeyEventType.KeyDown) {
+                                searchFocusRequester.requestFocus()
+                                true
+                            } else false
+                        }
                 ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(
-                                horizontal = adaptiveOuterHorizontalPadding(),
-                                vertical = ToolkitTheme.spacing.medium
+                    val importFileLabel = stringResource(Res.string.flow_import_file)
+                    val importClipboardLabel = stringResource(Res.string.flow_import_clipboard)
+                    val createFlowLabel = stringResource(Res.string.flow_create_new)
+                    val summaryPaneLabel = stringResource(Res.string.flow_summary_pane_title)
+                    AdaptivePaneHeader(
+                        title = stringResource(Res.string.flow_manager_title),
+                        subtitle = stringResource(Res.string.flow_manager_subtitle, state.flows.size),
+                        actions = {
+                            AppBarRow(
+                                maxItemCount = 3,
+                                overflowIndicator = { menuState ->
+                                    AdaptiveAppBarOverflowButton(menuState = menuState)
+                                }
+                            ) {
+                                clickableItem(
+                                    onClick = { showCreateDialog = true },
+                                    icon = { Icon(Icons.Default.Add, contentDescription = createFlowLabel) },
+                                    label = createFlowLabel
+                                )
+                                clickableItem(
+                                    onClick = { viewModel.onEvent(FlowEvent.TriggerImport) },
+                                    icon = { Icon(Icons.Default.Download, contentDescription = importFileLabel) },
+                                    label = importFileLabel
+                                )
+                                clickableItem(
+                                    onClick = {
+                                        val base64 = textClipboardManager.getText()?.text
+                                        if (!base64.isNullOrBlank()) {
+                                            viewModel.onEvent(FlowEvent.TriggerImportFromClipboard(base64))
+                                        }
+                                    },
+                                    icon = { Icon(Icons.Default.ContentCopy, contentDescription = importClipboardLabel) },
+                                    label = importClipboardLabel
+                                )
+                                toggleableItem(
+                                    checked = showSummaryPane,
+                                    onCheckedChange = { showSummaryPane = it },
+                                    icon = { Icon(Icons.Default.Settings, contentDescription = summaryPaneLabel) },
+                                    label = summaryPaneLabel
+                                )
+                            }
+                        }
+                    )
+
+                    Spacer(modifier = Modifier.height(ToolkitTheme.spacing.medium))
+
+                    // Premium Search Bar matching application design system
+                    ToolkitTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        placeholder = {
+                            Text(
+                                stringResource(Res.string.flow_search_placeholder),
+                                style = MaterialTheme.typography.bodyMedium
                             )
-                            .onPreviewKeyEvent { event ->
-                                if (event.isCtrlPressed && event.key == Key.F && event.type == KeyEventType.KeyDown) {
-                                    searchFocusRequester.requestFocus()
-                                    true
-                                } else false
-                            }
-                    ) {
-        val importFileLabel = stringResource(Res.string.flow_import_file)
-        val importClipboardLabel = stringResource(Res.string.flow_import_clipboard)
-        val createFlowLabel = stringResource(Res.string.flow_create_new)
-        val summaryPaneLabel = stringResource(Res.string.flow_summary_pane_title)
-        AdaptivePaneHeader(
-            title = stringResource(Res.string.flow_manager_title),
-            subtitle = stringResource(Res.string.flow_manager_subtitle, state.flows.size),
-            actions = {
-                AppBarRow(
-                    maxItemCount = 3,
-                    overflowIndicator = { menuState ->
-                        AdaptiveAppBarOverflowButton(menuState = menuState)
-                    }
-                ) {
-                    clickableItem(
-                        onClick = { showCreateDialog = true },
-                        icon = { Icon(Icons.Default.Add, contentDescription = createFlowLabel) },
-                        label = createFlowLabel
-                    )
-                    clickableItem(
-                        onClick = { viewModel.onEvent(FlowEvent.TriggerImport) },
-                        icon = { Icon(Icons.Default.Download, contentDescription = importFileLabel) },
-                        label = importFileLabel
-                    )
-                    clickableItem(
-                        onClick = {
-                            val base64 = textClipboardManager.getText()?.text
-                            if (!base64.isNullOrBlank()) {
-                                viewModel.onEvent(FlowEvent.TriggerImportFromClipboard(base64))
-                            }
                         },
-                        icon = { Icon(Icons.Default.ContentCopy, contentDescription = importClipboardLabel) },
-                        label = importClipboardLabel
+                        modifier = Modifier.fillMaxWidth().focusRequester(searchFocusRequester),
+                        leadingIcon = {
+                            Icon(
+                                Icons.Default.Search,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        },
+                        singleLine = true
                     )
-                    toggleableItem(
-                        checked = showSummaryPane,
-                        onCheckedChange = { checked ->
-                            showSummaryPane = checked
-                            scope.launch {
-                                if (checked) {
-                                    navigator.navigateTo(SupportingPaneScaffoldRole.Supporting)
-                                } else if (navigator.canNavigateBack()) {
-                                    navigator.navigateBack()
+
+                    Spacer(modifier = Modifier.height(ToolkitTheme.spacing.small))
+
+                    // Filter chips and sort row
+                    FlowRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small),
+                        itemVerticalAlignment = Alignment.CenterVertically
+                    ) {
+                        FlowFilterChipsRow(
+                            selectedFilter = chipFilter,
+                            onFilterSelected = { chipFilter = it },
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
+
+                        FlowSortDropdownChip(
+                            sortMode = sortMode,
+                            onSortModeChange = { sortMode = it }
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(ToolkitTheme.spacing.medium))
+
+                    val flowListScrollState = rememberScrollState()
+                    val flowListScrollbarReserve = if (flowListScrollState.maxValue > 0) {
+                        ToolkitTheme.dimensions.sduiScrollbarEndPadding
+                    } else {
+                        ToolkitTheme.spacing.none
+                    }
+
+                    Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .verticalScroll(flowListScrollState)
+                                .padding(end = flowListScrollbarReserve),
+                            verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.medium)
+                        ) {
+                            if (filteredFlows.isEmpty()) {
+                                Box(
+                                    Modifier.fillMaxSize().padding(vertical = ToolkitTheme.spacing.extraLarge),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = if (searchQuery.isEmpty() && chipFilter == FlowChipFilter.All) {
+                                            stringResource(Res.string.flow_no_flows)
+                                        } else {
+                                            stringResource(Res.string.flow_no_search_results)
+                                        },
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
+                                }
+                            } else {
+                                filteredFlows.forEach { flow ->
+                                    // Calculate parent relationships and missing capabilities reactively
+                                    val parentFlows = remember(flow.name, parentFlowsMap) {
+                                        parentFlowsMap[flow.name] ?: emptyList()
+                                    }
+
+                                    val missingCapabilities = remember(flow, activeCapabilities) {
+                                        flow.nodes.filterIsInstance<Node.CapabilityNode>()
+                                            .map { it.capability.name }
+                                            .filter { it !in activeCapabilities }
+                                            .distinct()
+                                    }
+
+                                    val notReadyNodes = remember(flow, state.flows, pluginLocksState, loadedPlugins) {
+                                        val effectiveConns = flow.getEffectiveConnections()
+                                        flow.nodes.filter { node ->
+                                            val settings =
+                                                if (node is Node.CapabilityNode) pluginManager.loadPluginSettings(node.pluginInfo.id).settings else null
+                                            val locks = if (node is Node.CapabilityNode) {
+                                                pluginLocksState[node.pluginInfo.id] ?: pluginLocksState.values.fold(emptyMap()) { acc, m -> acc + m }
+                                            } else null
+                                            !node.isReady(flow.connections, settings, locks, effectiveConns)
+                                        }
+                                    }
+
+                                    val isRunning = remember(flow.name, state.flows, allJobs) {
+                                        viewModel.isFlowRunning(flow.name)
+                                    }
+                                    val isPaused = remember(flow.name, allJobs) {
+                                        viewModel.isFlowPaused(flow.name)
+                                    }
+
+                                    FlowItem(
+                                        name = flow.name,
+                                        nodeCount = flow.nodes.size,
+                                        parentFlows = parentFlows,
+                                        missingCapabilities = missingCapabilities,
+                                        notReadyNodes = notReadyNodes,
+                                        isRunning = isRunning,
+                                        isPaused = isPaused,
+                                        isSelected = state.selectedFlowId == flow.name,
+                                        onSelect = {
+                                            if (missingCapabilities.isNotEmpty() || notReadyNodes.isNotEmpty()) {
+                                                Logger.w { "Cannot run flow '${flow.name}': Flow is not ready (missingCapabilities: $missingCapabilities, notReadyNodes: $notReadyNodes)" }
+                                            }
+                                            onRunFlow(flow.name)
+                                        },
+                                        onEditMetadata = { flowToEditMetadata = flow.name },
+                                        onEdit = {
+                                            viewModel.onEvent(FlowEvent.SelectFlow(flow.name))
+                                            onEditFlow(flow.name)
+                                        },
+                                        onDelete = { flowToDelete = flow.name },
+                                        onExport = { viewModel.onEvent(FlowEvent.ExportFlow(flow.name)) },
+                                        onShareClipboard = {
+                                            viewModel.onEvent(FlowEvent.ShareFlowToClipboard(flow.name) { base64 ->
+                                                scope.launch {
+                                                    clipboard.setClipEntry(PlatformUtils.clipEntryOf(base64))
+                                                }
+                                            })
+                                        }
+                                    )
                                 }
                             }
-                        },
-                        icon = { Icon(Icons.Default.Settings, contentDescription = summaryPaneLabel) },
-                        label = summaryPaneLabel
-                    )
+                        }
+                        if (flowListScrollState.maxValue > 0) {
+                            PlatformVerticalScrollbar(
+                                scrollState = flowListScrollState,
+                                modifier = Modifier
+                                    .align(Alignment.CenterEnd)
+                                    .fillMaxHeight()
+                            )
+                        }
+                    }
                 }
-            }
-        )
-
-        Spacer(modifier = Modifier.height(ToolkitTheme.spacing.medium))
-
-        // Premium Search Bar matching application design system
-        ToolkitTextField(
-            value = searchQuery,
-            onValueChange = { searchQuery = it },
-            placeholder = {
-                Text(
-                    stringResource(Res.string.flow_search_placeholder),
-                    style = MaterialTheme.typography.bodyMedium
-                )
             },
-            modifier = Modifier.fillMaxWidth().focusRequester(searchFocusRequester),
-            leadingIcon = {
-                Icon(
-                    Icons.Default.Search,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            },
-            singleLine = true
-        )
+            supportingPane = {
+                val readyCount = remember(state.flows) {
+                    state.flows.count { flow ->
+                        flow.nodes.all { it.isReady(flow.connections, null, null, null) }
+                    }
+                }
+                val issuesCount = state.flows.size - readyCount
 
-        Spacer(modifier = Modifier.height(ToolkitTheme.spacing.small))
-
-        // Filter chips and sort row
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            FlowFilterChipsRow(
-                selectedFilter = chipFilter,
-                onFilterSelected = { chipFilter = it },
-                modifier = Modifier.weight(1f)
-            )
-
-            Spacer(modifier = Modifier.width(ToolkitTheme.spacing.medium))
-
-            FlowSortDropdownChip(
-                sortMode = sortMode,
-                onSortModeChange = { sortMode = it }
-            )
-        }
-
-        Spacer(modifier = Modifier.height(ToolkitTheme.spacing.medium))
-
-        val flowListScrollState = rememberScrollState()
-        val flowListScrollbarReserve = if (flowListScrollState.maxValue > 0) {
-            ToolkitTheme.dimensions.sduiScrollbarEndPadding
-        } else {
-            ToolkitTheme.spacing.none
-        }
-
-        Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(flowListScrollState)
-                    .padding(end = flowListScrollbarReserve),
-                verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.medium)
-            ) {
-            if (filteredFlows.isEmpty()) {
-                Box(
-                    Modifier.fillMaxSize().padding(vertical = ToolkitTheme.spacing.extraLarge),
-                    contentAlignment = Alignment.Center
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(ToolkitTheme.spacing.large),
+                    verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.medium)
                 ) {
                     Text(
-                        text = if (searchQuery.isEmpty() && chipFilter == FlowChipFilter.All) {
-                            stringResource(Res.string.flow_no_flows)
-                        } else {
-                            stringResource(Res.string.flow_no_search_results)
-                        },
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.bodyMedium
+                        text = stringResource(Res.string.flow_summary_pane_title),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
-                }
-            } else {
-                filteredFlows.forEach { flow ->
-                    // Calculate parent relationships and missing capabilities reactively
-                    val parentFlows = remember(flow.name, parentFlowsMap) {
-                        parentFlowsMap[flow.name] ?: emptyList()
-                    }
-
-                    val missingCapabilities = remember(flow, activeCapabilities) {
-                        flow.nodes.filterIsInstance<Node.CapabilityNode>()
-                            .map { it.capability.name }
-                            .filter { it !in activeCapabilities }
-                            .distinct()
-                    }
-
-                    val notReadyNodes = remember(flow, state.flows, pluginLocksState, loadedPlugins) {
-                        val effectiveConns = flow.getEffectiveConnections()
-                        flow.nodes.filter { node ->
-                            val settings =
-                                if (node is Node.CapabilityNode) pluginManager.loadPluginSettings(node.pluginInfo.id).settings else null
-                            val locks = if (node is Node.CapabilityNode) {
-                                pluginLocksState[node.pluginInfo.id] ?: pluginLocksState.values.fold(emptyMap()) { acc, m -> acc + m }
-                            } else null
-                            !node.isReady(flow.connections, settings, locks, effectiveConns)
-                        }
-                    }
-
-                    val isRunning = remember(flow.name, state.flows, allJobs) {
-                        viewModel.isFlowRunning(flow.name)
-                    }
-                    val isPaused = remember(flow.name, allJobs) {
-                        viewModel.isFlowPaused(flow.name)
-                    }
-
-                    FlowItem(
-                        name = flow.name,
-                        nodeCount = flow.nodes.size,
-                        parentFlows = parentFlows,
-                        missingCapabilities = missingCapabilities,
-                        notReadyNodes = notReadyNodes,
-                        isRunning = isRunning,
-                        isPaused = isPaused,
-                        isSelected = state.selectedFlowId == flow.name,
-                        onSelect = {
-                            if (missingCapabilities.isNotEmpty() || notReadyNodes.isNotEmpty()) {
-                                Logger.w { "Cannot run flow '${flow.name}': Flow is not ready (missingCapabilities: $missingCapabilities, notReadyNodes: $notReadyNodes)" }
-                            }
-                            onRunFlow(flow.name)
-                        },
-                        onEditMetadata = { flowToEditMetadata = flow.name },
-                        onEdit = {
-                            viewModel.onEvent(FlowEvent.SelectFlow(flow.name))
-                            onEditFlow(flow.name)
-                        },
-                        onDelete = { flowToDelete = flow.name },
-                        onExport = { viewModel.onEvent(FlowEvent.ExportFlow(flow.name)) },
-                        onShareClipboard = {
-                            viewModel.onEvent(FlowEvent.ShareFlowToClipboard(flow.name) { base64 ->
-                                scope.launch {
-                                    clipboard.setClipEntry(PlatformUtils.clipEntryOf(base64))
-                                }
-                            })
-                        }
-                    )
-                }
-            }
-            }
-            if (flowListScrollState.maxValue > 0) {
-                PlatformVerticalScrollbar(
-                    scrollState = flowListScrollState,
-                    modifier = Modifier
-                        .align(Alignment.CenterEnd)
-                        .fillMaxHeight()
-                )
-            }
-        }
-                    }
-                }
-            }
-        },
-        supportingPane = {
-            AnimatedPane(
-                modifier = Modifier.preferredWidth(ToolkitTheme.dimensions.adaptiveSupportingPaneWidth)
-            ) {
-                Surface(
-                    color = MaterialTheme.colorScheme.surfaceContainer,
-                    shape = ToolkitTheme.shapes.large,
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    val readyCount = remember(state.flows) {
-                        state.flows.count { flow ->
-                            flow.nodes.all { it.isReady(flow.connections, null, null, null) }
-                        }
-                    }
-                    val issuesCount = state.flows.size - readyCount
-
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(ToolkitTheme.spacing.large),
-                        verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.medium)
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceContainerLowest,
+                        shape = ToolkitTheme.shapes.medium,
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        if (navigator.canNavigateBack()) {
-                            AdaptiveBackNavigationButton(
-                                onClick = {
-                                    showSummaryPane = false
-                                    scope.launch { navigator.navigateBack() }
+                        Column(
+                            modifier = Modifier.padding(ToolkitTheme.spacing.medium),
+                            verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
+                        ) {
+                            Text(
+                                text = stringResource(Res.string.flow_summary_ready_count, readyCount),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            HorizontalDivider()
+                            Text(
+                                text = stringResource(Res.string.flow_summary_issues_count, issuesCount),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = if (issuesCount > 0) {
+                                    MaterialTheme.colorScheme.error
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
                                 }
                             )
                         }
-                        Text(
-                            text = stringResource(Res.string.flow_summary_pane_title),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Surface(
-                            color = MaterialTheme.colorScheme.surfaceContainerLowest,
-                            shape = ToolkitTheme.shapes.medium,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Column(
-                                modifier = Modifier.padding(ToolkitTheme.spacing.medium),
-                                verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
-                            ) {
-                                Text(
-                                    text = stringResource(Res.string.flow_summary_ready_count, readyCount),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                                HorizontalDivider()
-                                Text(
-                                    text = stringResource(Res.string.flow_summary_issues_count, issuesCount),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = if (issuesCount > 0) {
-                                        MaterialTheme.colorScheme.error
-                                    } else {
-                                        MaterialTheme.colorScheme.onSurfaceVariant
-                                    }
-                                )
-                            }
-                        }
-                        Button(
-                            onClick = { showCreateDialog = true },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Icon(Icons.Default.Add, contentDescription = null)
-                            Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
-                            Text(stringResource(Res.string.flow_create_new))
-                        }
-                        OutlinedButton(
-                            onClick = { viewModel.onEvent(FlowEvent.TriggerImport) },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Icon(Icons.Default.Download, contentDescription = null)
-                            Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
-                            Text(stringResource(Res.string.flow_import_file))
-                        }
+                    }
+                    Button(
+                        onClick = { showCreateDialog = true },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = null)
+                        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
+                        Text(stringResource(Res.string.flow_create_new))
+                    }
+                    OutlinedButton(
+                        onClick = { viewModel.onEvent(FlowEvent.TriggerImport) },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.Download, contentDescription = null)
+                        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
+                        Text(stringResource(Res.string.flow_import_file))
                     }
                 }
             }
-        }
-    )
+        )
     }
     if (showCreateDialog) {
         CreateFlowDialog(

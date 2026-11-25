@@ -1154,4 +1154,8 @@
     <string name="flow_palette_drag_to_board">Trascina sulla lavagna per posizionare</string>
     <string name="setting_compact_panels_default">Barre Laterali e Pannelli Compatti</string>
     <string name="setting_compact_panels_default_subtitle">Avvia barre laterali secondarie e pannelli comprimibili nello stato minimo/compatto per massimizzare lo spazio di lavoro</string>
+    <string name="pane_collapse_sidebar">Nascondi barra laterale</string>
+    <string name="pane_expand_sidebar">Mostra barra laterale</string>
+    <string name="pane_collapse_bottom_panel">Comprimi pannello</string>
+    <string name="pane_expand_bottom_panel">Espandi pannello</string>
 </resources>

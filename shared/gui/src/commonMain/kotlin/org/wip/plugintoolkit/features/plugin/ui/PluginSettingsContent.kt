@@ -7,6 +7,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -61,6 +62,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -179,6 +181,18 @@ fun PluginSettingsContent(
     val hasGlobalParams = globalParams.isNotEmpty()
     val hasCapabilities = capabilities.isNotEmpty()
     val hasAnyResults = hasActions || hasCustomSettings || hasGlobalParams || hasCapabilities
+
+    val manifestDefaults = remember(manifest) {
+        @Suppress("UNCHECKED_CAST")
+        (manifest.settings?.mapValues { (_, meta) ->
+            meta.defaultValue ?: if (meta.type is DataType.Primitive && (meta.type as DataType.Primitive).primitiveType == PrimitiveType.BOOLEAN) {
+                JsonPrimitive(false)
+            } else null
+        }?.filterValues { it != null } ?: emptyMap()) as Map<String, kotlinx.serialization.json.JsonElement>
+    }
+    val providedSettings = remember(manifestDefaults, store.settings) {
+        manifestDefaults + store.settings
+    }
 
     val lockedEnumOptions = remember(manifest) {
         val result = mutableMapOf<String, MutableList<String>>()
@@ -337,23 +351,28 @@ fun PluginSettingsContent(
                 .padding(ToolkitTheme.spacing.large)
         ) {
             // Header with Plugin Name
-            Row(
+            FlowRow(
                 modifier = Modifier.fillMaxWidth().padding(bottom = ToolkitTheme.spacing.small),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small),
+                itemVerticalAlignment = Alignment.CenterVertically
             ) {
-                Column(modifier = Modifier.weight(1f)) {
+                Column(modifier = Modifier.weight(1f, fill = false)) {
                     Text(
                         text = manifest.plugin.name,
                         style = MaterialTheme.typography.headlineMedium,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onBackground
+                        color = MaterialTheme.colorScheme.onBackground,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
                     )
                     if (manifest.plugin.description.isNotBlank()) {
                         Text(
                             text = manifest.plugin.description,
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 }
@@ -369,21 +388,28 @@ fun PluginSettingsContent(
                         modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
                     )
                     Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
-                    Text(stringResource(Res.string.plugin_action_refresh_locks))
+                    Text(
+                        text = stringResource(Res.string.plugin_action_refresh_locks),
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
             }
 
             // Search & By Section Filter Row
-            Row(
+            FlowRow(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(bottom = ToolkitTheme.spacing.small),
-                verticalAlignment = Alignment.CenterVertically
+                horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.medium),
+                verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small),
+                itemVerticalAlignment = Alignment.CenterVertically
             ) {
                 ToolkitTextField(
                     value = searchQuery,
                     onValueChange = { searchQuery = it },
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.widthIn(min = ToolkitTheme.dimensions.sduiSidebarMinWidth).weight(1f),
                     placeholder = {
                         Text(
                             stringResource(Res.string.settings_search_placeholder),
@@ -412,26 +438,27 @@ fun PluginSettingsContent(
                     singleLine = true
                 )
 
-                Spacer(modifier = Modifier.width(ToolkitTheme.spacing.medium))
-
-                Text(
-                    text = stringResource(Res.string.plugin_settings_by_section),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
-                Switch(
-                    checked = searchBySection,
-                    onCheckedChange = { searchBySection = it }
-                )
-
-                if (isBusy) {
-                    CircularProgressIndicator(
-                        modifier = Modifier
-                            .padding(start = ToolkitTheme.spacing.medium)
-                            .size(ToolkitTheme.dimensions.iconMedium),
-                        strokeWidth = ToolkitTheme.dimensions.circularProgressStrokeWidth
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = stringResource(Res.string.plugin_settings_by_section),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1
                     )
+                    Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
+                    Switch(
+                        checked = searchBySection,
+                        onCheckedChange = { searchBySection = it }
+                    )
+
+                    if (isBusy) {
+                        CircularProgressIndicator(
+                            modifier = Modifier
+                                .padding(start = ToolkitTheme.spacing.medium)
+                                .size(ToolkitTheme.dimensions.iconMedium),
+                            strokeWidth = ToolkitTheme.dimensions.circularProgressStrokeWidth
+                        )
+                    }
                 }
             }
 
@@ -450,17 +477,6 @@ fun PluginSettingsContent(
                         )
                     }
                 } else {
-                    val manifestDefaults = remember(manifest) {
-                        (manifest.settings?.mapValues { (_, meta) ->
-                            meta.defaultValue ?: if (meta.type is DataType.Primitive && (meta.type as DataType.Primitive).primitiveType == PrimitiveType.BOOLEAN) {
-                                JsonPrimitive(false)
-                            } else null
-                        }?.filterValues { it != null } ?: emptyMap()) as Map<String, kotlinx.serialization.json.JsonElement>
-                    }
-                    val providedSettings = remember(manifestDefaults, store.settings) {
-                        manifestDefaults + store.settings
-                    }
-
                     LazyColumn(
                         state = lazyListState,
                         modifier = Modifier
@@ -741,6 +757,13 @@ fun PluginSettingsContent(
     selectedActionForParams?.let { action ->
         ActionParametersDialog(
             action = action,
+            providedSettings = providedSettings,
+            providedLocks = locks,
+            pluginId = pkg,
+            onNavigateToPluginSetting = { pid, key ->
+                selectedActionForParams = null
+                navigateToSettingInPlace(pid, key)
+            },
             onDismiss = { selectedActionForParams = null },
             onConfirm = { params ->
                 selectedActionForParams = null
@@ -767,6 +790,10 @@ private fun PluginSectionHeader(title: String) {
 @Composable
 private fun ActionParametersDialog(
     action: PluginAction,
+    providedSettings: Map<String, kotlinx.serialization.json.JsonElement> = emptyMap(),
+    providedLocks: Map<String, Boolean> = emptyMap(),
+    pluginId: String = "",
+    onNavigateToPluginSetting: ((pluginId: String, settingKey: String) -> Unit)? = null,
     onDismiss: () -> Unit,
     onConfirm: (Map<String, kotlinx.serialization.json.JsonElement>) -> Unit
 ) {
@@ -809,7 +836,11 @@ private fun ActionParametersDialog(
                         name = key,
                         metadata = meta,
                         value = paramState[key] ?: "",
-                        onValueChange = { paramState[key] = it }
+                        onValueChange = { paramState[key] = it },
+                        providedSettings = providedSettings,
+                        providedLocks = providedLocks,
+                        pluginId = pluginId,
+                        onNavigateToPluginSetting = onNavigateToPluginSetting
                     )
                 }
 

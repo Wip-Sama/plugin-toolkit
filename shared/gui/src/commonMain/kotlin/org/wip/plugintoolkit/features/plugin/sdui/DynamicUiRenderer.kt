@@ -96,6 +96,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -199,6 +200,7 @@ import org.wip.plugintoolkit.api.sdui.UiModifier
 import org.wip.plugintoolkit.api.sdui.UiNode
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.VerticalDragHandle
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.graphics.Color
 import org.wip.plugintoolkit.api.sdui.UnknownNode
 import org.wip.plugintoolkit.shared.components.ToolkitEmptyState

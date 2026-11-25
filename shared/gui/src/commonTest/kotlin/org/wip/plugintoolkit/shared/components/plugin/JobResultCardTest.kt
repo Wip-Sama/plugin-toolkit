@@ -339,4 +339,47 @@ class JobResultCardTest {
         assertTrue(report.contains("[aiModelInference] | RAM: 100.0 MB | VRAM: 512.0 MB"))
         assertTrue(report.contains("[aiModelInference] | RAM: 250.0 MB | VRAM: 1.0 GB"))
     }
+
+    @Test
+    fun testBuildJobExportReportIncludesOverheadWhenTotalExceedsCapabilities() {
+        val testStart = Instant.fromEpochMilliseconds(1700000000000L)
+        val testEnd = Instant.fromEpochMilliseconds(1700000002200L)
+
+        val job = BackgroundJob(
+            id = "flow-overhead-job",
+            name = "Single Node Flow",
+            type = JobType.Flow,
+            status = JobStatus.Completed,
+            enqueuedAt = testStart,
+            startedAt = testStart,
+            completedAt = testEnd,
+            pluginId = "org.wip.minimal",
+            capabilityName = "greet",
+            executionMetrics = JobExecutionMetrics(
+                startedAt = testStart,
+                completedAt = testEnd,
+                totalDurationMs = 2200L,
+                capabilityMetrics = listOf(
+                    CapabilityExecutionMetric(
+                        capabilityName = "greet",
+                        durationMs = 840L
+                    )
+                )
+            )
+        )
+
+        val report = buildJobExportReport(
+            job = job,
+            logs = emptyList(),
+            startedAtLabel = "Started",
+            completedAtLabel = "Completed",
+            durationLabel = "Duration",
+            memoryLabel = "Peak Memory",
+            capabilityBreakdownLabel = "Capabilities",
+            overheadLabel = "Host Overhead"
+        )
+
+        assertTrue(report.contains("greet: 840 ms (840ms) [38%]"), "Expected greet breakdown in report:\n$report")
+        assertTrue(report.contains("Host Overhead: 1360 ms (1.4s) [62%]"), "Expected host overhead breakdown in report:\n$report")
+    }
 }

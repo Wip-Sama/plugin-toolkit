@@ -5,6 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -45,6 +46,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import kotlinx.serialization.json.JsonPrimitive
 import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.viewmodel.koinViewModel
@@ -148,7 +150,7 @@ fun SinglePluginRunnerView(
             color = MaterialTheme.colorScheme.surfaceContainerLow,
             modifier = Modifier.fillMaxWidth()
         ) {
-            Row(
+            FlowRow(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(
@@ -156,9 +158,12 @@ fun SinglePluginRunnerView(
                         vertical = ToolkitTheme.spacing.medium
                     ),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small),
+                itemVerticalAlignment = Alignment.CenterVertically
             ) {
-                PluginHeader(manifest = manifest)
+                Box(modifier = Modifier.weight(1f, fill = false)) {
+                    PluginHeader(manifest = manifest)
+                }
 
                 ToolkitButtonGroup {
                     if (viewModel.hasSetupHandler) {
