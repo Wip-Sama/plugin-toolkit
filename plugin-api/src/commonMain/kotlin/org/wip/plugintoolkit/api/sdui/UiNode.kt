@@ -152,17 +152,24 @@ data class FloatingPanelNode @JvmOverloads constructor(
 
 /**
  * Collapsible edge sidebar attached to a boundary (left, top, right, bottom).
+ *
+ * Optionally declares an adjacent docked sequel sidebar pane rendered seamlessly on the right
+ * inside the same rounded floating sidebar container via [sequelChildren].
  */
 @Serializable
 @SerialName("sidebar")
-data class SidebarNode(
+data class SidebarNode @JvmOverloads constructor(
     override val id: String,
     val attachPoint: SidebarAttachPoint = SidebarAttachPoint.LEFT,
     val title: String? = null,
     val children: List<UiNode> = emptyList(),
     val isCollapsible: Boolean = true,
     val isCollapsed: Boolean = false,
-    override val modifier: UiModifier = UiModifier.None
+    override val modifier: UiModifier = UiModifier.None,
+    val sequelTitle: String? = null,
+    val sequelChildren: List<UiNode>? = null,
+    val sequelVisible: Boolean = true,
+    val sequelWidthDp: Int? = null
 ) : UiNode
 
 // ── Control Nodes ───────────────────────────────────────────────────────────

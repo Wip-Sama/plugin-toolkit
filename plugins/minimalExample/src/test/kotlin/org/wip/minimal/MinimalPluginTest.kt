@@ -6,6 +6,7 @@ import org.wip.plugintoolkit.api.ApiConfig
 import org.wip.plugintoolkit.api.OS
 import org.wip.plugintoolkit.api.PluginContext
 import org.wip.plugintoolkit.api.PluginNotificationType
+import org.wip.plugintoolkit.api.sdui.SidebarNode
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -45,6 +46,13 @@ class MinimalPluginTest {
         val entry = MinimalPluginPluginEntry(plugin)
         assertNotNull(entry.getProcessor().getOrNull())
         assertNull(entry.getInteractiveProcessor())
+
+        // Verify SidebarNode sequel defaults remain backward-compatible for plugins not using sequel panes
+        val sidebar = SidebarNode(id = "minimal_sidebar", title = "Minimal")
+        assertNull(sidebar.sequelTitle)
+        assertNull(sidebar.sequelChildren)
+        assertTrue(sidebar.sequelVisible)
+        assertNull(sidebar.sequelWidthDp)
 
         // Verify updated PluginContext default implementations remain binary-compatible for minimal plugins
         val noOpContext = object : PluginContext by StubNoOpContext() {}

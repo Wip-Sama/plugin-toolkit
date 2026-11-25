@@ -690,6 +690,30 @@ private fun renderBoardCompositorTree(
             isCollapsed = false,
             modifier = UiModifier.width(320)
         ) {
+            val selectedLayerForSequel = state.layers.find { it.id in state.selectedLayerIds }
+            sequel(
+                title = "Selection Summary",
+                visible = selectedLayerForSequel != null,
+                widthDp = 220
+            ) {
+                selectedLayerForSequel?.let { layer ->
+                    text(
+                        id = "sequelLayerId",
+                        text = "Layer: ${layer.id}",
+                        role = TypographyRole.TITLE_MEDIUM
+                    )
+                    badge(
+                        id = "sequelLayerTypeBadge",
+                        text = layer::class.simpleName ?: "Layer",
+                        color = SemanticColor.SECONDARY
+                    )
+                    text(
+                        id = "sequelLayerMeta",
+                        text = "Visible: ${layer.visible} • Locked: ${layer.locked}",
+                        role = TypographyRole.BODY_SMALL
+                    )
+                }
+            }
             if (activeExportJob != null) {
                 card(id = "exportJobCard", title = "Render Capability Job", modifier = UiModifier.fillMaxWidth()) {
                     val prog = activeExportJob.primaryProgress

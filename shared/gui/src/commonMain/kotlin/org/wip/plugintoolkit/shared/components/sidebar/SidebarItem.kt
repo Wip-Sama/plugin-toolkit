@@ -5,8 +5,6 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.focusable
-import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
@@ -33,8 +31,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.InputMode
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import org.wip.plugintoolkit.core.model.resolve
@@ -55,15 +55,18 @@ fun <T> SidebarItem(
     expandProgress: Float = if (isExpanded) 1f else 0f
 ) {
     val motion = MaterialTheme.motionScheme
+    val inputModeManager = LocalInputModeManager.current
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
     val isFocused by interactionSource.collectIsFocusedAsState()
+    val showKeyboardFocus = isFocused && inputModeManager.inputMode == InputMode.Keyboard
 
+    val hoverSurface = MaterialTheme.colorScheme.surfaceContainerHigh
     val backgroundColor by animateColorAsState(
         targetValue = when {
             isSelected -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = ToolkitTheme.opacity.buttonBackground)
-            isHovered || isFocused -> MaterialTheme.colorScheme.surfaceContainerHigh
-            else -> ToolkitTheme.colors.transparent
+            isHovered || showKeyboardFocus -> hoverSurface
+            else -> hoverSurface.copy(alpha = 0f)
         },
         animationSpec = motion.fastEffectsSpec(),
         label = "sidebarItemBackground"
@@ -124,7 +127,7 @@ fun <T> SidebarItem(
                 .clip(animatedShape)
                 .background(backgroundColor)
                 .then(
-                    if (isFocused) {
+                    if (showKeyboardFocus) {
                         Modifier.border(
                             width = ToolkitTheme.dimensions.progressIndicatorStroke,
                             color = MaterialTheme.colorScheme.primary,
@@ -134,8 +137,6 @@ fun <T> SidebarItem(
                         Modifier
                     }
                 )
-                .hoverable(interactionSource)
-                .focusable(interactionSource = interactionSource)
                 .pointerHoverIcon(PointerIcon.Hand)
                 .clickable(interactionSource = interactionSource, indication = null) { onClick() }
                 .padding(horizontal = ToolkitTheme.spacing.small, vertical = ToolkitTheme.spacing.small),

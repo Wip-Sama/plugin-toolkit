@@ -3,8 +3,6 @@ package org.wip.plugintoolkit.features.job.ui
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.focusable
-import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
@@ -62,8 +60,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.InputMode
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.navigation3.runtime.NavKey
@@ -323,15 +323,18 @@ private fun JobSidebarNavItem(
     onClick: () -> Unit
 ) {
     val motion = MaterialTheme.motionScheme
+    val inputModeManager = LocalInputModeManager.current
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
     val isFocused by interactionSource.collectIsFocusedAsState()
+    val showKeyboardFocus = isFocused && inputModeManager.inputMode == InputMode.Keyboard
 
+    val hoverSurface = MaterialTheme.colorScheme.surfaceContainerHigh
     val backgroundColor by animateColorAsState(
         targetValue = when {
             isSelected -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = ToolkitTheme.opacity.buttonBackground)
-            isHovered || isFocused -> MaterialTheme.colorScheme.surfaceContainerHigh
-            else -> ToolkitTheme.colors.transparent
+            isHovered || showKeyboardFocus -> hoverSurface
+            else -> hoverSurface.copy(alpha = 0f)
         },
         animationSpec = motion.fastEffectsSpec(),
         label = "jobSidebarItemBg"
@@ -360,8 +363,6 @@ private fun JobSidebarNavItem(
             .fillMaxWidth()
             .clip(ToolkitTheme.shapes.medium)
             .background(backgroundColor)
-            .hoverable(interactionSource)
-            .focusable(interactionSource = interactionSource)
             .pointerHoverIcon(PointerIcon.Hand)
             .clickable(interactionSource = interactionSource, indication = null, onClick = onClick)
             .padding(

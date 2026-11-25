@@ -164,7 +164,7 @@ fun ToolkitEmptyState(
                     imageVector = icon,
                     contentDescription = title,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = ToolkitTheme.opacity.disabled),
-                    modifier = Modifier.size(ToolkitTheme.dimensions.emptyStateIconSize)
+                    modifier = Modifier.size(ToolkitTheme.dimensions.iconLarge)
                 )
             }
         }
@@ -490,7 +490,7 @@ fun ToolkitSideSheet(
                     }
                 },
             shape = ToolkitTheme.shapes.large,
-            color = MaterialTheme.colorScheme.surfaceContainerLow,
+            color = MaterialTheme.colorScheme.surfaceContainer,
             border = BorderStroke(
                 ToolkitTheme.dimensions.borderUnselected,
                 MaterialTheme.colorScheme.outlineVariant

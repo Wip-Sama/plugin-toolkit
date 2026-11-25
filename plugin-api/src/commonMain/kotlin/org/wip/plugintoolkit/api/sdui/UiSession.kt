@@ -2102,6 +2102,30 @@ class SidebarBuilder(
     val isCollapsed: Boolean,
     val modifier: UiModifier
 ) : UiContainerBuilder() {
+    private var sequelTitle: String? = null
+    private var sequelChildren: List<UiNode>? = null
+    private var sequelVisible: Boolean = true
+    private var sequelWidthDp: Int? = null
+
+    /**
+     * Declares an optional adjacent sequel sidebar pane docked seamlessly on the right inside
+     * the same rounded floating sidebar container.
+     */
+    @JvmOverloads
+    fun sequel(
+        title: String? = null,
+        visible: Boolean = true,
+        widthDp: Int? = null,
+        block: UiContainerBuilder.() -> Unit
+    ) {
+        val container = object : UiContainerBuilder() {}
+        container.block()
+        sequelTitle = title
+        sequelVisible = visible
+        sequelWidthDp = widthDp
+        sequelChildren = container.buildChildren()
+    }
+
     fun build(): SidebarNode = SidebarNode(
         id = id,
         attachPoint = attachPoint,
@@ -2109,7 +2133,11 @@ class SidebarBuilder(
         isCollapsible = isCollapsible,
         isCollapsed = isCollapsed,
         modifier = modifier,
-        children = children.toList()
+        children = children.toList(),
+        sequelTitle = sequelTitle,
+        sequelChildren = sequelChildren,
+        sequelVisible = sequelVisible,
+        sequelWidthDp = sequelWidthDp
     )
 }
 

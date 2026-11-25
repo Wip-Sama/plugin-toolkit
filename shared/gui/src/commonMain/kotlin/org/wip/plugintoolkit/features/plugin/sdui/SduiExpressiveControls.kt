@@ -35,8 +35,8 @@ import org.wip.plugintoolkit.api.sdui.SplitButtonNode
 import org.wip.plugintoolkit.api.sdui.UiEvent
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.shared.components.ToolkitButtonGroup
-import org.wip.plugintoolkit.shared.components.menu.ToolkitDropdownMenu
-import org.wip.plugintoolkit.shared.components.menu.ToolkitDropdownMenuItem
+import org.wip.plugintoolkit.shared.components.ToolkitSplitButton
+import org.wip.plugintoolkit.shared.components.ToolkitSplitMenuItem
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.sdui_more_actions
 
@@ -136,141 +136,37 @@ internal fun RenderButtonGroupNode(
 }
 
 /**
- * Renders a Material 3 Expressive [SplitButtonNode] with a primary pill trigger and an anchored
- * contextual [ToolkitDropdownMenu] action sheet.
+ * Renders a Material 3 Expressive [SplitButtonNode] using the shared host [ToolkitSplitButton]
+ * so plugin toolbars share identical spring physics, tooltips, and dropdown menus.
  */
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun RenderSplitButtonNode(
     node: SplitButtonNode,
     onEvent: (UiEvent) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var expanded by remember(node.id) { mutableStateOf(false) }
-    val chevronRotation by animateFloatAsState(
-        targetValue = if (expanded) 180f else 0f,
-        animationSpec = MaterialTheme.motionScheme.fastSpatialSpec(),
-        label = "sduiSplitButtonChevronRotation"
-    )
-    val isEnabled = node.modifier.enabled
-    val useDenseHeight = LocalInDenseActionBar.current || LocalInCompactSduiSurface.current
-    val itemHeight = if (useDenseHeight) {
-        ToolkitTheme.dimensions.segmentedButtonHeight
-    } else {
-        ToolkitTheme.dimensions.standardButtonHeight
-    }
-
-    val (baseBg, baseFg) = if (node.isTonal) {
-        MaterialTheme.colorScheme.secondaryContainer to MaterialTheme.colorScheme.onSecondaryContainer
-    } else {
-        MaterialTheme.colorScheme.primary to MaterialTheme.colorScheme.onPrimary
-    }
-    val bgColor = if (isEnabled) baseBg else baseBg.copy(alpha = ToolkitTheme.opacity.settingsItemHover)
-    val fgColor = if (isEnabled) baseFg else baseFg.copy(alpha = ToolkitTheme.opacity.settingsItemHover)
     val menuTooltip = node.menuTooltip?.takeIf { it.isNotBlank() } ?: stringResource(Res.string.sdui_more_actions)
-
-    Box(modifier = modifier) {
-        ToolkitButtonGroup {
-            item(visible = true) { connectedShape, itemModifier ->
-                Surface(
-                    onClick = { onEvent(UiEvent.Click(node.id, node.primaryAction)) },
-                    enabled = isEnabled,
-                    shape = connectedShape,
-                    color = bgColor,
-                    contentColor = fgColor,
-                    modifier = itemModifier
-                        .heightIn(min = itemHeight)
-                        .then(if (isEnabled) Modifier.pointerHoverIcon(PointerIcon.Hand) else Modifier)
-                ) {
-                    Box(
-                        modifier = Modifier.padding(
-                            horizontal = ToolkitTheme.spacing.md,
-                            vertical = ToolkitTheme.spacing.xs
-                        ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        RenderButtonLabel(
-                            label = node.label,
-                            iconName = node.iconName,
-                            iconSize = ToolkitTheme.dimensions.iconSmall
-                        )
-                    }
-                }
-            }
-
-            item(visible = node.menuItems.isNotEmpty()) { connectedShape, itemModifier ->
-                val chevronShape = if (expanded) ToolkitTheme.shapes.pill else connectedShape
-                SduiTooltipBox(tooltip = menuTooltip) {
-                    Surface(
-                        onClick = { expanded = !expanded },
-                        enabled = isEnabled,
-                        shape = chevronShape,
-                        color = bgColor,
-                        contentColor = fgColor,
-                        modifier = itemModifier
-                            .heightIn(min = itemHeight)
-                            .semantics { contentDescription = menuTooltip }
-                            .then(if (isEnabled) Modifier.pointerHoverIcon(PointerIcon.Hand) else Modifier)
-                    ) {
-                        Box(
-                            modifier = Modifier.padding(
-                                horizontal = ToolkitTheme.spacing.sm,
-                                vertical = ToolkitTheme.spacing.xs
-                            ),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.KeyboardArrowDown,
-                                contentDescription = null,
-                                modifier = Modifier
-                                    .size(ToolkitTheme.dimensions.denseIconSize)
-                                    .graphicsLayer { rotationZ = chevronRotation }
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        if (node.menuItems.isNotEmpty()) {
-            ToolkitDropdownMenu(
-                expanded = expanded,
-                onDismissRequest = { expanded = false }
-            ) {
-                node.menuItems.forEachIndexed { index, menuItem ->
-                    if (menuItem.startsSection && index > 0) {
-                        HorizontalDivider(
-                            modifier = Modifier.padding(vertical = ToolkitTheme.spacing.xxs),
-                            color = MaterialTheme.colorScheme.outlineVariant
-                        )
-                    }
-                    val itemEnabled = menuItem.enabled && isEnabled
-                    ToolkitDropdownMenuItem(
-                        text = {
-                            Text(
-                                text = menuItem.label,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        },
-                        onClick = {
-                            expanded = false
-                            onEvent(UiEvent.Click(node.id, menuItem.action ?: menuItem.key))
-                        },
-                        leadingIcon = menuItem.iconName?.takeIf { it.isNotBlank() }?.let { iconName ->
-                            {
-                                Icon(
-                                    imageVector = SduiIconRegistry.resolve(iconName),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
-                                )
-                            }
-                        },
-                        enabled = itemEnabled,
-                        isDestructive = menuItem.isDestructive
-                    )
-                }
-            }
-        }
+    val leadingIcon = node.iconName?.takeIf { it.isNotBlank() }?.let { SduiIconRegistry.resolve(it) }
+    val mappedItems = node.menuItems.map { item ->
+        ToolkitSplitMenuItem(
+            key = item.action ?: item.key,
+            label = item.label,
+            icon = item.iconName?.takeIf { it.isNotBlank() }?.let { SduiIconRegistry.resolve(it) },
+            isDestructive = item.isDestructive,
+            enabled = item.enabled && node.modifier.enabled,
+            startsSection = item.startsSection
+        )
     }
+
+    ToolkitSplitButton(
+        label = node.label,
+        onPrimaryClick = { onEvent(UiEvent.Click(node.id, node.primaryAction)) },
+        menuItems = mappedItems,
+        onMenuItemClick = { clicked -> onEvent(UiEvent.Click(node.id, clicked.key)) },
+        modifier = modifier,
+        leadingIcon = leadingIcon,
+        isTonal = node.isTonal,
+        enabled = node.modifier.enabled,
+        menuTooltip = menuTooltip
+    )
 }

@@ -112,6 +112,7 @@ import org.wip.plugintoolkit.api.sdui.SemanticColor
 import org.wip.plugintoolkit.api.sdui.SpacingSize
 import org.wip.plugintoolkit.api.sdui.UiEvent
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
+import org.wip.plugintoolkit.shared.components.ToolkitAccordion
 import org.wip.plugintoolkit.core.utils.PlatformHorizontalScrollbar
 import org.wip.plugintoolkit.core.utils.PlatformUtils
 import org.wip.plugintoolkit.core.utils.PlatformVerticalScrollbar
@@ -571,157 +572,29 @@ internal fun RenderAccordion(
 ) {
     var expanded by remember(node.id, node.expanded) { mutableStateOf(node.expanded) }
     val isEnabled = node.modifier.enabled
-    val interactionSource = remember { MutableInteractionSource() }
-    val isHovered by interactionSource.collectIsHoveredAsState()
+    val leadingIcon = node.leadingIcon?.takeIf { it.isNotBlank() }?.let { SduiIconRegistry.resolve(it) }
+    val badgeColor = (node.badgeColor ?: SemanticColor.PRIMARY).toComposeColor()
 
-    val toggleAccordion = {
-        if (isEnabled) {
-            val nextExpanded = !expanded
-            expanded = nextExpanded
-            onEvent(UiEvent.ToggleChanged(node.id, nextExpanded))
-        }
-    }
-
-    val actionLabel = stringResource(
-        if (expanded) Res.string.sdui_accordion_collapse else Res.string.sdui_accordion_expand
-    )
-
-    Surface(
+    ToolkitAccordion(
+        title = node.title,
+        expanded = expanded,
+        onExpandedChange = { nextExpanded ->
+            if (isEnabled) {
+                expanded = nextExpanded
+                onEvent(UiEvent.ToggleChanged(node.id, nextExpanded))
+            }
+        },
         modifier = modifier,
-        shape = ToolkitTheme.shapes.medium,
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        border = BorderStroke(
-            ToolkitTheme.dimensions.borderUnselected,
-            MaterialTheme.colorScheme.outlineVariant.copy(alpha = ToolkitTheme.opacity.divider)
-        )
+        subtitle = node.subtitle,
+        leadingIcon = leadingIcon,
+        badgeText = node.badgeText,
+        badgeColor = badgeColor
     ) {
-        Column(modifier = Modifier.fillMaxWidth()) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(
-                        if (isHovered && isEnabled) {
-                            MaterialTheme.colorScheme.surfaceContainerHigh
-                        } else {
-                            MaterialTheme.colorScheme.surfaceContainerLow
-                        }
-                    )
-                    .hoverable(interactionSource = interactionSource, enabled = isEnabled)
-                    .clickable(
-                        interactionSource = interactionSource,
-                        indication = null,
-                        enabled = isEnabled,
-                        onClick = toggleAccordion
-                    )
-                    .then(if (isEnabled) Modifier.pointerHoverIcon(PointerIcon.Hand) else Modifier)
-                    .padding(horizontal = ToolkitTheme.spacing.md, vertical = ToolkitTheme.spacing.sm),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.sm)
-            ) {
-                node.leadingIcon?.let { iconName ->
-                    Icon(
-                        imageVector = SduiIconRegistry.resolve(iconName),
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(ToolkitTheme.dimensions.iconMediumSmall)
-                    )
-                }
-
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.xxs)
-                ) {
-                    Text(
-                        text = node.title,
-                        style = ToolkitTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    node.subtitle?.takeIf { it.isNotBlank() }?.let { subtitleText ->
-                        Text(
-                            text = subtitleText,
-                            style = ToolkitTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-
-                node.badgeText?.takeIf { it.isNotBlank() }?.let { badge ->
-                    val (bgColor, fgColor) = (node.badgeColor ?: SemanticColor.PRIMARY).toContainerPair()
-                    Surface(
-                        shape = ToolkitTheme.shapes.pill,
-                        color = bgColor
-                    ) {
-                        Text(
-                            text = badge,
-                            style = ToolkitTheme.typography.labelSmall,
-                            color = fgColor,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.padding(
-                                horizontal = ToolkitTheme.spacing.sm,
-                                vertical = ToolkitTheme.spacing.xxs
-                            )
-                        )
-                    }
-                }
-
-                SduiTooltipBox(tooltip = actionLabel) {
-                    IconButton(
-                        onClick = toggleAccordion,
-                        enabled = isEnabled,
-                        modifier = Modifier
-                            .size(ToolkitTheme.dimensions.denseIconButtonSize)
-                            .then(if (isEnabled) Modifier.pointerHoverIcon(PointerIcon.Hand) else Modifier)
-                    ) {
-                        Icon(
-                            imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                            contentDescription = actionLabel,
-                            modifier = Modifier.size(ToolkitTheme.dimensions.denseIconSize)
-                        )
-                    }
-                }
-            }
-
-            AnimatedVisibility(
-                visible = expanded,
-                enter = expandVertically(
-                    animationSpec = spring(
-                        dampingRatio = Spring.DampingRatioNoBouncy,
-                        stiffness = Spring.StiffnessMediumLow
-                    )
-                ) + fadeIn(),
-                exit = shrinkVertically(
-                    animationSpec = spring(
-                        dampingRatio = Spring.DampingRatioNoBouncy,
-                        stiffness = Spring.StiffnessMediumLow
-                    )
-                ) + fadeOut()
-            ) {
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    HorizontalDivider(
-                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = ToolkitTheme.opacity.divider)
-                    )
-                    val contentSpacing = resolveContainerSpacing(SpacingSize.SMALL, node.children, isVertical = true)
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(
-                                start = ToolkitTheme.dimensions.sduiAccordionIndent,
-                                top = ToolkitTheme.spacing.sm,
-                                end = ToolkitTheme.spacing.md,
-                                bottom = ToolkitTheme.spacing.md
-                            ),
-                        verticalArrangement = Arrangement.spacedBy(contentSpacing)
-                    ) {
-                        RenderColumnChildren(
-                            children = node.children,
-                            onEvent = onEvent,
-                            allowWeight = false
-                        )
-                    }
-                }
-            }
-        }
+        RenderColumnChildren(
+            children = node.children,
+            onEvent = onEvent,
+            allowWeight = false
+        )
     }
 }
 

@@ -2,6 +2,9 @@
 
 All notable changes to the Plugin API will be documented in this file.
 
+## 4.1.0-alpha06
+- Extended `SidebarNode` (`@JvmOverloads`) and `SidebarBuilder` (`sequel(...)` DSL) with optional docked sequel sidebar pane properties (`sequelTitle`, `sequelChildren`, `sequelVisible`, `sequelWidthDp`), all defaulting to backward-compatible values.
+
 ## 4.1.0-alpha04
 - Added `TreeViewNode` (`TreeNodeItem`), `FilePickerNode` (`FilePickerMode`), `ColorPickerNode`, `BreadcrumbsNode` (`BreadcrumbItem`), `PaginationNode`, `StepperNode` (`StepperItem`, `StepStatus`), and `MenuNode` with `@JvmOverloads` constructors and `UiNodeSerializer` registration.
 - Extended `ScrollableColumnNode` and `GridNode` (and DSL builders) with `scrollToIndex`, `scrollToEdge` (`ScrollEdge`), and `scrollRevision`.

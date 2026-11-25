@@ -197,7 +197,17 @@ import org.wip.plugintoolkit.api.sdui.TypographyRole
 import org.wip.plugintoolkit.api.sdui.UiEvent
 import org.wip.plugintoolkit.api.sdui.UiModifier
 import org.wip.plugintoolkit.api.sdui.UiNode
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.VerticalDragHandle
+import androidx.compose.ui.graphics.Color
 import org.wip.plugintoolkit.api.sdui.UnknownNode
+import org.wip.plugintoolkit.shared.components.ToolkitEmptyState
+import org.wip.plugintoolkit.shared.components.ToolkitStatusBadge
+import org.wip.plugintoolkit.shared.components.sidebar.SequelSidebarMode
+import org.wip.plugintoolkit.shared.components.sidebar.ToolkitFloatingSidebar
+import org.wip.plugintoolkit.shared.components.sidebar.ToolkitSequelSidebarToggleButton
+import org.wip.plugintoolkit.shared.components.sidebar.resolveSequelExpanded
+import org.wip.plugintoolkit.shared.components.sidebar.toggleSequelSidebarMode
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.core.utils.PlatformContextMenuArea
 import org.wip.plugintoolkit.core.utils.PlatformContextMenuItem
@@ -863,31 +873,11 @@ fun RenderUiNode(
         }
 
         is BadgeNode -> {
-            val badgeColor = node.color.toComposeColor()
-            Surface(
-                modifier = appliedModifier,
-                color = badgeColor.copy(alpha = ToolkitTheme.opacity.subtleHighlight),
-                shape = ToolkitTheme.shapes.pill,
-                border = BorderStroke(
-                    ToolkitTheme.dimensions.borderUnselected,
-                    badgeColor.copy(alpha = ToolkitTheme.opacity.borderLow)
-                )
-            ) {
-                Text(
-                    text = node.text,
-                    style = ToolkitTheme.typography.labelSmall,
-                    color = badgeColor,
-                    maxLines = 1,
-                    softWrap = false,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier
-                        .widthIn(max = ToolkitTheme.dimensions.sduiBadgeMaxWidth)
-                        .padding(
-                            horizontal = ToolkitTheme.spacing.sm,
-                            vertical = ToolkitTheme.spacing.xxs
-                        )
-                )
-            }
+            ToolkitStatusBadge(
+                text = node.text,
+                color = node.color.toComposeColor(),
+                modifier = appliedModifier
+            )
         }
 
         is IconNode -> {
@@ -2001,40 +1991,16 @@ private fun RenderEmptyState(
     onEvent: (UiEvent) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(ToolkitTheme.spacing.extraLarge),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
-    ) {
-        Icon(
-            imageVector = SduiIconRegistry.resolve(node.iconName),
-            contentDescription = node.title,
-            modifier = Modifier.size(ToolkitTheme.dimensions.emptyStateIconSize),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = ToolkitTheme.opacity.disabled)
-        )
-        Text(
-            text = node.title,
-            style = ToolkitTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-        node.description?.let { desc ->
-            Text(
-                text = desc,
-                style = ToolkitTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+    ToolkitEmptyState(
+        title = node.title,
+        icon = SduiIconRegistry.resolve(node.iconName),
+        modifier = modifier,
+        description = node.description,
+        actionLabel = node.actionLabel,
+        onAction = node.actionLabel?.let {
+            { onEvent(UiEvent.Click(node.id, "empty_state_action")) }
         }
-        node.actionLabel?.let { actionLabel ->
-            Button(
-                onClick = { onEvent(UiEvent.Click(node.id, "empty_state_action")) },
-                modifier = Modifier.padding(top = ToolkitTheme.spacing.small)
-            ) {
-                Text(text = actionLabel, style = ToolkitTheme.typography.labelMedium)
-            }
-        }
-    }
+    )
 }
 
 /**
@@ -2129,7 +2095,8 @@ private fun RenderSplitPane(
     @Composable
     fun SplitPaneContainer(
         paneNode: UiNode,
-        paneModifier: Modifier
+        paneModifier: Modifier,
+        containerColor: Color
     ) {
         val innerPadding = if (paneNode.modifier.padding == SpacingSize.NONE) {
             ToolkitTheme.spacing.md
@@ -2139,7 +2106,7 @@ private fun RenderSplitPane(
         Surface(
             modifier = paneModifier,
             shape = ToolkitTheme.shapes.large,
-            color = MaterialTheme.colorScheme.surfaceContainerLow,
+            color = containerColor,
             border = BorderStroke(
                 ToolkitTheme.dimensions.borderUnselected,
                 MaterialTheme.colorScheme.outlineVariant.copy(alpha = ToolkitTheme.opacity.subtleHighlight)
@@ -2155,6 +2122,7 @@ private fun RenderSplitPane(
         }
     }
 
+    @OptIn(ExperimentalMaterial3ExpressiveApi::class)
     @Composable
     fun SplitResizeHandle(totalPx: Float) {
         val interactionSource = remember { MutableInteractionSource() }
@@ -2194,19 +2162,19 @@ private fun RenderSplitPane(
                 },
             contentAlignment = Alignment.Center
         ) {
-            Box(
-                modifier = (if (node.isHorizontal) {
-                    Modifier
-                        .width(ToolkitTheme.dimensions.sduiSplitHandlePillThickness)
-                        .height(ToolkitTheme.dimensions.sduiSplitHandlePillLength)
-                } else {
-                    Modifier
+            if (node.isHorizontal) {
+                VerticalDragHandle(
+                    interactionSource = interactionSource
+                )
+            } else {
+                Box(
+                    modifier = Modifier
                         .height(ToolkitTheme.dimensions.sduiSplitHandlePillThickness)
                         .width(ToolkitTheme.dimensions.sduiSplitHandlePillLength)
-                })
-                    .clip(ToolkitTheme.shapes.pill)
-                    .background(handleColor)
-            )
+                        .clip(ToolkitTheme.shapes.pill)
+                        .background(handleColor)
+                )
+            }
         }
     }
 
@@ -2225,14 +2193,16 @@ private fun RenderSplitPane(
             ) {
                 SplitPaneContainer(
                     paneNode = node.first,
-                    paneModifier = Modifier.weight(fraction1).fillMaxHeight()
+                    paneModifier = Modifier.weight(fraction1).fillMaxHeight(),
+                    containerColor = MaterialTheme.colorScheme.surfaceContainer
                 )
                 if (node.resizable) {
                     SplitResizeHandle(totalPx = totalPx)
                 }
                 SplitPaneContainer(
                     paneNode = node.second,
-                    paneModifier = Modifier.weight(fraction2).fillMaxHeight()
+                    paneModifier = Modifier.weight(fraction2).fillMaxHeight(),
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerLowest
                 )
             }
         } else {
@@ -2246,14 +2216,16 @@ private fun RenderSplitPane(
             ) {
                 SplitPaneContainer(
                     paneNode = node.first,
-                    paneModifier = Modifier.weight(fraction1).fillMaxWidth()
+                    paneModifier = Modifier.weight(fraction1).fillMaxWidth(),
+                    containerColor = MaterialTheme.colorScheme.surfaceContainer
                 )
                 if (node.resizable) {
                     SplitResizeHandle(totalPx = totalPx)
                 }
                 SplitPaneContainer(
                     paneNode = node.second,
-                    paneModifier = Modifier.weight(fraction2).fillMaxWidth()
+                    paneModifier = Modifier.weight(fraction2).fillMaxWidth(),
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerLowest
                 )
             }
         }
@@ -2440,7 +2412,7 @@ private fun RenderScaffold(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.surface)
+            .background(Color.Transparent)
             .padding(ToolkitTheme.spacing.sm)
             .clipToBounds()
     ) {
@@ -2697,6 +2669,7 @@ private fun RenderFloatingPanel(
     }
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun RenderSidebar(
     node: SidebarNode,
@@ -2708,108 +2681,258 @@ private fun RenderSidebar(
     val delegatesScrolling = remember(node.children) { node.children.any { it.containsScrollableOrWeightedContent() } }
     val applySidebarScroll = isHorizontal && !delegatesScrolling && !LocalInVerticalScroll.current
 
-    val requestedExpandedWidth = (node.modifier.widthDp?.dp ?: ToolkitTheme.dimensions.sduiSidebarDefaultWidth)
-        .coerceIn(ToolkitTheme.dimensions.sduiSidebarMinWidth, ToolkitTheme.dimensions.sduiSidebarMaxWidth)
-    val animatedSidebarWidth by animateDpAsState(
-        targetValue = if (isCollapsed) ToolkitTheme.dimensions.sidebarCollapsedWidth else requestedExpandedWidth,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioNoBouncy,
-            stiffness = Spring.StiffnessMediumLow
+    val sequelNodes = node.sequelChildren.orEmpty()
+    val hasSequel = isHorizontal && sequelNodes.isNotEmpty()
+    var sequelMode by remember(node.id, node.sequelVisible) {
+        mutableStateOf(
+            if (node.sequelVisible) SequelSidebarMode.Auto else SequelSidebarMode.ForcedCompact
         )
+    }
+    val isSequelShown = hasSequel && !isCollapsed && resolveSequelExpanded(
+        mode = sequelMode,
+        isWideViewport = node.sequelVisible
+    )
+    val sequelWidth = (node.sequelWidthDp?.dp ?: ToolkitTheme.dimensions.floatingSidebarSequelWidth)
+        .coerceIn(ToolkitTheme.dimensions.floatingSidebarMinWidth, ToolkitTheme.dimensions.sduiSidebarMaxWidth)
+
+    val requestedPrimaryWidth = (node.modifier.widthDp?.dp ?: ToolkitTheme.dimensions.sduiSidebarDefaultWidth)
+        .coerceIn(ToolkitTheme.dimensions.sduiSidebarMinWidth, ToolkitTheme.dimensions.sduiSidebarMaxWidth)
+    val targetTotalWidth = when {
+        isCollapsed -> ToolkitTheme.dimensions.sidebarCollapsedWidth
+        isSequelShown -> requestedPrimaryWidth + sequelWidth
+        else -> requestedPrimaryWidth
+    }
+    val animatedSidebarWidth by animateDpAsState(
+        targetValue = targetTotalWidth,
+        animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
+        label = "sduiSidebarWidth"
     )
 
-    Surface(
-        modifier = if (isHorizontal) {
-            modifier.width(animatedSidebarWidth).fillMaxHeight()
-        } else {
-            modifier.fillMaxWidth()
-        },
-        shape = ToolkitTheme.shapes.large,
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        border = BorderStroke(
-            ToolkitTheme.dimensions.borderUnselected,
-            MaterialTheme.colorScheme.outlineVariant.copy(alpha = ToolkitTheme.opacity.divider)
-        )
-    ) {
-        Column(
-            modifier = (if (isHorizontal) Modifier.fillMaxSize() else Modifier.fillMaxWidth())
-                .padding(ToolkitTheme.dimensions.sduiCompactSpacing),
-            verticalArrangement = Arrangement.spacedBy(ToolkitTheme.dimensions.sduiCompactSpacing)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                if (!isCollapsed) {
-                    node.title?.let { titleText ->
-                        Text(
-                            text = titleText,
-                            style = ToolkitTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f).padding(end = ToolkitTheme.spacing.xs)
-                        )
-                    } ?: Spacer(modifier = Modifier.weight(1f))
+    val sidebarBorder = BorderStroke(
+        ToolkitTheme.dimensions.borderUnselected,
+        MaterialTheme.colorScheme.outlineVariant.copy(alpha = ToolkitTheme.opacity.divider)
+    )
+
+    if (isHorizontal) {
+        ToolkitFloatingSidebar(
+            navigationKey = Unit,
+            animateNavigation = false,
+            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+            sequelContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+            shape = ToolkitTheme.shapes.large,
+            border = sidebarBorder,
+            sequelVisible = isSequelShown,
+            sequelWidth = sequelWidth,
+            sequelContent = if (hasSequel) {
+                {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(ToolkitTheme.dimensions.sduiCompactSpacing),
+                        verticalArrangement = Arrangement.spacedBy(ToolkitTheme.dimensions.sduiCompactSpacing)
+                    ) {
+                        node.sequelTitle?.takeIf { it.isNotBlank() }?.let { titleText ->
+                            Text(
+                                text = titleText,
+                                style = ToolkitTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                        val sequelScroll = rememberScrollState()
+                        val sequelScrollbarReserve = if (sequelScroll.maxValue > 0) {
+                            ToolkitTheme.dimensions.sduiScrollbarEndPadding
+                        } else {
+                            ToolkitTheme.spacing.none
+                        }
+                        Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                            CompositionLocalProvider(LocalInVerticalScroll provides true) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .verticalScroll(sequelScroll)
+                                        .padding(end = sequelScrollbarReserve),
+                                    verticalArrangement = Arrangement.spacedBy(
+                                        resolveContainerSpacing(SpacingSize.SMALL, sequelNodes, isVertical = true)
+                                    )
+                                ) {
+                                    RenderColumnChildren(
+                                        children = sequelNodes,
+                                        onEvent = onEvent,
+                                        allowWeight = false
+                                    )
+                                }
+                            }
+                            if (sequelScroll.maxValue > 0) {
+                                PlatformVerticalScrollbar(
+                                    scrollState = sequelScroll,
+                                    modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight()
+                                )
+                            }
+                        }
+                    }
                 }
-                if (node.isCollapsible) {
-                    SduiTooltipBox(tooltip = stringResource(Res.string.sdui_toggle_sidebar)) {
-                        IconButton(
-                            onClick = { isCollapsed = !isCollapsed },
-                            modifier = Modifier
-                                .size(ToolkitTheme.dimensions.denseIconButtonSize)
-                                .pointerHoverIcon(PointerIcon.Hand)
+            } else null,
+            modifier = modifier.width(animatedSidebarWidth).fillMaxHeight()
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(ToolkitTheme.dimensions.sduiCompactSpacing),
+                verticalArrangement = Arrangement.spacedBy(ToolkitTheme.dimensions.sduiCompactSpacing)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    if (!isCollapsed) {
+                        node.title?.let { titleText ->
+                            Text(
+                                text = titleText,
+                                style = ToolkitTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f).padding(end = ToolkitTheme.spacing.xs)
+                            )
+                        } ?: Spacer(modifier = Modifier.weight(1f))
+
+                        if (hasSequel) {
+                            ToolkitSequelSidebarToggleButton(
+                                isExpanded = isSequelShown,
+                                onToggle = { sequelMode = toggleSequelSidebarMode(isSequelShown) }
+                            )
+                        }
+                    }
+                    if (node.isCollapsible) {
+                        SduiTooltipBox(tooltip = stringResource(Res.string.sdui_toggle_sidebar)) {
+                            IconButton(
+                                onClick = { isCollapsed = !isCollapsed },
+                                modifier = Modifier
+                                    .size(ToolkitTheme.dimensions.denseIconButtonSize)
+                                    .pointerHoverIcon(PointerIcon.Hand)
+                            ) {
+                                Icon(
+                                    imageVector = if (isCollapsed) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
+                                    contentDescription = stringResource(Res.string.sdui_toggle_sidebar),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(ToolkitTheme.dimensions.denseIconSize)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                AnimatedVisibility(
+                    visible = !isCollapsed,
+                    modifier = Modifier.weight(1f).fillMaxWidth()
+                ) {
+                    if (applySidebarScroll) {
+                        val sidebarScrollState = rememberScrollState()
+                        val scrollbarReserve = if (sidebarScrollState.maxValue > 0) {
+                            ToolkitTheme.dimensions.sduiScrollbarEndPadding
+                        } else {
+                            ToolkitTheme.spacing.none
+                        }
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            CompositionLocalProvider(LocalInVerticalScroll provides true) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .verticalScroll(sidebarScrollState)
+                                        .padding(end = scrollbarReserve),
+                                    verticalArrangement = Arrangement.spacedBy(
+                                        resolveContainerSpacing(SpacingSize.SMALL, node.children, isVertical = true)
+                                    )
+                                ) {
+                                    RenderColumnChildren(
+                                        children = node.children,
+                                        onEvent = onEvent,
+                                        allowWeight = false
+                                    )
+                                }
+                            }
+                            PlatformVerticalScrollbar(
+                                scrollState = sidebarScrollState,
+                                modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight()
+                            )
+                        }
+                    } else {
+                        Column(
+                            modifier = Modifier.fillMaxSize(),
+                            verticalArrangement = Arrangement.spacedBy(
+                                resolveContainerSpacing(SpacingSize.SMALL, node.children, isVertical = true)
+                            )
                         ) {
-                            Icon(
-                                imageVector = if (isCollapsed) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
-                                contentDescription = stringResource(Res.string.sdui_toggle_sidebar),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(ToolkitTheme.dimensions.denseIconSize)
+                            RenderColumnChildren(
+                                children = node.children,
+                                onEvent = onEvent,
+                                allowWeight = true
                             )
                         }
                     }
                 }
             }
-
-            AnimatedVisibility(
-                visible = !isCollapsed,
-                modifier = if (isHorizontal) Modifier.weight(1f).fillMaxWidth() else Modifier.fillMaxWidth()
+        }
+    } else {
+        Surface(
+            modifier = modifier.fillMaxWidth(),
+            shape = ToolkitTheme.shapes.large,
+            color = MaterialTheme.colorScheme.surfaceContainer,
+            border = sidebarBorder
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(ToolkitTheme.dimensions.sduiCompactSpacing),
+                verticalArrangement = Arrangement.spacedBy(ToolkitTheme.dimensions.sduiCompactSpacing)
             ) {
-                if (applySidebarScroll) {
-                    val sidebarScrollState = rememberScrollState()
-                    val scrollbarReserve = if (sidebarScrollState.maxValue > 0) {
-                        ToolkitTheme.dimensions.sduiScrollbarEndPadding
-                    } else {
-                        ToolkitTheme.spacing.none
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    if (!isCollapsed) {
+                        node.title?.let { titleText ->
+                            Text(
+                                text = titleText,
+                                style = ToolkitTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f).padding(end = ToolkitTheme.spacing.xs)
+                            )
+                        } ?: Spacer(modifier = Modifier.weight(1f))
                     }
-                    Box(modifier = if (isHorizontal) Modifier.fillMaxSize() else Modifier.fillMaxWidth()) {
-                        CompositionLocalProvider(LocalInVerticalScroll provides true) {
-                            Column(
+                    if (node.isCollapsible) {
+                        SduiTooltipBox(tooltip = stringResource(Res.string.sdui_toggle_sidebar)) {
+                            IconButton(
+                                onClick = { isCollapsed = !isCollapsed },
                                 modifier = Modifier
-                                    .fillMaxWidth()
-                                    .verticalScroll(sidebarScrollState)
-                                    .padding(end = scrollbarReserve),
-                                verticalArrangement = Arrangement.spacedBy(
-                                    resolveContainerSpacing(SpacingSize.SMALL, node.children, isVertical = true)
-                                )
+                                    .size(ToolkitTheme.dimensions.denseIconButtonSize)
+                                    .pointerHoverIcon(PointerIcon.Hand)
                             ) {
-                                RenderColumnChildren(
-                                    children = node.children,
-                                    onEvent = onEvent,
-                                    allowWeight = false
+                                Icon(
+                                    imageVector = if (isCollapsed) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
+                                    contentDescription = stringResource(Res.string.sdui_toggle_sidebar),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(ToolkitTheme.dimensions.denseIconSize)
                                 )
                             }
                         }
-                        PlatformVerticalScrollbar(
-                            scrollState = sidebarScrollState,
-                            modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight()
-                        )
                     }
-                } else {
+                }
+                AnimatedVisibility(
+                    visible = !isCollapsed,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
                     Column(
-                        modifier = if (isHorizontal) Modifier.fillMaxSize() else Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth(),
                         verticalArrangement = Arrangement.spacedBy(
                             resolveContainerSpacing(SpacingSize.SMALL, node.children, isVertical = true)
                         )

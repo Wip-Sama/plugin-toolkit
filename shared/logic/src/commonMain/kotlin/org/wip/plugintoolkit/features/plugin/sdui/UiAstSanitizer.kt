@@ -639,7 +639,20 @@ object UiAstSanitizer {
                     }
                 )
                 is FloatingPanelNode -> node.copy(children = node.children.map { sanitizeNode(it, depth + 1) })
-                is SidebarNode -> node.copy(children = node.children.map { sanitizeNode(it, depth + 1) })
+                is SidebarNode -> {
+                    val sequelWidth = node.sequelWidthDp
+                    if (sequelWidth != null && sequelWidth <= 0) {
+                        return ErrorBoundaryNode(
+                            id = node.id,
+                            errorMessage = "Invalid SidebarNode '${node.id}': sequelWidthDp=$sequelWidth must be > 0",
+                            failedNodeType = "SidebarNode"
+                        )
+                    }
+                    node.copy(
+                        children = node.children.map { sanitizeNode(it, depth + 1) },
+                        sequelChildren = node.sequelChildren?.map { sanitizeNode(it, depth + 1) }
+                    )
+                }
                 is AccordionNode -> node.copy(children = node.children.map { sanitizeNode(it, depth + 1) })
                 is BoardNode -> {
                     val seenLayerIds = mutableSetOf<String>()
