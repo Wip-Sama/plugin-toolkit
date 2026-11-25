@@ -126,8 +126,31 @@ private fun confirmCloseWithActiveJobs(): Boolean {
     return choice == 0
 }
 
-fun detectSystemConfig(): SystemConfig {
+fun detectSystemConfig(args: Array<String> = emptyArray()): SystemConfig {
     val userDir = File(System.getProperty("user.dir"))
+
+    val cliPortableDir = DevBootstrap.resolveCliOptionValues(args, DefaultSystemConfig().STARTUP_FLAG_PORTABLE_DIR)
+        .lastOrNull()
+    if (!cliPortableDir.isNullOrBlank()) {
+        val resolvedDir = File(cliPortableDir).absolutePath
+        Logger.i { "Startup: Portable mode forced via CLI --portable-dir ($resolvedDir)" }
+        return PortableSystemConfig(resolvedDir)
+    }
+
+    val propPortableDir = System.getProperty(DevBootstrap.PROP_PORTABLE_DIR)?.trim()
+    if (!propPortableDir.isNullOrBlank()) {
+        val resolvedDir = File(propPortableDir).absolutePath
+        Logger.i { "Startup: Portable mode forced via JVM property ${DevBootstrap.PROP_PORTABLE_DIR} ($resolvedDir)" }
+        return PortableSystemConfig(resolvedDir)
+    }
+
+    val cliPortableFlag = args.contains(DefaultSystemConfig().STARTUP_FLAG_PORTABLE)
+    val propPortableFlag = System.getProperty(DevBootstrap.PROP_PORTABLE)?.equals("true", ignoreCase = true) == true
+    if (cliPortableFlag || propPortableFlag) {
+        Logger.i { "Startup: Portable mode enabled via flag/property in user.dir (${userDir.absolutePath})" }
+        return PortableSystemConfig(userDir.absolutePath)
+    }
+
     if (File(userDir, ".portable").exists()) {
         Logger.i { "Startup: Portable marker found in user.dir (${userDir.absolutePath})" }
         return PortableSystemConfig(userDir.absolutePath)
@@ -190,7 +213,7 @@ fun main(args: Array<String>) {
 }
 
 suspend fun performStartup(args: Array<String>, updateStatus: (String) -> Unit = {}): Pair<SettingsViewModel, WindowStartMode> {
-    val detectedConfig = detectSystemConfig()
+    val detectedConfig = detectSystemConfig(args)
     val isSafeMode = args.contains(detectedConfig.STARTUP_FLAG_SAFE_MODE) ||
             args.contains(detectedConfig.STARTUP_FLAG_NO_SETTINGS) ||
             args.contains("--provisional")
@@ -337,6 +360,9 @@ suspend fun performStartup(args: Array<String>, updateStatus: (String) -> Unit =
     updateStatus("Cleaning up updates...")
     updateService.cleanupOldUpdates(settingsRepository.getSettingsDir())
 
+    val devPluginJars = if (isNoPlugins) emptyList() else DevBootstrap.resolveDevPluginJars(args)
+    val devRepoPath = if (isSafeMode) null else DevBootstrap.resolveDevRepoPath(args)
+
     if (isNoPlugins) {
         Logger.i { "Startup: Skipping plugin auto-load (--safe-mode or --no-plugins specified)" }
     } else {
@@ -348,7 +374,18 @@ suspend fun performStartup(args: Array<String>, updateStatus: (String) -> Unit =
                 Logger.e(e) { "Startup: Failed to initialize PluginRegistry" }
             }
 
-            val pluginsToLoad = pluginManager.installedPlugins.value.filter { it.isEnabled }
+            val devHandledPkgs = if (devPluginJars.isNotEmpty()) {
+                try {
+                    DevBootstrap.syncDevPlugins(devPluginJars, registry, pluginManager)
+                } catch (e: Throwable) {
+                    Logger.e(e) { "Startup: Failed to synchronize dev plugins" }
+                    emptySet()
+                }
+            } else {
+                emptySet()
+            }
+
+            val pluginsToLoad = pluginManager.installedPlugins.value.filter { it.isEnabled && it.pkg !in devHandledPkgs }
             Logger.i { "Startup: Found ${pluginsToLoad.size} enabled plugins to load/setup" }
 
             pluginsToLoad.forEachIndexed { index, plugin ->
@@ -385,7 +422,16 @@ suspend fun performStartup(args: Array<String>, updateStatus: (String) -> Unit =
     }
 
     updateStatus("Refreshing repositories...")
-    koin.get<RepoManager>() // Trigger initialization and background refresh
+    val repoManager = koin.get<RepoManager>() // Trigger initialization and background refresh
+    if (devRepoPath != null) {
+        appScope.launch {
+            try {
+                DevBootstrap.registerDevRepo(devRepoPath, settingsRepository, repoManager)
+            } catch (e: Throwable) {
+                Logger.e(e) { "Startup: Failed to register dev repository $devRepoPath" }
+            }
+        }
+    }
 
     // Check for updates on startup if enabled
     val settings = viewModel.settings.value

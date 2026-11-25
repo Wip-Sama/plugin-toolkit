@@ -21,6 +21,8 @@ interface SystemConfig {
     val STARTUP_FLAG_SAFE_MODE: String get() = "--safe-mode"
     val STARTUP_FLAG_NO_SETTINGS: String get() = "--no-settings"
     val STARTUP_FLAG_NO_PLUGINS: String get() = "--no-plugins"
+    val STARTUP_FLAG_PORTABLE: String get() = "--portable"
+    val STARTUP_FLAG_PORTABLE_DIR: String get() = "--portable-dir"
     val WINDOWS_STARTUP_REGISTRY_PATH: String?
     val LINUX_AUTOSTART_DIR: String?
     val LINUX_DESKTOP_FILENAME: String?

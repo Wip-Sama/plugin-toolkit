@@ -71,6 +71,16 @@ class PluginToolkitCli : CliktCommand(
         help = "List all installed plugins and their validation status"
     ).flag(default = false)
 
+    private val portable by option(
+        "--portable",
+        help = "Run in portable mode using the current working directory"
+    ).flag(default = false)
+
+    private val portableDir by option(
+        "--portable-dir",
+        help = "Run in portable mode using the specified base directory"
+    )
+
     override fun run() = runBlocking {
         if (!listCapabilities && !listPlugins) {
             echo("Use --help to view available commands and options.")
@@ -113,10 +123,14 @@ class PluginToolkitCli : CliktCommand(
 
     private fun initKoin() {
         val userDir = File(System.getProperty("user.dir"))
-        val systemConfig: SystemConfig = if (File(userDir, ".portable").exists()) {
-            PortableSystemConfig(userDir.absolutePath)
-        } else {
-            DefaultSystemConfig()
+        val portablePropDir = System.getProperty("plugintoolkit.portable.dir")?.takeIf { it.isNotBlank() }
+        val portablePropFlag = System.getProperty("plugintoolkit.portable")?.equals("true", ignoreCase = true) == true
+        val systemConfig: SystemConfig = when {
+            !portableDir.isNullOrBlank() -> PortableSystemConfig(File(portableDir!!).absolutePath)
+            portablePropDir != null -> PortableSystemConfig(File(portablePropDir).absolutePath)
+            portable || portablePropFlag || File(userDir, ".portable").exists() ->
+                PortableSystemConfig(userDir.absolutePath)
+            else -> DefaultSystemConfig()
         }
 
         startKoin {

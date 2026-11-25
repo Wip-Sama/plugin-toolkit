@@ -32,6 +32,32 @@ To build and run the development version of the desktop application:
   .\gradlew.bat :apps:desktopApp:run
   ```
 
+### Running in Isolated Portable Dev Mode (Recommended for Testing)
+
+To avoid reading or modifying your global user installation directory, run the toolkit inside an isolated portable sandbox (`apps/desktopApp/build/portable-sandbox`) with `minimalExample`, `completeExample`, and the local dev repository automatically staged and loaded:
+- **Run portable dev sandbox:**
+  ```shell
+  .\gradlew.bat :apps:desktopApp:runPortable
+  ```
+- **Reset portable sandbox data before launch:**
+  ```shell
+  .\gradlew.bat :apps:desktopApp:runPortable -PcleanPortable=true
+  ```
+- **Run with Compose Hot Reload in portable mode:**
+  ```shell
+  .\gradlew.bat :apps:desktopApp:hotRunJvm -Pportable=true
+  ```
+- **Run pure portable mode (without auto-loading example plugins):**
+  ```shell
+  .\gradlew.bat :apps:desktopApp:runPortable -PdevExamples=false
+  ```
+- **Build only the local example plugin repository (`build/local-plugin-repo/index.json`):**
+  ```shell
+  .\gradlew.bat :buildLocalPluginRepo
+  ```
+
+Direct CLI flags and JVM properties are also supported: `--portable`, `--portable-dir=<path>`, `--dev-plugin=<jarPath>`, `--dev-repo=<indexJsonPath>` (or `-Dplugintoolkit.portable=true`, `-Dplugintoolkit.portable.dir=<path>`, `-Dplugintoolkit.dev.plugins=<paths>`, `-Dplugintoolkit.dev.repo=<path>`).
+
 ### Running the Headless CLI
 
 To run the command-line interface:
@@ -61,7 +87,7 @@ To build a plugin JAR:
 .\gradlew.bat :plugins:completeExample:jar
 .\gradlew.bat :plugins:minimalExample:jar
 ```
-The compiled plugin JARs will be generated in `plugins/<pluginName>/build/libs/`.
+The compiled plugin JARs will be generated inuild/libs/`. `plugins/<pluginName>/b
 
 ---
 
