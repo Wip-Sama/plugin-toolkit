@@ -22,11 +22,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performMouseInput
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -298,5 +301,145 @@ class AdaptiveLayoutAndNavigationTest {
         composeTestRule.onNodeWithContentDescription(overflowTooltip).performClick()
         composeTestRule.onNodeWithText("InstallAction").performClick()
         assertTrue(overflowActionClicked)
+    }
+
+    @Test
+    fun appScaffoldDesktopPreservesCollapsibleSectionsAndPinnedBottomItems() {
+        var currentScreen by mutableStateOf<Screen>(Screen.Main)
+
+        val sections = listOf(
+            SidebarSectionData(
+                title = "Management".localized,
+                elements = listOf(
+                    SidebarElement(
+                        id = Screen.Main,
+                        icon = Icons.Default.Home,
+                        title = "Main".localized
+                    ),
+                    SidebarElement(
+                        id = Screen.FlowManager,
+                        icon = Icons.Default.Refresh,
+                        title = "FlowsNav".localized
+                    )
+                )
+            )
+        )
+        val bottomSections = listOf(
+            SidebarSectionData(
+                title = null,
+                elements = listOf(
+                    SidebarElement(
+                        id = Screen.Settings,
+                        icon = Icons.Default.Settings,
+                        title = "SettingsNav".localized
+                    )
+                )
+            )
+        )
+
+        composeTestRule.setContent {
+            AppTheme(appearance = AppearanceSettings()) {
+                CompositionLocalProvider(LocalDensity provides Density(1f)) {
+                    AppScaffold(
+                        settings = AppSettings(
+                            appearance = AppearanceSettings(
+                                useCustomTitleBar = false,
+                                sidebarStartMode = SidebarStartMode.Expanded,
+                                isSidebarCollapsed = false
+                            )
+                        ),
+                        sections = sections,
+                        bottomSections = bottomSections,
+                        currentScreen = currentScreen,
+                        onScreenSelected = { currentScreen = it },
+                        notificationService = FakeNotificationService(),
+                        dialogService = DialogService()
+                    ) {
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            Text("Desktop Body")
+                        }
+                    }
+                }
+            }
+        }
+
+        // Both section items and pinned bottom section item are visible initially
+        composeTestRule.onNodeWithText("Main").assertIsDisplayed()
+        composeTestRule.onNodeWithText("FlowsNav").assertIsDisplayed()
+        composeTestRule.onNodeWithText("SettingsNav").assertIsDisplayed()
+
+        // Collapsing the Management category hides unselected FlowsNav while keeping selected Main visible
+        composeTestRule.onNodeWithText("Management").performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithText("Main").assertIsDisplayed()
+        composeTestRule.onNodeWithText("FlowsNav").assertDoesNotExist()
+        composeTestRule.onNodeWithText("SettingsNav").assertIsDisplayed()
+    }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun collapsedSidebarDelaysHoverExpandAndCancelsOnQuickExit() {
+        val sections = listOf(
+            SidebarSectionData(
+                title = "Management".localized,
+                elements = listOf(
+                    SidebarElement(
+                        id = Screen.Main,
+                        icon = Icons.Default.Home,
+                        title = "Main".localized
+                    )
+                )
+            )
+        )
+
+        composeTestRule.setContent {
+            AppTheme(appearance = AppearanceSettings()) {
+                CompositionLocalProvider(LocalDensity provides Density(1f)) {
+                    AppScaffold(
+                        settings = AppSettings(
+                            appearance = AppearanceSettings(
+                                useCustomTitleBar = false,
+                                sidebarStartMode = SidebarStartMode.Collapsed,
+                                isSidebarCollapsed = true
+                            )
+                        ),
+                        sections = sections,
+                        bottomSections = emptyList(),
+                        currentScreen = Screen.Main,
+                        onScreenSelected = {},
+                        notificationService = FakeNotificationService(),
+                        dialogService = DialogService()
+                    ) {
+                        Box(modifier = Modifier.fillMaxSize())
+                    }
+                }
+            }
+        }
+
+        // Initially collapsed: text label is not rendered
+        composeTestRule.onNodeWithText("Main").assertDoesNotExist()
+
+        // Brief hover (< 250ms) followed by exit must NOT trigger expansion
+        composeTestRule.onNodeWithTag("navigation_sidebar").performMouseInput {
+            enter(center)
+        }
+        composeTestRule.mainClock.advanceTimeBy(100L)
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithText("Main").assertDoesNotExist()
+
+        composeTestRule.onNodeWithTag("navigation_sidebar").performMouseInput {
+            exit()
+        }
+        composeTestRule.mainClock.advanceTimeBy(300L)
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithText("Main").assertDoesNotExist()
+
+        // Sustained hover (>= 250ms) DOES expand the sidebar and reveal labels
+        composeTestRule.onNodeWithTag("navigation_sidebar").performMouseInput {
+            enter(center)
+        }
+        composeTestRule.mainClock.advanceTimeBy(350L)
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithText("Main").assertIsDisplayed()
     }
 }
