@@ -1,5 +1,10 @@
 package org.wip.plugintoolkit.features.settings.ui
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -7,6 +12,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -14,6 +20,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
@@ -22,10 +29,9 @@ import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Upgrade
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -43,7 +49,10 @@ import org.wip.plugintoolkit.api.utils.ChangelogParser
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.core.ui.MarkdownText
 import org.wip.plugintoolkit.core.update.UpdateInfo
+import org.wip.plugintoolkit.core.utils.PlatformVerticalScrollbar
 import org.wip.plugintoolkit.features.plugin.ui.ChangelogContent
+import org.wip.plugintoolkit.shared.components.ToolkitLinearProgressIndicator
+import org.wip.plugintoolkit.shared.components.ToolkitStatusBadge
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.test_error
 import plugintoolkit.composeapp.generated.resources.test_info
@@ -57,6 +66,7 @@ import plugintoolkit.composeapp.generated.resources.update_no_release_notes
 import plugintoolkit.composeapp.generated.resources.update_now
 import plugintoolkit.composeapp.generated.resources.update_stop_jobs
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun UpdateDialog(
     updateInfo: UpdateInfo,
@@ -85,47 +95,50 @@ fun UpdateDialog(
         }
     }
 
+    val motion = MaterialTheme.motionScheme
+
     Dialog(
         onDismissRequest = if (isDownloading) ({}) else onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
         Surface(
             modifier = Modifier
-                .width(ToolkitTheme.dimensions.dialogUpdateWidth)
+                .fillMaxWidth(0.88f)
+                .widthIn(min = ToolkitTheme.dimensions.dialogUpdateWidth, max = ToolkitTheme.dimensions.settingsContentMaxWidth)
                 .heightIn(
                     min = ToolkitTheme.dimensions.dialogUpdateHeight,
                     max = ToolkitTheme.dimensions.dialogUpdateMaxHeight
-                )
-                .clip(MaterialTheme.shapes.extraLarge),
-            color = MaterialTheme.colorScheme.surface,
-            tonalElevation = ToolkitTheme.dimensions.elevationMediumHigh,
+                ),
+            shape = ToolkitTheme.shapes.extraLarge,
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            shadowElevation = ToolkitTheme.dimensions.elevationHigh,
             border = BorderStroke(
                 width = ToolkitTheme.dimensions.borderThin,
                 color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = ToolkitTheme.opacity.divider)
             )
         ) {
-            Column(modifier = Modifier.fillMaxWidth()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(ToolkitTheme.spacing.large),
+                verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.medium)
+            ) {
                 // Header
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(
-                            horizontal = ToolkitTheme.spacing.large,
-                            vertical = ToolkitTheme.spacing.medium
-                        ),
+                    modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Box(
                         modifier = Modifier
                             .size(ToolkitTheme.dimensions.updateIconContainerSize)
-                            .clip(ToolkitTheme.shapes.medium)
+                            .clip(ToolkitTheme.shapes.large)
                             .background(MaterialTheme.colorScheme.primaryContainer),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             Icons.Default.Upgrade,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
                             modifier = Modifier.size(ToolkitTheme.dimensions.iconMediumLarge)
                         )
                     }
@@ -153,105 +166,115 @@ fun UpdateDialog(
 
                             val releaseDate = parsedReleases.firstOrNull()?.date
                             if (!releaseDate.isNullOrBlank()) {
-                                Surface(
-                                    color = MaterialTheme.colorScheme.surfaceVariant,
-                                    shape = ToolkitTheme.shapes.small
-                                ) {
-                                    Text(
-                                        text = releaseDate,
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.padding(
-                                            horizontal = ToolkitTheme.spacing.small,
-                                            vertical = ToolkitTheme.spacing.extraSmall
-                                        )
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-
-                HorizontalDivider(
-                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = ToolkitTheme.opacity.divider)
-                )
-
-                // Content area
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                        .padding(horizontal = ToolkitTheme.spacing.large)
-                ) {
-                    if (parsedReleases.isNotEmpty()) {
-                        ChangelogContent(
-                            versions = parsedReleases,
-                            modifier = Modifier.fillMaxSize(),
-                            showLevelFilter = parsedReleases.size > 1,
-                            useCards = false,
-                            showVersionHeader = parsedReleases.size > 1
-                        )
-                    } else {
-                        SelectionContainer(modifier = Modifier.fillMaxSize()) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .verticalScroll(rememberScrollState())
-                                    .padding(
-                                        top = ToolkitTheme.spacing.medium,
-                                        bottom = ToolkitTheme.spacing.large
-                                    )
-                            ) {
-                                MarkdownText(
-                                    text = updateInfo.changelog ?: stringResource(Res.string.update_no_release_notes),
-                                    style = MaterialTheme.typography.bodyMedium
+                                ToolkitStatusBadge(
+                                    text = releaseDate,
+                                    color = MaterialTheme.colorScheme.secondary
                                 )
                             }
                         }
                     }
                 }
 
-                if (isDownloading) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = ToolkitTheme.spacing.large, vertical = ToolkitTheme.spacing.small)
-                    ) {
-                        Text(
-                            text = stringResource(Res.string.update_downloading),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        Spacer(modifier = Modifier.height(ToolkitTheme.spacing.small))
-                        LinearProgressIndicator(
-                            progress = { progress },
+                // Tonal well for changelog content (no wireframed dividers)
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    shape = ToolkitTheme.shapes.large,
+                    color = MaterialTheme.colorScheme.surfaceContainerLowest
+                ) {
+                    if (parsedReleases.isNotEmpty()) {
+                        ChangelogContent(
+                            versions = parsedReleases,
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .height(ToolkitTheme.dimensions.progressIndicatorHeightSmall)
-                                .clip(MaterialTheme.shapes.small)
+                                .fillMaxSize()
+                                .padding(ToolkitTheme.spacing.medium),
+                            showLevelFilter = parsedReleases.size > 1,
+                            useCards = false,
+                            showVersionHeader = parsedReleases.size > 1
                         )
-                        Spacer(modifier = Modifier.height(ToolkitTheme.spacing.extraSmall))
-                        Text(
-                            text = "${(progress * 100).toInt()}%",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                    } else {
+                        val notesScroll = rememberScrollState()
+                        val scrollbarReserve = if (notesScroll.maxValue > 0) {
+                            ToolkitTheme.dimensions.sduiScrollbarEndPadding
+                        } else {
+                            ToolkitTheme.spacing.none
+                        }
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            SelectionContainer(modifier = Modifier.fillMaxSize()) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .verticalScroll(notesScroll)
+                                        .padding(
+                                            start = ToolkitTheme.spacing.large,
+                                            top = ToolkitTheme.spacing.medium,
+                                            bottom = ToolkitTheme.spacing.large,
+                                            end = ToolkitTheme.spacing.large + scrollbarReserve
+                                        )
+                                ) {
+                                    MarkdownText(
+                                        text = updateInfo.changelog ?: stringResource(Res.string.update_no_release_notes),
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
+                                }
+                            }
+                            PlatformVerticalScrollbar(
+                                scrollState = notesScroll,
+                                modifier = Modifier
+                                    .align(Alignment.CenterEnd)
+                                    .fillMaxHeight()
+                            )
+                        }
                     }
                 }
 
-                HorizontalDivider(
-                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = ToolkitTheme.opacity.divider)
-                )
+                AnimatedVisibility(
+                    visible = isDownloading,
+                    enter = expandVertically(motion.fastSpatialSpec()) + fadeIn(motion.fastEffectsSpec()),
+                    exit = shrinkVertically(motion.fastSpatialSpec()) + fadeOut(motion.fastEffectsSpec())
+                ) {
+                    Surface(
+                        shape = ToolkitTheme.shapes.medium,
+                        color = MaterialTheme.colorScheme.surfaceContainer,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(ToolkitTheme.spacing.medium),
+                            verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = stringResource(Res.string.update_downloading),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Text(
+                                    text = "${(progress * 100).toInt().coerceIn(0, 100)}%",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            ToolkitLinearProgressIndicator(
+                                progress = if (progress > 0f) progress else null,
+                                wavy = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    }
+                }
 
                 // Footer Buttons
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(
-                            horizontal = ToolkitTheme.spacing.large,
-                            vertical = ToolkitTheme.spacing.medium
-                        ),
+                    modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -265,7 +288,7 @@ fun UpdateDialog(
                     Button(
                         onClick = onDownload,
                         enabled = !isDownloading,
-                        shape = ToolkitTheme.shapes.medium
+                        shape = ToolkitTheme.shapes.pill
                     ) {
                         Icon(
                             Icons.Default.Download,
@@ -289,6 +312,8 @@ fun UpdateConfirmationDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
+        shape = ToolkitTheme.shapes.extraLarge,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
         title = {
             Text(
                 stringResource(Res.string.update_jobs_running),
@@ -304,9 +329,8 @@ fun UpdateConfirmationDialog(
         confirmButton = {
             Button(
                 onClick = { onConfirm(true) },
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.error).run {
-                    androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                }
+                shape = ToolkitTheme.shapes.pill,
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
             ) {
                 Text(stringResource(Res.string.update_stop_jobs))
             }

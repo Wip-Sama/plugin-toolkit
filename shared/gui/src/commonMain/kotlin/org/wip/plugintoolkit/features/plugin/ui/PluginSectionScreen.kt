@@ -79,9 +79,15 @@ fun PluginSectionScreen(
     val selectedPluginId = (currentKey as? PluginNavKey.PluginDetail)?.id
 
     val scope = rememberCoroutineScope()
+    val settingsRepository: org.wip.plugintoolkit.features.settings.logic.SettingsRepository = koinInject()
+    val appSettings by settingsRepository.settings.collectAsState()
     val directive = rememberAdaptivePaneScaffoldDirective()
     val navigator = rememberListDetailPaneScaffoldNavigator<String>(scaffoldDirective = directive)
-    var sequelMode by remember { mutableStateOf(SequelSidebarMode.Auto) }
+    var sequelMode by remember(appSettings.appearance.compactPanelsByDefault) {
+        mutableStateOf(
+            if (appSettings.appearance.compactPanelsByDefault) SequelSidebarMode.ForcedCompact else SequelSidebarMode.Auto
+        )
+    }
     val isLargeWidth = isLargeAdaptiveWidth()
     val isSequelExpanded = resolveSequelExpanded(sequelMode, isLargeWidth) &&
         (selectedPluginId != null || sequelMode == SequelSidebarMode.ForcedExpanded)
@@ -100,6 +106,10 @@ fun PluginSectionScreen(
                 loadedPlugins = loadedPlugins,
                 selectedPluginId = selectedPluginId,
                 onPluginSelected = { id ->
+                    val plugin = loadedPlugins.find { it.getManifest().getOrNull()?.plugin?.id == id }
+                    if (plugin != null && viewModel.selectedPlugin != plugin) {
+                        viewModel.selectPlugin(plugin)
+                    }
                     if ((currentKey as? PluginNavKey.PluginDetail)?.id != id) {
                         backStack.add(PluginNavKey.PluginDetail(id))
                     }
@@ -151,7 +161,9 @@ fun PluginSectionScreen(
                             val plugin = loadedPlugins.find { it.getManifest().getOrThrow().plugin.id == key.id }
                             if (plugin != null) {
                                 LaunchedEffect(key.id) {
-                                    viewModel.selectPlugin(plugin)
+                                    if (viewModel.selectedPlugin != plugin) {
+                                        viewModel.selectPlugin(plugin)
+                                    }
                                 }
                                 PluginContent(
                                     viewModel = viewModel,

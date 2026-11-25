@@ -10,11 +10,41 @@ import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.layout
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 
 private const val SCROLLBAR_UNHOVER_ALPHA = 0.28f
 private const val SCROLLBAR_HOVER_ALPHA = 0.56f
-private const val SCROLLBAR_HIDE_DELAY_MILLIS = 1500
+
+/**
+ * Guards Skiko's `VerticalScrollbar` against unbounded height constraints (`Constraints.Infinity`),
+ * which otherwise cause `IllegalStateException: Size(w x 2147483647) is out of range` during
+ * lookahead, animated pane transitions, window fullscreen switches, or nested scroll passes.
+ */
+private fun Modifier.guardBoundedVerticalScrollbar(): Modifier = this.layout { measurable, constraints ->
+    if (!constraints.hasBoundedHeight || constraints.maxHeight <= 0) {
+        layout(0, 0) {}
+    } else {
+        val placeable = measurable.measure(constraints)
+        layout(placeable.width, placeable.height) {
+            placeable.placeRelative(0, 0)
+        }
+    }
+}
+
+/**
+ * Guards Skiko's `HorizontalScrollbar` against unbounded width constraints (`Constraints.Infinity`).
+ */
+private fun Modifier.guardBoundedHorizontalScrollbar(): Modifier = this.layout { measurable, constraints ->
+    if (!constraints.hasBoundedWidth || constraints.maxWidth <= 0) {
+        layout(0, 0) {}
+    } else {
+        val placeable = measurable.measure(constraints)
+        layout(placeable.width, placeable.height) {
+            placeable.placeRelative(0, 0)
+        }
+    }
+}
 
 @Composable
 private fun rememberToolkitScrollbarStyle(): ScrollbarStyle {
@@ -37,7 +67,7 @@ actual fun PlatformVerticalScrollbar(
     if (scrollState.maxValue <= 0) return
     VerticalScrollbar(
         adapter = rememberScrollbarAdapter(scrollState),
-        modifier = modifier,
+        modifier = modifier.guardBoundedVerticalScrollbar(),
         style = rememberToolkitScrollbarStyle()
     )
 }
@@ -50,7 +80,7 @@ actual fun PlatformVerticalScrollbar(
     if (!lazyListState.canScrollForward && !lazyListState.canScrollBackward) return
     VerticalScrollbar(
         adapter = rememberScrollbarAdapter(lazyListState),
-        modifier = modifier,
+        modifier = modifier.guardBoundedVerticalScrollbar(),
         style = rememberToolkitScrollbarStyle()
     )
 }
@@ -63,7 +93,7 @@ actual fun PlatformVerticalScrollbar(
     if (!lazyGridState.canScrollForward && !lazyGridState.canScrollBackward) return
     VerticalScrollbar(
         adapter = rememberScrollbarAdapter(lazyGridState),
-        modifier = modifier,
+        modifier = modifier.guardBoundedVerticalScrollbar(),
         style = rememberToolkitScrollbarStyle()
     )
 }
@@ -76,7 +106,7 @@ actual fun PlatformHorizontalScrollbar(
     if (scrollState.maxValue <= 0) return
     HorizontalScrollbar(
         adapter = rememberScrollbarAdapter(scrollState),
-        modifier = modifier,
+        modifier = modifier.guardBoundedHorizontalScrollbar(),
         style = rememberToolkitScrollbarStyle()
     )
 }

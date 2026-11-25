@@ -2,6 +2,7 @@ package org.wip.plugintoolkit.features.repository.ui.components
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -110,6 +111,195 @@ fun PluginListItem(
     ToolkitCard(
         modifier = Modifier.fillMaxWidth()
     ) {
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            val stackVertically = maxWidth < ToolkitTheme.dimensions.breakpointCompact
+
+            val actionsRow: @Composable () -> Unit = {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(ToolkitTheme.spacing.small)
+                ) {
+                    IconButton(
+                        onClick = { onShowChangelog(plugin) },
+                        modifier = Modifier.tooltip(Res.string.plugin_changelog)
+                    ) {
+                        Icon(
+                            Icons.Default.History,
+                            contentDescription = stringResource(Res.string.plugin_changelog),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(ToolkitTheme.dimensions.iconMediumSmall)
+                        )
+                    }
+
+                    if (installState != null) {
+                        var isHovered by remember(plugin.pkg) { mutableStateOf(false) }
+
+                        Surface(
+                            shape = CircleShape,
+                            color = if (isHovered) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.surfaceVariant,
+                            contentColor = if (isHovered) MaterialTheme.colorScheme.onError else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier
+                                .onPointerEvent(PointerEventType.Enter) { isHovered = true }
+                                .onPointerEvent(PointerEventType.Exit) { isHovered = false }
+                                .clickable { onCancel(plugin.pkg) }
+                                .padding(horizontal = ToolkitTheme.spacing.mediumSmall, vertical = ToolkitTheme.spacing.badgeHorizontal)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(horizontal = ToolkitTheme.spacing.small, vertical = ToolkitTheme.spacing.extraSmall)
+                            ) {
+                                if (isHovered) {
+                                    Icon(
+                                        Icons.Default.Cancel,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
+                                    )
+                                    Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
+                                    Text(
+                                        stringResource(Res.string.repo_action_cancel_update),
+                                        style = MaterialTheme.typography.labelMedium
+                                    )
+                                } else if (installState.status == JobStatus.Queued) {
+                                    Icon(
+                                        Icons.Default.Schedule,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
+                                    )
+                                    Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
+                                    Text(
+                                        stringResource(Res.string.repo_action_queued),
+                                        style = MaterialTheme.typography.labelMedium
+                                    )
+                                } else {
+                                    CircularProgressIndicator(
+                                        progress = { installState.progress },
+                                        modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall),
+                                        strokeWidth = ToolkitTheme.dimensions.circularProgressStrokeWidth,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
+                                    Text(
+                                        stringResource(Res.string.repo_action_updating),
+                                        style = MaterialTheme.typography.labelMedium
+                                    )
+                                }
+                            }
+                        }
+                    } else if (hasUpdate) {
+                        Button(
+                            onClick = { onInstall(plugin) },
+                            enabled = !isRefreshing && isCompatible,
+                            shape = CircleShape,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                contentColor = MaterialTheme.colorScheme.onPrimary
+                            )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Upgrade,
+                                contentDescription = null,
+                                modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
+                            )
+                            Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
+                            Text(stringResource(Res.string.repo_action_update_version, plugin.version), maxLines = 1)
+                        }
+                    } else if (isInstalled) {
+                        val isDowngrade =
+                            org.wip.plugintoolkit.core.utils.VersionUtils.compare(plugin.version, installedVersion!!) < 0
+                        val label = if (isDowngrade) {
+                            stringResource(Res.string.repo_downgrade_version, plugin.version)
+                        } else {
+                            stringResource(Res.string.repo_reinstall_version, plugin.version)
+                        }
+
+                        Button(
+                            onClick = { onInstall(plugin) },
+                            enabled = !isRefreshing && isCompatible,
+                            shape = CircleShape,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                        ) {
+                            Icon(
+                                Icons.Default.Download,
+                                contentDescription = null,
+                                modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
+                            )
+                            Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
+                            Text(label, maxLines = 1)
+                        }
+                    } else {
+                        Button(
+                            onClick = { onInstall(plugin) },
+                            enabled = !isRefreshing && isCompatible,
+                            shape = CircleShape,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                        ) {
+                            Icon(
+                                Icons.Default.Download,
+                                contentDescription = null,
+                                modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
+                            )
+                            Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
+                            Text(stringResource(Res.string.repo_install_version, plugin.version), maxLines = 1)
+                        }
+                    }
+                }
+            }
+
+            if (stackVertically) {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(ToolkitTheme.spacing.small)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.Top
+                    ) {
+                        // Plugin Icon
+                        Surface(
+                            shape = MaterialTheme.shapes.medium,
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            modifier = Modifier.size(ToolkitTheme.dimensions.listIconSize)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    Icons.Default.Extension,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(ToolkitTheme.dimensions.listIconContentSize)
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.medium))
+
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = plugin.name,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            if (plugin.description.isNotBlank()) {
+                                Text(
+                                    text = plugin.description,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 2
+                                )
+                            }
+                        }
+                    }
+                    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
+                        actionsRow()
+                    }
+                }
+            } else {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
@@ -297,139 +487,8 @@ fun PluginListItem(
             Spacer(modifier = Modifier.width(ToolkitTheme.spacing.medium))
 
             // Action Buttons
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(ToolkitTheme.spacing.small)
-            ) {
-                IconButton(
-                    onClick = { onShowChangelog(plugin) },
-                    modifier = Modifier.tooltip(Res.string.plugin_changelog)
-                ) {
-                    Icon(
-                        Icons.Default.History,
-                        contentDescription = stringResource(Res.string.plugin_changelog),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(ToolkitTheme.dimensions.iconMediumSmall)
-                    )
-                }
-
-                if (installState != null) {
-                var isHovered by remember(plugin.pkg) { mutableStateOf(false) }
-
-                Surface(
-                    shape = CircleShape,
-                    color = if (isHovered) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.surfaceVariant,
-                    contentColor = if (isHovered) MaterialTheme.colorScheme.onError else MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier
-                        .onPointerEvent(PointerEventType.Enter) { isHovered = true }
-                        .onPointerEvent(PointerEventType.Exit) { isHovered = false }
-                        .clickable { onCancel(plugin.pkg) }
-                        .padding(horizontal = ToolkitTheme.spacing.mediumSmall, vertical = ToolkitTheme.spacing.badgeHorizontal)
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(horizontal = ToolkitTheme.spacing.small, vertical = ToolkitTheme.spacing.extraSmall)
-                    ) {
-                        if (isHovered) {
-                            Icon(
-                                Icons.Default.Cancel,
-                                contentDescription = null,
-                                modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
-                            )
-                            Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
-                            Text(
-                                stringResource(Res.string.repo_action_cancel_update),
-                                style = MaterialTheme.typography.labelMedium
-                            )
-                        } else if (installState.status == JobStatus.Queued) {
-                            Icon(
-                                Icons.Default.Schedule,
-                                contentDescription = null,
-                                modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
-                            )
-                            Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
-                            Text(
-                                stringResource(Res.string.repo_action_queued),
-                                style = MaterialTheme.typography.labelMedium
-                            )
-                        } else {
-                            CircularProgressIndicator(
-                                progress = { installState.progress },
-                                modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall),
-                                strokeWidth = ToolkitTheme.dimensions.circularProgressStrokeWidth,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
-                            Text(
-                                stringResource(Res.string.repo_action_updating),
-                                style = MaterialTheme.typography.labelMedium
-                            )
-                        }
-                    }
-                }
-            } else if (hasUpdate) {
-                Button(
-                    onClick = { onInstall(plugin) },
-                    enabled = !isRefreshing && isCompatible,
-                    shape = CircleShape,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary
-                    )
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Upgrade,
-                        contentDescription = null,
-                        modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
-                    )
-                    Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
-                    Text(stringResource(Res.string.repo_action_update_version, plugin.version))
-                }
-            } else if (isInstalled) {
-                val isDowngrade =
-                    org.wip.plugintoolkit.core.utils.VersionUtils.compare(plugin.version, installedVersion!!) < 0
-                val label = if (isDowngrade) {
-                    stringResource(Res.string.repo_downgrade_version, plugin.version)
-                } else {
-                    stringResource(Res.string.repo_reinstall_version, plugin.version)
-                }
-
-                Button(
-                    onClick = { onInstall(plugin) },
-                    enabled = !isRefreshing && isCompatible,
-                    shape = CircleShape,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                    )
-                ) {
-                    Icon(
-                        Icons.Default.Download,
-                        contentDescription = null,
-                        modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
-                    )
-                    Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
-                    Text(label)
-                }
-            } else {
-                Button(
-                    onClick = { onInstall(plugin) },
-                    enabled = !isRefreshing && isCompatible,
-                    shape = CircleShape,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                    )
-                ) {
-                    Icon(
-                        Icons.Default.Download,
-                        contentDescription = null,
-                        modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
-                    )
-                    Spacer(modifier = Modifier.width(ToolkitTheme.spacing.small))
-                    Text(stringResource(Res.string.repo_install_version, plugin.version))
-                }
-            }
+            actionsRow()
+        }
             }
         }
     }

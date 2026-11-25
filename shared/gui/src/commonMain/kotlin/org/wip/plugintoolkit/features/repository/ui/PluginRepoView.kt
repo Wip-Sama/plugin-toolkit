@@ -69,7 +69,7 @@ fun PluginRepoView(
 
     Box(modifier = Modifier.fillMaxSize()) {
         ToolkitAdaptiveListDetailWorkspace<String>(
-            listPaneWidth = ToolkitTheme.dimensions.adaptiveListPaneWidth,
+            listPaneWidth = ToolkitTheme.dimensions.floatingSidebarDefaultWidth,
             listPane = { navigator ->
                 PluginRepoSidebar(
                     repositories = filteredRepos,

@@ -1,11 +1,17 @@
 package org.wip.plugintoolkit.features.plugin.ui
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -14,16 +20,18 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.History
+import org.wip.plugintoolkit.shared.components.ToolkitCard
+import org.wip.plugintoolkit.shared.components.ToolkitTooltipBox
 import org.wip.plugintoolkit.shared.components.menu.ToolkitDropdownMenu
 import org.wip.plugintoolkit.shared.components.menu.ToolkitDropdownMenuItem
-import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -44,12 +52,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import org.wip.plugintoolkit.api.Release
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.core.ui.MarkdownText
+import org.wip.plugintoolkit.core.utils.PlatformVerticalScrollbar
 import org.jetbrains.compose.resources.stringResource
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.action_close
@@ -90,8 +97,11 @@ fun ChangelogView(
                     fontWeight = FontWeight.Bold
                 )
                 Spacer(modifier = Modifier.weight(1f))
-                IconButton(onClick = onClose) {
-                    Icon(Icons.Default.Close, contentDescription = stringResource(Res.string.action_close), tint = MaterialTheme.colorScheme.primary)
+                val closeLabel = stringResource(Res.string.action_close)
+                ToolkitTooltipBox(tooltip = closeLabel) {
+                    IconButton(onClick = onClose) {
+                        Icon(Icons.Default.Close, contentDescription = closeLabel, tint = MaterialTheme.colorScheme.primary)
+                    }
                 }
             }
         }
@@ -104,7 +114,7 @@ fun ChangelogView(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun ChangelogContent(
     versions: List<Release>,
@@ -159,12 +169,13 @@ fun ChangelogContent(
                     .padding(vertical = ToolkitTheme.spacing.extraSmall)
             ) {
                 if (shouldShowLevelFilter) {
-                    Row(
+                    FlowRow(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = ToolkitTheme.spacing.medium),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
+                        horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small),
+                        verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.extraSmall),
+                        itemVerticalAlignment = Alignment.CenterVertically
                     ) {
                         FilterLevel.entries.forEach { level ->
                             FilterChip(
@@ -192,8 +203,6 @@ fun ChangelogContent(
                             )
                         }
 
-                        Spacer(modifier = Modifier.weight(1f))
-
                         // Dropdown for the selected level
                         if (selectedLevel != FilterLevel.Everything) {
                             var expanded by remember { mutableStateOf(false) }
@@ -216,12 +225,16 @@ fun ChangelogContent(
                             }
 
                             Box {
-                                OutlinedCard(
+                                Surface(
                                     onClick = { expanded = true },
-                                    shape = ToolkitTheme.shapes.small
+                                    shape = ToolkitTheme.shapes.pill,
+                                    color = MaterialTheme.colorScheme.surfaceContainerHigh
                                 ) {
                                     Row(
-                                        modifier = Modifier.padding(horizontal = ToolkitTheme.spacing.mediumSmall, vertical = ToolkitTheme.spacing.small),
+                                        modifier = Modifier.padding(
+                                            horizontal = ToolkitTheme.spacing.mediumSmall,
+                                            vertical = ToolkitTheme.spacing.small
+                                        ),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Text(currentText, style = MaterialTheme.typography.labelLarge)
@@ -298,25 +311,45 @@ fun ChangelogContent(
             selectedCategory == "General" || v.categories.containsKey(selectedCategory)
         }
 
-        SelectionContainer(modifier = Modifier.fillMaxSize()) {
-            val horizontalPadding = if (useCards) ToolkitTheme.spacing.medium else ToolkitTheme.spacing.none
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(
-                    start = horizontalPadding,
-                    end = horizontalPadding,
-                    top = ToolkitTheme.spacing.medium,
-                    bottom = ToolkitTheme.spacing.large
-                ),
-                verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.medium)
-            ) {
-                items(displayVersions) { version ->
-                    if (useCards) {
-                        VersionCard(version, selectedCategory)
-                    } else {
-                        VersionContent(version, selectedCategory, showVersionHeader = showVersionHeader)
+        val motion = MaterialTheme.motionScheme
+        AnimatedContent(
+            targetState = Triple(selectedLevel, selectedCategory, displayVersions.size),
+            transitionSpec = {
+                fadeIn(motion.fastEffectsSpec()) togetherWith fadeOut(motion.fastEffectsSpec())
+            },
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+            label = "changelogContentFilter"
+        ) {
+            val listState = rememberLazyListState()
+            Box(modifier = Modifier.fillMaxSize()) {
+                SelectionContainer(modifier = Modifier.fillMaxSize()) {
+                    val horizontalPadding = if (useCards) ToolkitTheme.spacing.medium else ToolkitTheme.spacing.none
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(
+                            start = horizontalPadding,
+                            end = horizontalPadding + ToolkitTheme.dimensions.sduiScrollbarEndPadding,
+                            top = ToolkitTheme.spacing.medium,
+                            bottom = ToolkitTheme.spacing.large
+                        ),
+                        verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.medium)
+                    ) {
+                        items(displayVersions) { version ->
+                            if (useCards) {
+                                VersionCard(version, selectedCategory)
+                            } else {
+                                VersionContent(version, selectedCategory, showVersionHeader = showVersionHeader)
+                            }
+                        }
                     }
                 }
+                PlatformVerticalScrollbar(
+                    lazyListState = listState,
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .fillMaxHeight()
+                )
             }
         }
     }
@@ -327,13 +360,12 @@ fun VersionCard(
     version: Release,
     selectedCategory: String
 ) {
-    ElevatedCard(
+    ToolkitCard(
         modifier = Modifier.fillMaxWidth(),
-        shape = ToolkitTheme.shapes.large
+        shape = ToolkitTheme.shapes.large,
+        containerColor = MaterialTheme.colorScheme.surfaceContainer
     ) {
-        Column(modifier = Modifier.padding(ToolkitTheme.spacing.medium)) {
-            VersionContent(version, selectedCategory, showVersionHeader = true)
-        }
+        VersionContent(version, selectedCategory, showVersionHeader = true)
     }
 }
 

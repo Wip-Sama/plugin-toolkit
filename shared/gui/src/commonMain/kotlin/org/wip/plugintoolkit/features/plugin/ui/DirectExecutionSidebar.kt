@@ -6,6 +6,7 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -136,113 +137,123 @@ fun DirectExecutionSidebar(
         Modifier.width(ToolkitTheme.dimensions.floatingSidebarDefaultWidth)
     }
 
-    val navigationKey = if (isSequelExpanded) null else selectedPluginId
+    val minTwoColumnWidth = ToolkitTheme.dimensions.floatingSidebarMinWidth * 2
 
-    ToolkitFloatingSidebar(
-        navigationKey = navigationKey,
+    BoxWithConstraints(
         modifier = modifier
             .then(widthModifier)
             .fillMaxHeight()
-            .onPreviewKeyEvent { event ->
-                if (event.isCtrlPressed && event.key == Key.F && event.type == KeyEventType.KeyDown) {
-                    if (selectedPluginId == null || isSequelExpanded) {
-                        pluginSearchFocusRequester.requestFocus()
-                    } else {
-                        capabilitySearchFocusRequester.requestFocus()
-                    }
-                    true
-                } else false
-            }
-            .onPointerEvent(PointerEventType.Press) { event ->
-                isShiftPressed = event.keyboardModifiers.isShiftPressed
+    ) {
+        // When available width forces single-column layout, always fall back to drill-down mode
+        // so the Back navigation button remains visible instead of disappearing behind sequel mode.
+        val effectiveSequelExpanded = isSequelExpanded && maxWidth >= minTwoColumnWidth
+        val navigationKey = if (effectiveSequelExpanded) null else selectedPluginId
+
+        ToolkitFloatingSidebar(
+            navigationKey = navigationKey,
+            modifier = Modifier
+                .fillMaxSize()
+                .onPreviewKeyEvent { event ->
+                    if (event.isCtrlPressed && event.key == Key.F && event.type == KeyEventType.KeyDown) {
+                        if (selectedPluginId == null || effectiveSequelExpanded) {
+                            pluginSearchFocusRequester.requestFocus()
+                        } else {
+                            capabilitySearchFocusRequester.requestFocus()
+                        }
+                        true
+                    } else false
+                }
+                .onPointerEvent(PointerEventType.Press) { event ->
+                    isShiftPressed = event.keyboardModifiers.isShiftPressed
+                },
+            navigationTransitionSpec = { initial, target ->
+                if (target != null && initial == null) {
+                    slideInHorizontally(motion.defaultSpatialSpec()) { it } + fadeIn(motion.fastEffectsSpec()) togetherWith
+                        slideOutHorizontally(motion.defaultSpatialSpec()) { -it } + fadeOut(motion.fastEffectsSpec())
+                } else {
+                    slideInHorizontally(motion.defaultSpatialSpec()) { -it } + fadeIn(motion.fastEffectsSpec()) togetherWith
+                        slideOutHorizontally(motion.defaultSpatialSpec()) { it } + fadeOut(motion.fastEffectsSpec())
+                }
             },
-        navigationTransitionSpec = { initial, target ->
-            if (target != null && initial == null) {
-                slideInHorizontally(motion.defaultSpatialSpec()) { it } + fadeIn(motion.fastEffectsSpec()) togetherWith
-                    slideOutHorizontally(motion.defaultSpatialSpec()) { -it } + fadeOut(motion.fastEffectsSpec())
-            } else {
-                slideInHorizontally(motion.defaultSpatialSpec()) { -it } + fadeIn(motion.fastEffectsSpec()) togetherWith
-                    slideOutHorizontally(motion.defaultSpatialSpec()) { it } + fadeOut(motion.fastEffectsSpec())
+            sequelVisible = effectiveSequelExpanded,
+            sequelContent = {
+                if (selectedPluginId != null) {
+                    PluginCapabilitiesSidebarPane(
+                        loadedPlugins = loadedPlugins,
+                        pluginId = selectedPluginId,
+                        isInteractiveOnly = isInteractiveOnly,
+                        capabilitySearchQuery = capabilitySearchQuery,
+                        onCapabilitySearchQueryChange = { capabilitySearchQuery = it },
+                        capabilitySearchFocusRequester = capabilitySearchFocusRequester,
+                        selectedCapability = selectedCapability,
+                        onCapabilitySelected = onCapabilitySelected,
+                        showBackRow = false,
+                        onBackToPlugins = onBackToPlugins,
+                        onNavigateToPluginSetting = onNavigateToPluginSetting,
+                        currentRouter = currentRouter,
+                        headerActions = null
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(ToolkitTheme.spacing.medium),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = stringResource(Res.string.plugin_selection_hint),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
             }
-        },
-        sequelVisible = isSequelExpanded,
-        sequelContent = {
-            if (selectedPluginId != null) {
+        ) { activeKey ->
+            if (activeKey == null) {
+                LoadedPluginsSidebarPane(
+                    loadedPlugins = loadedPlugins,
+                    selectedPluginId = selectedPluginId,
+                    isInteractiveOnly = isInteractiveOnly,
+                    pluginSearchQuery = pluginSearchQuery,
+                    onPluginSearchQueryChange = { pluginSearchQuery = it },
+                    pluginSearchFocusRequester = pluginSearchFocusRequester,
+                    onPluginSelected = onPluginSelected,
+                    headerActions = onToggleSequelMode?.let { toggle ->
+                        {
+                            ToolkitSequelSidebarToggleButton(
+                                isExpanded = effectiveSequelExpanded,
+                                onToggle = toggle
+                            )
+                        }
+                    }
+                )
+            } else {
                 PluginCapabilitiesSidebarPane(
                     loadedPlugins = loadedPlugins,
-                    pluginId = selectedPluginId,
+                    pluginId = activeKey,
                     isInteractiveOnly = isInteractiveOnly,
                     capabilitySearchQuery = capabilitySearchQuery,
                     onCapabilitySearchQueryChange = { capabilitySearchQuery = it },
                     capabilitySearchFocusRequester = capabilitySearchFocusRequester,
                     selectedCapability = selectedCapability,
                     onCapabilitySelected = onCapabilitySelected,
-                    showBackRow = false,
-                    onBackToPlugins = onBackToPlugins,
+                    showBackRow = true,
+                    onBackToPlugins = {
+                        capabilitySearchQuery = ""
+                        onBackToPlugins()
+                    },
                     onNavigateToPluginSetting = onNavigateToPluginSetting,
                     currentRouter = currentRouter,
-                    headerActions = null
+                    headerActions = onToggleSequelMode?.let { toggle ->
+                        {
+                            ToolkitSequelSidebarToggleButton(
+                                isExpanded = effectiveSequelExpanded,
+                                onToggle = toggle
+                            )
+                        }
+                    }
                 )
-            } else {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(ToolkitTheme.spacing.medium),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = stringResource(Res.string.plugin_selection_hint),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
             }
-        }
-    ) { activeKey ->
-        if (activeKey == null) {
-            LoadedPluginsSidebarPane(
-                loadedPlugins = loadedPlugins,
-                selectedPluginId = selectedPluginId,
-                isInteractiveOnly = isInteractiveOnly,
-                pluginSearchQuery = pluginSearchQuery,
-                onPluginSearchQueryChange = { pluginSearchQuery = it },
-                pluginSearchFocusRequester = pluginSearchFocusRequester,
-                onPluginSelected = onPluginSelected,
-                headerActions = onToggleSequelMode?.let { toggle ->
-                    {
-                        ToolkitSequelSidebarToggleButton(
-                            isExpanded = isSequelExpanded,
-                            onToggle = toggle
-                        )
-                    }
-                }
-            )
-        } else {
-            PluginCapabilitiesSidebarPane(
-                loadedPlugins = loadedPlugins,
-                pluginId = activeKey,
-                isInteractiveOnly = isInteractiveOnly,
-                capabilitySearchQuery = capabilitySearchQuery,
-                onCapabilitySearchQueryChange = { capabilitySearchQuery = it },
-                capabilitySearchFocusRequester = capabilitySearchFocusRequester,
-                selectedCapability = selectedCapability,
-                onCapabilitySelected = onCapabilitySelected,
-                showBackRow = true,
-                onBackToPlugins = {
-                    capabilitySearchQuery = ""
-                    onBackToPlugins()
-                },
-                onNavigateToPluginSetting = onNavigateToPluginSetting,
-                currentRouter = currentRouter,
-                headerActions = onToggleSequelMode?.let { toggle ->
-                    {
-                        ToolkitSequelSidebarToggleButton(
-                            isExpanded = isSequelExpanded,
-                            onToggle = toggle
-                        )
-                    }
-                }
-            )
         }
     }
 }

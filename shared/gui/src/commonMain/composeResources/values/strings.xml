@@ -609,6 +609,7 @@
     <string name="setting_resource_sampling_interval">Resource Sampling Interval</string>
     <string name="setting_resource_sampling_interval_subtitle">Frequency in milliseconds for sampling RAM, VRAM, and CPU utilization during job and flow execution (default: 5000 ms).</string>
     <string name="job_capability_breakdown_title">Capability Breakdown</string>
+    <string name="job_overhead_label">Application &amp; Flow Overhead</string>
     <string name="job_export_success_toast">Execution report exported successfully</string>
     <string name="job_no_metrics_recorded">No execution metrics recorded</string>
     <string name="job_execution_count_format">x%1$d</string>
@@ -1155,4 +1156,6 @@
     <string name="flow_palette_expand">Show node palette</string>
     <string name="flow_palette_drop_on_board">Drop to add node</string>
     <string name="flow_palette_drag_to_board">Drag onto board to place</string>
+    <string name="setting_compact_panels_default">Compact Sidebars &amp; Collapsible Panels</string>
+    <string name="setting_compact_panels_default_subtitle">Start secondary sidebars and collapsible supporting panes in their minimum/compact state to maximize workspace area</string>
 </resources>

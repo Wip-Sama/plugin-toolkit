@@ -93,6 +93,13 @@ fun SettingsRegistryBuilder.appearanceDefinitions() {
                         }
                     }
                 ) { copy(sidebarStartMode = it) }
+
+                switch(
+                    AppearanceSettings::compactPanelsByDefault,
+                    Res.string.setting_compact_panels_default,
+                    Icons.Default.ViewSidebar,
+                    subtitle = SettingText.Resource(Res.string.setting_compact_panels_default_subtitle)
+                ) { copy(compactPanelsByDefault = it) }
             }
 
             SettingCustom(

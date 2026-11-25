@@ -273,26 +273,38 @@ fun PluginManagerView(
     }
 
     val scope = rememberCoroutineScope()
-    val baseDirective = rememberAdaptivePaneScaffoldDirective()
-    var showFoldersPane by remember { mutableStateOf(true) }
-    val directive = remember(baseDirective, showFoldersPane) {
-        if (showFoldersPane) baseDirective else baseDirective.copy(maxHorizontalPartitions = 1)
+    val settingsRepository: org.wip.plugintoolkit.features.settings.logic.SettingsRepository = koinInject()
+    val appSettings by settingsRepository.settings.collectAsState()
+    var showFoldersPane by remember(appSettings.appearance.compactPanelsByDefault) {
+        mutableStateOf(!appSettings.appearance.compactPanelsByDefault)
     }
-    val navigator = rememberSupportingPaneScaffoldNavigator<Unit>(scaffoldDirective = directive)
     val paneExpansionState = rememberSupportingPaneExpansionState(
         initialWidth = ToolkitTheme.dimensions.adaptiveSupportingPaneWidth
     )
 
-    SupportingPaneScaffold(
-        directive = navigator.scaffoldDirective,
-        value = navigator.scaffoldValue,
+    BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
-            .padding(adaptiveWorkspacePadding()),
-        paneExpansionState = paneExpansionState,
-        paneExpansionDragHandle = { state ->
-            DesktopPaneDragHandle(paneExpansionState = state)
-        },
+            .padding(adaptiveWorkspacePadding())
+    ) {
+        val canFitTwoPanes = maxWidth >= ToolkitTheme.dimensions.adaptiveSupportingPaneWidth + ToolkitTheme.dimensions.breakpointMedium
+        val baseDirective = rememberAdaptivePaneScaffoldDirective(
+            availableContentWidth = maxWidth,
+            minTwoPaneWidth = ToolkitTheme.dimensions.adaptiveSupportingPaneWidth + ToolkitTheme.dimensions.breakpointMedium
+        )
+        val directive = remember(baseDirective, showFoldersPane, canFitTwoPanes) {
+            if (showFoldersPane && canFitTwoPanes) baseDirective else baseDirective.copy(maxHorizontalPartitions = 1)
+        }
+        val navigator = rememberSupportingPaneScaffoldNavigator<Unit>(scaffoldDirective = directive)
+
+        SupportingPaneScaffold(
+            directive = navigator.scaffoldDirective,
+            value = navigator.scaffoldValue,
+            modifier = Modifier.fillMaxSize(),
+            paneExpansionState = paneExpansionState,
+            paneExpansionDragHandle = { state ->
+                DesktopPaneDragHandle(paneExpansionState = state)
+            },
         mainPane = {
             AnimatedPane {
                 Surface(
@@ -615,4 +627,5 @@ fun PluginManagerView(
             }
         }
     )
+    }
 }

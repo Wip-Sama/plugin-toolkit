@@ -54,6 +54,7 @@ import org.wip.plugintoolkit.features.job.utils.ProcessGpuUtils
 import org.wip.plugintoolkit.features.job.utils.ProcessCpuUtils
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.job_capability_breakdown_title
+import plugintoolkit.composeapp.generated.resources.job_overhead_label
 import plugintoolkit.composeapp.generated.resources.job_completed_at_label
 import plugintoolkit.composeapp.generated.resources.job_duration_label
 import plugintoolkit.composeapp.generated.resources.job_execution_count_format
@@ -296,7 +297,8 @@ internal fun ExecutionInfoSection(
             Spacer(modifier = Modifier.height(ToolkitTheme.spacing.small))
 
             val totalAllCapMs = metricsByCapability.values.sumOf { execs -> execs.sumOf { it.durationMs } }
-            val totalMs = durationMs?.coerceAtLeast(1L) ?: totalAllCapMs.coerceAtLeast(1L)
+            val totalMs = maxOf(durationMs ?: 0L, totalAllCapMs).coerceAtLeast(1L)
+            val overheadMs = (totalMs - totalAllCapMs).coerceAtLeast(0L)
 
             Column(
                 verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small),
@@ -309,8 +311,64 @@ internal fun ExecutionInfoSection(
                         totalJobDurationMs = totalMs
                     )
                 }
+                if (overheadMs > 0L) {
+                    OverheadBreakdownCard(
+                        label = stringResource(Res.string.job_overhead_label),
+                        overheadMs = overheadMs,
+                        totalJobDurationMs = totalMs
+                    )
+                }
             }
         }
+    }
+}
+
+@Composable
+private fun OverheadBreakdownCard(
+    label: String,
+    overheadMs: Long,
+    totalJobDurationMs: Long,
+    modifier: Modifier = Modifier
+) {
+    val fraction = (overheadMs.toFloat() / totalJobDurationMs).coerceIn(0f, 1f)
+    val percent = (fraction * 100).roundToInt()
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(
+                MaterialTheme.colorScheme.surfaceContainerLowest,
+                ToolkitTheme.shapes.small
+            )
+            .padding(ToolkitTheme.spacing.small)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                text = "${formatDurationMs(overheadMs)} ($percent%)",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Spacer(modifier = Modifier.height(ToolkitTheme.spacing.extraSmall))
+        ToolkitLinearProgressIndicator(
+            progress = fraction,
+            wavy = false,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(ToolkitTheme.dimensions.capabilityProgressBarHeight),
+            color = MaterialTheme.colorScheme.outline,
+            trackColor = MaterialTheme.colorScheme.surfaceVariant
+        )
     }
 }
 

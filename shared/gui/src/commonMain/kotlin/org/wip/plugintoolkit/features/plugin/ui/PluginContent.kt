@@ -439,10 +439,10 @@ fun CapabilityTester(
         }
     }
 
-    Row(
+    androidx.compose.foundation.layout.FlowRow(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.medium),
-        verticalAlignment = Alignment.CenterVertically
+        verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
     ) {
         OutlinedButton(
             onClick = onSetAsDefault,
@@ -455,7 +455,7 @@ fun CapabilityTester(
                 modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
             )
             Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
-            Text(stringResource(Res.string.action_set_as_default))
+            Text(stringResource(Res.string.action_set_as_default), maxLines = 1)
         }
 
         OutlinedButton(
@@ -468,7 +468,7 @@ fun CapabilityTester(
                 modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
             )
             Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
-            Text(stringResource(Res.string.action_reset_to_default))
+            Text(stringResource(Res.string.action_reset_to_default), maxLines = 1)
         }
 
         Button(

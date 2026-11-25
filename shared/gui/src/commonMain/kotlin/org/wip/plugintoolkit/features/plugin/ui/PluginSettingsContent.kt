@@ -249,6 +249,26 @@ fun PluginSettingsContent(
             .maxByOrNull { it.value }?.key ?: sectionIndices.keys.firstOrNull() ?: ""
     }
 
+    val navigateToSettingInPlace: (String, String) -> Unit = { targetPluginId, targetSettingKey ->
+        if (targetPluginId.isBlank() || targetPluginId == pkg) {
+            val targetKey = when {
+                customSettings.containsKey(targetSettingKey) -> "section_custom"
+                capabilities.any { it.parameters?.containsKey(targetSettingKey) == true } -> {
+                    val cap = capabilities.first { it.parameters?.containsKey(targetSettingKey) == true }
+                    "cap_${cap.name}"
+                }
+                globalParams.containsKey(targetSettingKey) -> "section_global"
+                else -> sectionIndices.keys.firstOrNull()
+            }
+            val targetIndex = targetKey?.let { sectionIndices[it] }
+            if (targetIndex != null) {
+                coroutineScope.launch {
+                    lazyListState.animateScrollToItem(targetIndex)
+                }
+            }
+        }
+    }
+
     // Auto-scroll to requested setting or section
     LaunchedEffect(scrollToSetting, sectionIndices, customSettings) {
         if (scrollToSetting != null) {
@@ -513,7 +533,9 @@ fun PluginSettingsContent(
                                                 },
                                                 enabled = !isBusy,
                                                 providedSettings = providedSettings,
-                                                providedLocks = locks
+                                                providedLocks = locks,
+                                                pluginId = pkg,
+                                                onNavigateToPluginSetting = navigateToSettingInPlace
                                             )
 
                                             val lockedOptionsForSetting = lockedEnumOptions[key]?.distinct() ?: emptyList()
@@ -591,7 +613,10 @@ fun PluginSettingsContent(
                                                 )
                                             },
                                             enabled = !isBusy,
-                                            providedSettings = providedSettings
+                                            providedSettings = providedSettings,
+                                            providedLocks = locks,
+                                            pluginId = pkg,
+                                            onNavigateToPluginSetting = navigateToSettingInPlace
                                         )
                                     }
                                 }
@@ -667,7 +692,9 @@ fun PluginSettingsContent(
                                             },
                                             enabled = !isBusy,
                                             providedSettings = providedSettings,
-                                            providedLocks = locks
+                                            providedLocks = locks,
+                                            pluginId = pkg,
+                                            onNavigateToPluginSetting = navigateToSettingInPlace
                                         )
                                     }
                                 }

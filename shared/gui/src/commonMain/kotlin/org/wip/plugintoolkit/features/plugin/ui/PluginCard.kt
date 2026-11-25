@@ -1,6 +1,9 @@
 package org.wip.plugintoolkit.features.plugin.ui
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -38,36 +41,71 @@ fun PluginCard(
         onClick = if (isLoaded) onClick else null
     ) {
         BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-            val isCompact = maxWidth < ToolkitTheme.dimensions.breakpointCompact
+            val stackVertically = maxWidth < ToolkitTheme.dimensions.breakpointCompact
+            val isCompact = maxWidth < ToolkitTheme.dimensions.breakpointMedium
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                PluginCardInfoSection(
-                    plugin = plugin,
-                    isLoaded = isLoaded,
-                    isLockedByJob = isLockedByJob,
-                    activity = activity,
-                    alternateUpdate = alternateUpdate,
-                    onSwitchRepo = onSwitchRepo,
-                    modifier = Modifier.weight(1f)
-                )
+            if (stackVertically) {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
+                ) {
+                    PluginCardInfoSection(
+                        plugin = plugin,
+                        isLoaded = isLoaded,
+                        isLockedByJob = isLockedByJob,
+                        activity = activity,
+                        alternateUpdate = alternateUpdate,
+                        onSwitchRepo = onSwitchRepo,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Box(
+                        modifier = Modifier.fillMaxWidth(),
+                        contentAlignment = Alignment.CenterEnd
+                    ) {
+                        PluginCardActions(
+                            plugin = plugin,
+                            customActions = customActions,
+                            alternateUpdate = alternateUpdate,
+                            hasUpdate = hasUpdate,
+                            enabled = enabled,
+                            activity = activity,
+                            isCompact = true,
+                            onToggle = onToggle,
+                            onSwitchRepo = onSwitchRepo,
+                            onAction = onAction
+                        )
+                    }
+                }
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    PluginCardInfoSection(
+                        plugin = plugin,
+                        isLoaded = isLoaded,
+                        isLockedByJob = isLockedByJob,
+                        activity = activity,
+                        alternateUpdate = alternateUpdate,
+                        onSwitchRepo = onSwitchRepo,
+                        modifier = Modifier.weight(1f)
+                    )
 
-                Spacer(modifier = Modifier.width(ToolkitTheme.spacing.medium))
+                    Spacer(modifier = Modifier.width(ToolkitTheme.spacing.medium))
 
-                PluginCardActions(
-                    plugin = plugin,
-                    customActions = customActions,
-                    alternateUpdate = alternateUpdate,
-                    hasUpdate = hasUpdate,
-                    enabled = enabled,
-                    activity = activity,
-                    isCompact = isCompact,
-                    onToggle = onToggle,
-                    onSwitchRepo = onSwitchRepo,
-                    onAction = onAction
-                )
+                    PluginCardActions(
+                        plugin = plugin,
+                        customActions = customActions,
+                        alternateUpdate = alternateUpdate,
+                        hasUpdate = hasUpdate,
+                        enabled = enabled,
+                        activity = activity,
+                        isCompact = isCompact,
+                        onToggle = onToggle,
+                        onSwitchRepo = onSwitchRepo,
+                        onAction = onAction
+                    )
+                }
             }
         }
     }

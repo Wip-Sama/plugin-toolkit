@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -78,15 +79,172 @@ internal fun FlowItem(
         modifier = Modifier.fillMaxWidth(),
         onClick = onSelect
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.extraSmall)
-            ) {
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            val stackVertically = maxWidth < ToolkitTheme.dimensions.breakpointCompact
+
+            val actionsContent: @Composable () -> Unit = {
+                ToolkitButtonGroup {
+                    item { shape, modifierSpec ->
+                        ToolkitTooltipBox(
+                            tooltip = stringResource(Res.string.action_export_flow_tooltip),
+                            modifier = modifierSpec
+                        ) {
+                            FilledTonalIconButton(
+                                onClick = onExport,
+                                shape = shape,
+                                modifier = Modifier.size(ToolkitTheme.dimensions.menuItem)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Share,
+                                    contentDescription = stringResource(Res.string.action_export_flow),
+                                    tint = MaterialTheme.colorScheme.secondary,
+                                    modifier = Modifier.size(ToolkitTheme.dimensions.iconMediumSmall)
+                                )
+                            }
+                        }
+                    }
+                    item { shape, modifierSpec ->
+                        ToolkitTooltipBox(
+                            tooltip = stringResource(Res.string.action_copy_flow_clipboard_tooltip),
+                            modifier = modifierSpec
+                        ) {
+                            FilledTonalIconButton(
+                                onClick = onShareClipboard,
+                                shape = shape,
+                                modifier = Modifier.size(ToolkitTheme.dimensions.menuItem)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.ContentCopy,
+                                    contentDescription = stringResource(Res.string.action_copy_flow_clipboard),
+                                    tint = MaterialTheme.colorScheme.secondary,
+                                    modifier = Modifier.size(ToolkitTheme.dimensions.iconMediumSmall)
+                                )
+                            }
+                        }
+                    }
+                    item { shape, modifierSpec ->
+                        val metadataLabel = stringResource(Res.string.action_edit_metadata)
+                        ToolkitTooltipBox(
+                            tooltip = metadataLabel,
+                            modifier = modifierSpec
+                        ) {
+                            FilledTonalIconButton(
+                                onClick = onEditMetadata,
+                                shape = shape,
+                                modifier = Modifier.size(ToolkitTheme.dimensions.menuItem)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Settings,
+                                    contentDescription = metadataLabel,
+                                    tint = MaterialTheme.colorScheme.tertiary,
+                                    modifier = Modifier.size(ToolkitTheme.dimensions.iconMediumSmall)
+                                )
+                            }
+                        }
+                    }
+                    item { shape, modifierSpec ->
+                        val editLabel = stringResource(Res.string.action_edit)
+                        ToolkitTooltipBox(
+                            tooltip = editLabel,
+                            modifier = modifierSpec
+                        ) {
+                            FilledTonalIconButton(
+                                onClick = onEdit,
+                                shape = shape,
+                                modifier = Modifier.size(ToolkitTheme.dimensions.menuItem)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Edit,
+                                    contentDescription = editLabel,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(ToolkitTheme.dimensions.iconMediumSmall)
+                                )
+                            }
+                        }
+                    }
+                    item { shape, modifierSpec ->
+                        val deleteLabel = stringResource(Res.string.action_delete)
+                        ToolkitTooltipBox(
+                            tooltip = deleteLabel,
+                            modifier = modifierSpec
+                        ) {
+                            FilledTonalIconButton(
+                                onClick = onDelete,
+                                shape = shape,
+                                modifier = Modifier.size(ToolkitTheme.dimensions.menuItem)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Delete,
+                                    contentDescription = deleteLabel,
+                                    tint = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.size(ToolkitTheme.dimensions.iconMediumSmall)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (stackVertically) {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
+                ) {
+                    FlowCardInfoColumn(
+                        name = name,
+                        nodeCount = nodeCount,
+                        parentFlows = parentFlows,
+                        missingCapabilities = missingCapabilities,
+                        notReadyNodes = notReadyNodes,
+                        isBroken = isBroken,
+                        isRunning = isRunning,
+                        isPaused = isPaused,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
+                        actionsContent()
+                    }
+                }
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    FlowCardInfoColumn(
+                        name = name,
+                        nodeCount = nodeCount,
+                        parentFlows = parentFlows,
+                        missingCapabilities = missingCapabilities,
+                        notReadyNodes = notReadyNodes,
+                        isBroken = isBroken,
+                        isRunning = isRunning,
+                        isPaused = isPaused,
+                        modifier = Modifier.weight(1f)
+                    )
+                    actionsContent()
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun FlowCardInfoColumn(
+    name: String,
+    nodeCount: Int,
+    parentFlows: List<String>,
+    missingCapabilities: List<String>,
+    notReadyNodes: List<Node>,
+    isBroken: Boolean,
+    isRunning: Boolean,
+    isPaused: Boolean,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.extraSmall)
+    ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small)
@@ -237,107 +395,4 @@ internal fun FlowItem(
                     }
                 }
             }
-
-            ToolkitButtonGroup {
-                item { shape, modifierSpec ->
-                    ToolkitTooltipBox(
-                        tooltip = stringResource(Res.string.action_export_flow_tooltip),
-                        modifier = modifierSpec
-                    ) {
-                        FilledTonalIconButton(
-                            onClick = onExport,
-                            shape = shape,
-                            modifier = Modifier.size(ToolkitTheme.dimensions.menuItem)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Share,
-                                contentDescription = stringResource(Res.string.action_export_flow),
-                                tint = MaterialTheme.colorScheme.secondary,
-                                modifier = Modifier.size(ToolkitTheme.dimensions.iconMediumSmall)
-                            )
-                        }
-                    }
-                }
-                item { shape, modifierSpec ->
-                    ToolkitTooltipBox(
-                        tooltip = stringResource(Res.string.action_copy_flow_clipboard_tooltip),
-                        modifier = modifierSpec
-                    ) {
-                        FilledTonalIconButton(
-                            onClick = onShareClipboard,
-                            shape = shape,
-                            modifier = Modifier.size(ToolkitTheme.dimensions.menuItem)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.ContentCopy,
-                                contentDescription = stringResource(Res.string.action_copy_flow_clipboard),
-                                tint = MaterialTheme.colorScheme.secondary,
-                                modifier = Modifier.size(ToolkitTheme.dimensions.iconMediumSmall)
-                            )
-                        }
-                    }
-                }
-                item { shape, modifierSpec ->
-                    val metadataLabel = stringResource(Res.string.action_edit_metadata)
-                    ToolkitTooltipBox(
-                        tooltip = metadataLabel,
-                        modifier = modifierSpec
-                    ) {
-                        FilledTonalIconButton(
-                            onClick = onEditMetadata,
-                            shape = shape,
-                            modifier = Modifier.size(ToolkitTheme.dimensions.menuItem)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Settings,
-                                contentDescription = metadataLabel,
-                                tint = MaterialTheme.colorScheme.tertiary,
-                                modifier = Modifier.size(ToolkitTheme.dimensions.iconMediumSmall)
-                            )
-                        }
-                    }
-                }
-                item { shape, modifierSpec ->
-                    val editLabel = stringResource(Res.string.action_edit)
-                    ToolkitTooltipBox(
-                        tooltip = editLabel,
-                        modifier = modifierSpec
-                    ) {
-                        FilledTonalIconButton(
-                            onClick = onEdit,
-                            shape = shape,
-                            modifier = Modifier.size(ToolkitTheme.dimensions.menuItem)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Edit,
-                                contentDescription = editLabel,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(ToolkitTheme.dimensions.iconMediumSmall)
-                            )
-                        }
-                    }
-                }
-                item { shape, modifierSpec ->
-                    val deleteLabel = stringResource(Res.string.action_delete)
-                    ToolkitTooltipBox(
-                        tooltip = deleteLabel,
-                        modifier = modifierSpec
-                    ) {
-                        FilledTonalIconButton(
-                            onClick = onDelete,
-                            shape = shape,
-                            modifier = Modifier.size(ToolkitTheme.dimensions.menuItem)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Delete,
-                                contentDescription = deleteLabel,
-                                tint = MaterialTheme.colorScheme.error,
-                                modifier = Modifier.size(ToolkitTheme.dimensions.iconMediumSmall)
-                            )
-                        }
-                    }
-                }
-            }
         }
-    }
-}

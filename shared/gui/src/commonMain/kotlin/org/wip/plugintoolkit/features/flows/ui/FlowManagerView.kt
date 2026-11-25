@@ -259,22 +259,38 @@ fun FlowManagerView(
         runCatching { searchFocusRequester.requestFocus() }
     }
 
-    val directive = rememberAdaptivePaneScaffoldDirective()
-    val navigator = rememberSupportingPaneScaffoldNavigator<Unit>(scaffoldDirective = directive)
+    val settingsRepository: org.wip.plugintoolkit.features.settings.logic.SettingsRepository = koinInject()
+    val appSettings by settingsRepository.settings.collectAsState()
+    var showSummaryPane by remember(appSettings.appearance.compactPanelsByDefault) {
+        mutableStateOf(!appSettings.appearance.compactPanelsByDefault)
+    }
     val paneExpansionState = rememberSupportingPaneExpansionState(
         initialWidth = ToolkitTheme.dimensions.adaptiveSupportingPaneWidth
     )
 
-    SupportingPaneScaffold(
-        directive = navigator.scaffoldDirective,
-        value = navigator.scaffoldValue,
+    BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
-            .padding(adaptiveWorkspacePadding()),
-        paneExpansionState = paneExpansionState,
-        paneExpansionDragHandle = { state ->
-            DesktopPaneDragHandle(paneExpansionState = state)
-        },
+            .padding(adaptiveWorkspacePadding())
+    ) {
+        val canFitTwoPanes = maxWidth >= ToolkitTheme.dimensions.adaptiveSupportingPaneWidth + ToolkitTheme.dimensions.breakpointMedium
+        val baseDirective = rememberAdaptivePaneScaffoldDirective(
+            availableContentWidth = maxWidth,
+            minTwoPaneWidth = ToolkitTheme.dimensions.adaptiveSupportingPaneWidth + ToolkitTheme.dimensions.breakpointMedium
+        )
+        val directive = remember(baseDirective, showSummaryPane, canFitTwoPanes) {
+            if (showSummaryPane && canFitTwoPanes) baseDirective else baseDirective.copy(maxHorizontalPartitions = 1)
+        }
+        val navigator = rememberSupportingPaneScaffoldNavigator<Unit>(scaffoldDirective = directive)
+
+        SupportingPaneScaffold(
+            directive = navigator.scaffoldDirective,
+            value = navigator.scaffoldValue,
+            modifier = Modifier.fillMaxSize(),
+            paneExpansionState = paneExpansionState,
+            paneExpansionDragHandle = { state ->
+                DesktopPaneDragHandle(paneExpansionState = state)
+            },
         mainPane = {
             AnimatedPane {
                 Surface(
@@ -330,10 +346,16 @@ fun FlowManagerView(
                         icon = { Icon(Icons.Default.ContentCopy, contentDescription = importClipboardLabel) },
                         label = importClipboardLabel
                     )
-                    clickableItem(
-                        onClick = {
+                    toggleableItem(
+                        checked = showSummaryPane,
+                        onCheckedChange = { checked ->
+                            showSummaryPane = checked
                             scope.launch {
-                                navigator.navigateTo(SupportingPaneScaffoldRole.Supporting)
+                                if (checked) {
+                                    navigator.navigateTo(SupportingPaneScaffoldRole.Supporting)
+                                } else if (navigator.canNavigateBack()) {
+                                    navigator.navigateBack()
+                                }
                             }
                         },
                         icon = { Icon(Icons.Default.Settings, contentDescription = summaryPaneLabel) },
@@ -523,7 +545,10 @@ fun FlowManagerView(
                     ) {
                         if (navigator.canNavigateBack()) {
                             AdaptiveBackNavigationButton(
-                                onClick = { scope.launch { navigator.navigateBack() } }
+                                onClick = {
+                                    showSummaryPane = false
+                                    scope.launch { navigator.navigateBack() }
+                                }
                             )
                         }
                         Text(
@@ -579,6 +604,7 @@ fun FlowManagerView(
             }
         }
     )
+    }
     if (showCreateDialog) {
         CreateFlowDialog(
             initialName = newFlowName,

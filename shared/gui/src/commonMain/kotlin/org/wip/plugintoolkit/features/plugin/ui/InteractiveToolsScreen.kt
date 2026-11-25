@@ -164,11 +164,17 @@ fun InteractiveToolsScreen(
     }
 
     val scope = rememberCoroutineScope()
+    val settingsRepository: org.wip.plugintoolkit.features.settings.logic.SettingsRepository = koinInject()
+    val appSettings by settingsRepository.settings.collectAsState()
     val directive = rememberAdaptivePaneScaffoldDirective()
     val navigator = rememberListDetailPaneScaffoldNavigator<String>(
         scaffoldDirective = directive
     )
-    var sequelMode by remember { mutableStateOf(SequelSidebarMode.Auto) }
+    var sequelMode by remember(appSettings.appearance.compactPanelsByDefault) {
+        mutableStateOf(
+            if (appSettings.appearance.compactPanelsByDefault) SequelSidebarMode.ForcedCompact else SequelSidebarMode.Auto
+        )
+    }
     val isLargeWidth = isLargeAdaptiveWidth()
     val isSequelExpanded = resolveSequelExpanded(sequelMode, isLargeWidth) &&
         (selectedPluginId != null || sequelMode == SequelSidebarMode.ForcedExpanded)

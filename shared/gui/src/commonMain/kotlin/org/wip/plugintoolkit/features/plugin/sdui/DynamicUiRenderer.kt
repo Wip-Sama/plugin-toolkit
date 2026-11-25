@@ -2076,8 +2076,113 @@ private fun RenderDialog(
 }
 
 /**
+ * Skippable pane wrapper hoisted out of [RenderSplitPane] so dragging the resize handle
+ * re-measures pane weights without recomposing heavy child SDUI subtrees on every pointer frame.
+ */
+@Composable
+private fun SplitPaneContainer(
+    paneNode: UiNode,
+    onEvent: (UiEvent) -> Unit,
+    containerColor: Color,
+    modifier: Modifier = Modifier
+) {
+    val innerPadding = if (paneNode.modifier.padding == SpacingSize.NONE) {
+        ToolkitTheme.spacing.md
+    } else {
+        ToolkitTheme.spacing.sm
+    }
+    Surface(
+        modifier = modifier,
+        shape = ToolkitTheme.shapes.large,
+        color = containerColor,
+        border = BorderStroke(
+            ToolkitTheme.dimensions.borderUnselected,
+            MaterialTheme.colorScheme.outlineVariant.copy(alpha = ToolkitTheme.opacity.subtleHighlight)
+        )
+    ) {
+        SafeUiNodeRenderer(
+            node = paneNode,
+            onEvent = onEvent,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun SplitResizeHandle(
+    nodeId: String,
+    isHorizontal: Boolean,
+    totalPx: Float,
+    resizeLabel: String,
+    onDragStart: () -> Unit,
+    onDragDeltaFraction: (Float) -> Unit,
+    onDragFinish: () -> Unit
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+    val currentTotalPx by rememberUpdatedState(totalPx)
+    val currentOnDragStart by rememberUpdatedState(onDragStart)
+    val currentOnDragDelta by rememberUpdatedState(onDragDeltaFraction)
+    val currentOnDragFinish by rememberUpdatedState(onDragFinish)
+
+    val handleColor = if (isHovered) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        MaterialTheme.colorScheme.outlineVariant.copy(alpha = ToolkitTheme.opacity.divider)
+    }
+    val pointerIcon = if (isHorizontal) {
+        PlatformUtils.horizontalResizePointerIcon()
+    } else {
+        PlatformUtils.verticalResizePointerIcon()
+    }
+    Box(
+        modifier = (if (isHorizontal) {
+            Modifier.fillMaxHeight().width(ToolkitTheme.dimensions.sduiSplitHandleThickness)
+        } else {
+            Modifier.fillMaxWidth().height(ToolkitTheme.dimensions.sduiSplitHandleThickness)
+        })
+            .hoverable(interactionSource)
+            .pointerHoverIcon(pointerIcon)
+            .semantics { contentDescription = resizeLabel }
+            .pointerInput(nodeId, isHorizontal) {
+                detectDragGestures(
+                    onDragStart = { currentOnDragStart() },
+                    onDrag = { change, dragAmount ->
+                        change.consume()
+                        val sizePx = currentTotalPx
+                        if (sizePx > 1f) {
+                            val delta = if (isHorizontal) dragAmount.x else dragAmount.y
+                            currentOnDragDelta(delta / sizePx)
+                        }
+                    },
+                    onDragEnd = { currentOnDragFinish() },
+                    onDragCancel = { currentOnDragFinish() }
+                )
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        if (isHorizontal) {
+            VerticalDragHandle(
+                interactionSource = interactionSource
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .height(ToolkitTheme.dimensions.sduiSplitHandlePillThickness)
+                    .width(ToolkitTheme.dimensions.sduiSplitHandlePillLength)
+                    .clip(ToolkitTheme.shapes.pill)
+                    .background(handleColor)
+            )
+        }
+    }
+}
+
+/**
  * Desktop master-detail layout split pane separating tonal containers with Material 3 gutters
- * and optional interactive pointer drag resizing.
+ * and smooth interactive pointer drag resizing.
  */
 @Composable
 private fun RenderSplitPane(
@@ -2085,98 +2190,20 @@ private fun RenderSplitPane(
     onEvent: (UiEvent) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var fraction1 by remember(node.id, node.splitFraction) {
+    var fraction1 by remember(node.id) {
         mutableStateOf(node.splitFraction.coerceIn(0.1f, 0.9f))
     }
+    var isDragging by remember(node.id) { mutableStateOf(false) }
+
+    LaunchedEffect(node.splitFraction) {
+        if (!isDragging) {
+            fraction1 = node.splitFraction.coerceIn(0.1f, 0.9f)
+        }
+    }
+
     val fraction2 = (1f - fraction1).coerceIn(0.1f, 0.9f)
     val resizeLabel = stringResource(Res.string.sdui_resize_pane)
     val density = LocalDensity.current
-
-    @Composable
-    fun SplitPaneContainer(
-        paneNode: UiNode,
-        paneModifier: Modifier,
-        containerColor: Color
-    ) {
-        val innerPadding = if (paneNode.modifier.padding == SpacingSize.NONE) {
-            ToolkitTheme.spacing.md
-        } else {
-            ToolkitTheme.spacing.sm
-        }
-        Surface(
-            modifier = paneModifier,
-            shape = ToolkitTheme.shapes.large,
-            color = containerColor,
-            border = BorderStroke(
-                ToolkitTheme.dimensions.borderUnselected,
-                MaterialTheme.colorScheme.outlineVariant.copy(alpha = ToolkitTheme.opacity.subtleHighlight)
-            )
-        ) {
-            SafeUiNodeRenderer(
-                node = paneNode,
-                onEvent = onEvent,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding)
-            )
-        }
-    }
-
-    @OptIn(ExperimentalMaterial3ExpressiveApi::class)
-    @Composable
-    fun SplitResizeHandle(totalPx: Float) {
-        val interactionSource = remember { MutableInteractionSource() }
-        val isHovered by interactionSource.collectIsHoveredAsState()
-        val handleColor = if (isHovered) {
-            MaterialTheme.colorScheme.primary
-        } else {
-            MaterialTheme.colorScheme.outlineVariant.copy(alpha = ToolkitTheme.opacity.divider)
-        }
-        val pointerIcon = if (node.isHorizontal) {
-            PlatformUtils.horizontalResizePointerIcon()
-        } else {
-            PlatformUtils.verticalResizePointerIcon()
-        }
-        Box(
-            modifier = (if (node.isHorizontal) {
-                Modifier.fillMaxHeight().width(ToolkitTheme.dimensions.sduiSplitHandleThickness)
-            } else {
-                Modifier.fillMaxWidth().height(ToolkitTheme.dimensions.sduiSplitHandleThickness)
-            })
-                .hoverable(interactionSource)
-                .pointerHoverIcon(pointerIcon)
-                .semantics { contentDescription = resizeLabel }
-                .pointerInput(node.id, node.isHorizontal, totalPx) {
-                    detectDragGestures(
-                        onDrag = { change, dragAmount ->
-                            change.consume()
-                            if (totalPx > 1f) {
-                                val delta = if (node.isHorizontal) dragAmount.x else dragAmount.y
-                                fraction1 = (fraction1 + delta / totalPx).coerceIn(0.1f, 0.9f)
-                            }
-                        },
-                        onDragEnd = {
-                            onEvent(UiEvent.ValueChanged(node.id, fraction1.toDouble()))
-                        }
-                    )
-                },
-            contentAlignment = Alignment.Center
-        ) {
-            if (node.isHorizontal) {
-                VerticalDragHandle(
-                    interactionSource = interactionSource
-                )
-            } else {
-                Box(
-                    modifier = Modifier
-                        .height(ToolkitTheme.dimensions.sduiSplitHandlePillThickness)
-                        .width(ToolkitTheme.dimensions.sduiSplitHandlePillLength)
-                        .clip(ToolkitTheme.shapes.pill)
-                        .background(handleColor)
-                )
-            }
-        }
-    }
 
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val totalPx = with(density) {
@@ -2193,16 +2220,31 @@ private fun RenderSplitPane(
             ) {
                 SplitPaneContainer(
                     paneNode = node.first,
-                    paneModifier = Modifier.weight(fraction1).fillMaxHeight(),
-                    containerColor = MaterialTheme.colorScheme.surfaceContainer
+                    onEvent = onEvent,
+                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                    modifier = Modifier.weight(fraction1).fillMaxHeight()
                 )
                 if (node.resizable) {
-                    SplitResizeHandle(totalPx = totalPx)
+                    SplitResizeHandle(
+                        nodeId = node.id,
+                        isHorizontal = true,
+                        totalPx = totalPx,
+                        resizeLabel = resizeLabel,
+                        onDragStart = { isDragging = true },
+                        onDragDeltaFraction = { deltaFrac ->
+                            fraction1 = (fraction1 + deltaFrac).coerceIn(0.1f, 0.9f)
+                        },
+                        onDragFinish = {
+                            isDragging = false
+                            onEvent(UiEvent.ValueChanged(node.id, fraction1.toDouble()))
+                        }
+                    )
                 }
                 SplitPaneContainer(
                     paneNode = node.second,
-                    paneModifier = Modifier.weight(fraction2).fillMaxHeight(),
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerLowest
+                    onEvent = onEvent,
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+                    modifier = Modifier.weight(fraction2).fillMaxHeight()
                 )
             }
         } else {
@@ -2216,16 +2258,31 @@ private fun RenderSplitPane(
             ) {
                 SplitPaneContainer(
                     paneNode = node.first,
-                    paneModifier = Modifier.weight(fraction1).fillMaxWidth(),
-                    containerColor = MaterialTheme.colorScheme.surfaceContainer
+                    onEvent = onEvent,
+                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                    modifier = Modifier.weight(fraction1).fillMaxWidth()
                 )
                 if (node.resizable) {
-                    SplitResizeHandle(totalPx = totalPx)
+                    SplitResizeHandle(
+                        nodeId = node.id,
+                        isHorizontal = false,
+                        totalPx = totalPx,
+                        resizeLabel = resizeLabel,
+                        onDragStart = { isDragging = true },
+                        onDragDeltaFraction = { deltaFrac ->
+                            fraction1 = (fraction1 + deltaFrac).coerceIn(0.1f, 0.9f)
+                        },
+                        onDragFinish = {
+                            isDragging = false
+                            onEvent(UiEvent.ValueChanged(node.id, fraction1.toDouble()))
+                        }
+                    )
                 }
                 SplitPaneContainer(
                     paneNode = node.second,
-                    paneModifier = Modifier.weight(fraction2).fillMaxWidth(),
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerLowest
+                    onEvent = onEvent,
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+                    modifier = Modifier.weight(fraction2).fillMaxWidth()
                 )
             }
         }

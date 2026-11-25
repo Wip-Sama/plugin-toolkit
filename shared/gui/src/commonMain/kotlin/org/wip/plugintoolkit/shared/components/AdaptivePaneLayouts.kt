@@ -3,6 +3,7 @@ package org.wip.plugintoolkit.shared.components
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.WindowInsets
@@ -46,6 +47,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import androidx.window.core.layout.WindowSizeClass
 import org.jetbrains.compose.resources.stringResource
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
@@ -56,18 +58,36 @@ import plugintoolkit.composeapp.generated.resources.nav_more_options
 /** Maximum proportional width allocated to resizable primary/list panes during drag. */
 private const val MAX_RESIZABLE_PANE_PROPORTION = 0.55f
 
+/** Minimum comfortable width reserved for a detail or main pane before collapsing to single-pane mode. */
+private val MIN_COMFORTABLE_DETAIL_PANE_WIDTH = 440.dp
+
 /**
  * Computes a desktop-tuned [PaneScaffoldDirective] with sleek `12.dp` horizontal partition spacing
  * (`ToolkitTheme.dimensions.workspacePaneGap`) housing the [DesktopPaneDragHandle].
+ *
+ * When [availableContentWidth] is provided (measured inside the content area after subtracting the
+ * primary navigation sidebar), two-pane layouts automatically fall back to a single pane whenever
+ * the content viewport cannot comfortably fit both panes side-by-side without squishing cards.
  */
 @OptIn(ExperimentalMaterial3AdaptiveApi::class)
 @Composable
-fun rememberAdaptivePaneScaffoldDirective(): PaneScaffoldDirective {
+fun rememberAdaptivePaneScaffoldDirective(
+    availableContentWidth: Dp = Dp.Unspecified,
+    minTwoPaneWidth: Dp = 760.dp
+): PaneScaffoldDirective {
     val windowAdaptiveInfo = currentWindowAdaptiveInfo()
     val horizontalSpacer = ToolkitTheme.dimensions.workspacePaneGap
     val baseDirective = calculatePaneScaffoldDirective(windowAdaptiveInfo)
-    return remember(baseDirective, horizontalSpacer) {
-        baseDirective.copy(horizontalPartitionSpacerSize = horizontalSpacer)
+    return remember(baseDirective, horizontalSpacer, availableContentWidth, minTwoPaneWidth) {
+        val maxPartitions = if (availableContentWidth != Dp.Unspecified && availableContentWidth < minTwoPaneWidth) {
+            1
+        } else {
+            baseDirective.maxHorizontalPartitions
+        }
+        baseDirective.copy(
+            maxHorizontalPartitions = maxPartitions,
+            horizontalPartitionSpacerSize = horizontalSpacer
+        )
     }
 }
 
@@ -167,51 +187,66 @@ fun rememberSupportingPaneExpansionState(
 @Composable
 fun <T> ToolkitAdaptiveListDetailWorkspace(
     modifier: Modifier = Modifier,
-    navigator: ThreePaneScaffoldNavigator<T> = rememberListDetailPaneScaffoldNavigator<T>(
-        scaffoldDirective = rememberAdaptivePaneScaffoldDirective()
-    ),
+    navigator: ThreePaneScaffoldNavigator<T>? = null,
     listPaneWidth: Dp = ToolkitTheme.dimensions.floatingSidebarDefaultWidth,
     listPaneMinWidth: Dp = ToolkitTheme.dimensions.floatingSidebarMinWidth,
     detailContainerColor: Color = MaterialTheme.colorScheme.surfaceContainerLowest,
     listPane: @Composable ThreePaneScaffoldScope.(ThreePaneScaffoldNavigator<T>) -> Unit,
     detailPane: @Composable BoxScope.(ThreePaneScaffoldNavigator<T>) -> Unit
 ) {
-    val paneExpansionState = rememberFixedListPaneExpansionState(
-        initialWidth = listPaneWidth,
-        minWidth = listPaneMinWidth
-    )
-
-    ListDetailPaneScaffold(
-        directive = navigator.scaffoldDirective,
-        value = navigator.scaffoldValue,
+    BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
-            .padding(adaptiveWorkspacePadding()),
-        paneExpansionState = paneExpansionState,
-        paneExpansionDragHandle = { state ->
-            DesktopPaneDragHandle(paneExpansionState = state)
-        },
-        listPane = {
-            AnimatedPane(
-                modifier = Modifier.preferredWidth(listPaneWidth)
-            ) {
-                listPane(navigator)
-            }
-        },
-        detailPane = {
-            AnimatedPane {
-                Surface(
-                    color = detailContainerColor,
-                    shape = ToolkitTheme.shapes.large,
-                    modifier = Modifier.fillMaxSize()
+            .padding(adaptiveWorkspacePadding())
+    ) {
+        val minTwoPaneWidth = listPaneWidth + MIN_COMFORTABLE_DETAIL_PANE_WIDTH
+        val contentDirective = rememberAdaptivePaneScaffoldDirective(
+            availableContentWidth = maxWidth,
+            minTwoPaneWidth = minTwoPaneWidth
+        )
+        val effectiveNavigator = navigator ?: rememberListDetailPaneScaffoldNavigator<T>(
+            scaffoldDirective = contentDirective
+        )
+        val effectiveDirective = if (maxWidth < minTwoPaneWidth) {
+            effectiveNavigator.scaffoldDirective.copy(maxHorizontalPartitions = 1)
+        } else {
+            effectiveNavigator.scaffoldDirective
+        }
+        val paneExpansionState = rememberFixedListPaneExpansionState(
+            initialWidth = listPaneWidth,
+            minWidth = listPaneMinWidth
+        )
+
+        ListDetailPaneScaffold(
+            directive = effectiveDirective,
+            value = effectiveNavigator.scaffoldValue,
+            modifier = Modifier.fillMaxSize(),
+            paneExpansionState = paneExpansionState,
+            paneExpansionDragHandle = { state ->
+                DesktopPaneDragHandle(paneExpansionState = state)
+            },
+            listPane = {
+                AnimatedPane(
+                    modifier = Modifier.preferredWidth(listPaneWidth)
                 ) {
-                    Box(modifier = Modifier.fillMaxSize()) {
-                        detailPane(navigator)
+                    listPane(effectiveNavigator)
+                }
+            },
+            detailPane = {
+                AnimatedPane {
+                    Surface(
+                        color = detailContainerColor,
+                        shape = ToolkitTheme.shapes.large,
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            detailPane(effectiveNavigator)
+                        }
                     }
                 }
             }
-        }
-    )
+        )
+    }
 }
 
 /**

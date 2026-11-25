@@ -58,6 +58,7 @@ data class AppearanceSettings(
     val useAccentInTheme: Boolean = false,
     val sidebarStartMode: SidebarStartMode = SidebarStartMode.Remember,
     val isSidebarCollapsed: Boolean = false,
+    val compactPanelsByDefault: Boolean = false,
     val useCustomTitleBar: Boolean = true,
     val connectionStyle: ConnectionCurveStyle = ConnectionCurveStyle.CardinalSpline,
     val connectionRoundness: Float = 0.5f,
