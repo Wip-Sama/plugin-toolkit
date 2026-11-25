@@ -63,7 +63,6 @@ import org.wip.plugintoolkit.shared.components.ToolkitTooltipBox
 import org.wip.plugintoolkit.shared.components.menu.ToolkitDropdownDivider
 import org.wip.plugintoolkit.shared.components.menu.ToolkitDropdownMenu
 import org.wip.plugintoolkit.shared.components.menu.ToolkitDropdownMenuItem
-import org.wip.plugintoolkit.shared.components.tooltip
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.action_more_actions
 import plugintoolkit.composeapp.generated.resources.plugin_action_refresh_locks
@@ -613,33 +612,39 @@ internal fun PluginCardActions(
             }
 
             item { shape, modifierSpec ->
-                FilledTonalIconButton(
-                    onClick = { onAction(PluginStatusAction.Settings) },
-                    shape = shape,
+                ToolkitTooltipBox(
+                    tooltip = stringResource(Res.string.plugin_settings_tooltip),
                     modifier = modifierSpec
-                        .size(ToolkitTheme.dimensions.standardButtonHeight)
-                        .tooltip(Res.string.plugin_settings_tooltip),
-                    enabled = readyStatus && !isBusy
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Settings,
-                        contentDescription = stringResource(Res.string.plugin_settings)
-                    )
+                    FilledTonalIconButton(
+                        onClick = { onAction(PluginStatusAction.Settings) },
+                        shape = shape,
+                        modifier = Modifier.size(ToolkitTheme.dimensions.standardButtonHeight),
+                        enabled = readyStatus && !isBusy
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = stringResource(Res.string.plugin_settings)
+                        )
+                    }
                 }
             }
 
             item { shape, modifierSpec ->
-                Box {
-                    FilledTonalIconButton(
-                        onClick = { menuExpanded = true },
-                        shape = shape,
-                        modifier = modifierSpec.size(ToolkitTheme.dimensions.standardButtonHeight),
-                        enabled = readyStatus && !isBusy
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.MoreVert,
-                            contentDescription = stringResource(Res.string.action_more_actions)
-                        )
+                val moreActionsLabel = stringResource(Res.string.action_more_actions)
+                Box(modifier = modifierSpec) {
+                    ToolkitTooltipBox(tooltip = moreActionsLabel) {
+                        FilledTonalIconButton(
+                            onClick = { menuExpanded = true },
+                            shape = shape,
+                            modifier = Modifier.size(ToolkitTheme.dimensions.standardButtonHeight),
+                            enabled = readyStatus && !isBusy
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.MoreVert,
+                                contentDescription = moreActionsLabel
+                            )
+                        }
                     }
                     PluginCardOverflowMenu(
                         expanded = menuExpanded,

@@ -32,16 +32,17 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import org.jetbrains.compose.resources.StringResource
+import org.jetbrains.compose.resources.stringResource
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.core.utils.PlatformUtils
-import org.wip.plugintoolkit.shared.components.tooltip
+import org.wip.plugintoolkit.shared.components.LONG_TOOLTIP_DELAY
+import org.wip.plugintoolkit.shared.components.ToolkitTooltipBox
+import org.wip.plugintoolkit.shared.components.ToolkitTooltipPosition
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.action_close
 import plugintoolkit.composeapp.generated.resources.action_maximize
 import plugintoolkit.composeapp.generated.resources.action_minimize
 import plugintoolkit.composeapp.generated.resources.action_restore
-import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.Duration.Companion.seconds
 
 private val MAC_CLOSE_COLOR = Color(0xFFFF5F56)
 private val MAC_MINIMIZE_COLOR = Color(0xFFFFBD2E)
@@ -86,62 +87,66 @@ fun MacWindowControls(
         verticalAlignment = Alignment.CenterVertically
     ) {
         // Close (Red)
-        Box(
-            modifier = Modifier
-                .size(controlSize)
-                .clip(CircleShape)
-                .background(MAC_CLOSE_COLOR)
-                .border(ToolkitTheme.dimensions.borderThin, MAC_BORDER_COLOR, CircleShape)
-                .tooltip(
-                    Res.string.action_close,
-                    delay = 2.seconds
-                )
-                .clickable(onClick = controller.onClose),
-            contentAlignment = Alignment.Center
+        ToolkitTooltipBox(
+            tooltip = stringResource(Res.string.action_close),
+            position = ToolkitTooltipPosition.Below,
+            delay = LONG_TOOLTIP_DELAY
         ) {
-            if (isRowHovered) {
-                Canvas(modifier = Modifier.size(6.dp)) {
-                    drawLine(
-                        color = Color(0xFF4C0000),
-                        start = Offset.Zero,
-                        end = Offset(size.width, size.height),
-                        strokeWidth = 1.2f,
-                        cap = StrokeCap.Round
-                    )
-                    drawLine(
-                        color = Color(0xFF4C0000),
-                        start = Offset(size.width, 0f),
-                        end = Offset(0f, size.height),
-                        strokeWidth = 1.2f,
-                        cap = StrokeCap.Round
-                    )
+            Box(
+                modifier = Modifier
+                    .size(controlSize)
+                    .clip(CircleShape)
+                    .background(MAC_CLOSE_COLOR)
+                    .border(ToolkitTheme.dimensions.borderThin, MAC_BORDER_COLOR, CircleShape)
+                    .clickable(onClick = controller.onClose),
+                contentAlignment = Alignment.Center
+            ) {
+                if (isRowHovered) {
+                    Canvas(modifier = Modifier.size(6.dp)) {
+                        drawLine(
+                            color = Color(0xFF4C0000),
+                            start = Offset.Zero,
+                            end = Offset(size.width, size.height),
+                            strokeWidth = 1.2f,
+                            cap = StrokeCap.Round
+                        )
+                        drawLine(
+                            color = Color(0xFF4C0000),
+                            start = Offset(size.width, 0f),
+                            end = Offset(0f, size.height),
+                            strokeWidth = 1.2f,
+                            cap = StrokeCap.Round
+                        )
+                    }
                 }
             }
         }
 
         // Minimize (Yellow)
-        Box(
-            modifier = Modifier
-                .size(controlSize)
-                .clip(CircleShape)
-                .background(MAC_MINIMIZE_COLOR)
-                .border(ToolkitTheme.dimensions.borderThin, MAC_BORDER_COLOR, CircleShape)
-                .tooltip(
-                    Res.string.action_minimize,
-                    delay = 2.seconds
-                )
-                .clickable(onClick = controller.onMinimize),
-            contentAlignment = Alignment.Center
+        ToolkitTooltipBox(
+            tooltip = stringResource(Res.string.action_minimize),
+            position = ToolkitTooltipPosition.Below,
+            delay = LONG_TOOLTIP_DELAY
         ) {
-            if (isRowHovered) {
-                Canvas(modifier = Modifier.size(6.dp)) {
-                    drawLine(
-                        color = Color(0xFF5A3E00),
-                        start = Offset(0f, size.height / 2),
-                        end = Offset(size.width, size.height / 2),
-                        strokeWidth = 1.2f,
-                        cap = StrokeCap.Round
-                    )
+            Box(
+                modifier = Modifier
+                    .size(controlSize)
+                    .clip(CircleShape)
+                    .background(MAC_MINIMIZE_COLOR)
+                    .border(ToolkitTheme.dimensions.borderThin, MAC_BORDER_COLOR, CircleShape)
+                    .clickable(onClick = controller.onMinimize),
+                contentAlignment = Alignment.Center
+            ) {
+                if (isRowHovered) {
+                    Canvas(modifier = Modifier.size(6.dp)) {
+                        drawLine(
+                            color = Color(0xFF5A3E00),
+                            start = Offset(0f, size.height / 2),
+                            end = Offset(size.width, size.height / 2),
+                            strokeWidth = 1.2f,
+                            cap = StrokeCap.Round
+                        )
+                    }
                 }
             }
         }
@@ -152,28 +157,30 @@ fun MacWindowControls(
         } else {
             Res.string.action_maximize
         }
-        Box(
-            modifier = Modifier
-                .size(controlSize)
-                .clip(CircleShape)
-                .background(MAC_MAXIMIZE_COLOR)
-                .border(ToolkitTheme.dimensions.borderThin, MAC_BORDER_COLOR, CircleShape)
-                .tooltip(
-                    maxTooltip,
-                    delay = 2.seconds
-                )
-                .clickable(onClick = controller.onMaximizeToggle),
-            contentAlignment = Alignment.Center
+        ToolkitTooltipBox(
+            tooltip = stringResource(maxTooltip),
+            position = ToolkitTooltipPosition.Below,
+            delay = LONG_TOOLTIP_DELAY
         ) {
-            if (isRowHovered) {
-                Canvas(modifier = Modifier.size(6.dp)) {
-                    drawLine(
-                        color = Color(0xFF0D5316),
-                        start = Offset.Zero,
-                        end = Offset(size.width, size.height),
-                        strokeWidth = 1.2f,
-                        cap = StrokeCap.Round
-                    )
+            Box(
+                modifier = Modifier
+                    .size(controlSize)
+                    .clip(CircleShape)
+                    .background(MAC_MAXIMIZE_COLOR)
+                    .border(ToolkitTheme.dimensions.borderThin, MAC_BORDER_COLOR, CircleShape)
+                    .clickable(onClick = controller.onMaximizeToggle),
+                contentAlignment = Alignment.Center
+            ) {
+                if (isRowHovered) {
+                    Canvas(modifier = Modifier.size(6.dp)) {
+                        drawLine(
+                            color = Color(0xFF0D5316),
+                            start = Offset.Zero,
+                            end = Offset(size.width, size.height),
+                            strokeWidth = 1.2f,
+                            cap = StrokeCap.Round
+                        )
+                    }
                 }
             }
         }
@@ -295,23 +302,25 @@ private fun StandardWindowControlButton(
 
     val iconColor = MaterialTheme.colorScheme.onSurface
 
-    Box(
-        modifier = modifier
-            .width(width)
-            .height(height)
-            .background(bgColor)
-            .tooltip(
-                tooltip,
-                delay = 2.seconds
-            )
-            .clickable(
-                interactionSource = interactionSource,
-                indication = null,
-                onClick = onClick
-            ),
-        contentAlignment = Alignment.Center
+    ToolkitTooltipBox(
+        tooltip = stringResource(tooltip),
+        position = ToolkitTooltipPosition.Below,
+        delay = LONG_TOOLTIP_DELAY
     ) {
-        content(iconColor)
+        Box(
+            modifier = modifier
+                .width(width)
+                .height(height)
+                .background(bgColor)
+                .clickable(
+                    interactionSource = interactionSource,
+                    indication = null,
+                    onClick = onClick
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            content(iconColor)
+        }
     }
 }
 
@@ -341,37 +350,39 @@ private fun CloseWindowControlButton(
         MaterialTheme.colorScheme.onSurface
     }
 
-    Box(
-        modifier = Modifier
-            .width(width)
-            .height(height)
-            .background(bgColor)
-            .tooltip(
-                tooltip,
-                delay = 2.seconds
-            )
-            .clickable(
-                interactionSource = interactionSource,
-                indication = null,
-                onClick = onClick
-            ),
-        contentAlignment = Alignment.Center
+    ToolkitTooltipBox(
+        tooltip = stringResource(tooltip),
+        position = ToolkitTooltipPosition.Below,
+        delay = LONG_TOOLTIP_DELAY
     ) {
-        Canvas(modifier = Modifier.size(10.dp)) {
-            drawLine(
-                color = iconColor,
-                start = Offset.Zero,
-                end = Offset(size.width, size.height),
-                strokeWidth = 1.3f,
-                cap = StrokeCap.Square
-            )
-            drawLine(
-                color = iconColor,
-                start = Offset(size.width, 0f),
-                end = Offset(0f, size.height),
-                strokeWidth = 1.3f,
-                cap = StrokeCap.Square
-            )
+        Box(
+            modifier = Modifier
+                .width(width)
+                .height(height)
+                .background(bgColor)
+                .clickable(
+                    interactionSource = interactionSource,
+                    indication = null,
+                    onClick = onClick
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Canvas(modifier = Modifier.size(10.dp)) {
+                drawLine(
+                    color = iconColor,
+                    start = Offset.Zero,
+                    end = Offset(size.width, size.height),
+                    strokeWidth = 1.3f,
+                    cap = StrokeCap.Square
+                )
+                drawLine(
+                    color = iconColor,
+                    start = Offset(size.width, 0f),
+                    end = Offset(0f, size.height),
+                    strokeWidth = 1.3f,
+                    cap = StrokeCap.Square
+                )
+            }
         }
     }
 }

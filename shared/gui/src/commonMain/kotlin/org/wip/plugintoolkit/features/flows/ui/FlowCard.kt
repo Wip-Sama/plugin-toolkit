@@ -34,7 +34,7 @@ import org.wip.plugintoolkit.shared.components.ToolkitButtonGroup
 import org.wip.plugintoolkit.shared.components.ToolkitCard
 import org.wip.plugintoolkit.shared.components.ToolkitChip
 import org.wip.plugintoolkit.shared.components.ToolkitChipStyle
-import org.wip.plugintoolkit.shared.components.tooltip
+import org.wip.plugintoolkit.shared.components.ToolkitTooltipBox
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.action_copy_flow_clipboard
 import plugintoolkit.composeapp.generated.resources.action_copy_flow_clipboard_tooltip
@@ -240,77 +240,101 @@ internal fun FlowItem(
 
             ToolkitButtonGroup {
                 item { shape, modifierSpec ->
-                    FilledTonalIconButton(
-                        onClick = onExport,
-                        shape = shape,
-                        modifier = modifierSpec.size(ToolkitTheme.dimensions.menuItem)
+                    ToolkitTooltipBox(
+                        tooltip = stringResource(Res.string.action_export_flow_tooltip),
+                        modifier = modifierSpec
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Share,
-                            contentDescription = stringResource(Res.string.action_export_flow),
-                            tint = MaterialTheme.colorScheme.secondary,
-                            modifier = Modifier
-                                .size(ToolkitTheme.dimensions.iconMediumSmall)
-                                .tooltip(Res.string.action_export_flow_tooltip)
-                        )
+                        FilledTonalIconButton(
+                            onClick = onExport,
+                            shape = shape,
+                            modifier = Modifier.size(ToolkitTheme.dimensions.menuItem)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Share,
+                                contentDescription = stringResource(Res.string.action_export_flow),
+                                tint = MaterialTheme.colorScheme.secondary,
+                                modifier = Modifier.size(ToolkitTheme.dimensions.iconMediumSmall)
+                            )
+                        }
                     }
                 }
                 item { shape, modifierSpec ->
-                    FilledTonalIconButton(
-                        onClick = onShareClipboard,
-                        shape = shape,
-                        modifier = modifierSpec.size(ToolkitTheme.dimensions.menuItem)
+                    ToolkitTooltipBox(
+                        tooltip = stringResource(Res.string.action_copy_flow_clipboard_tooltip),
+                        modifier = modifierSpec
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.ContentCopy,
-                            contentDescription = stringResource(Res.string.action_copy_flow_clipboard),
-                            tint = MaterialTheme.colorScheme.secondary,
-                            modifier = Modifier
-                                .size(ToolkitTheme.dimensions.iconMediumSmall)
-                                .tooltip(Res.string.action_copy_flow_clipboard_tooltip)
-                        )
+                        FilledTonalIconButton(
+                            onClick = onShareClipboard,
+                            shape = shape,
+                            modifier = Modifier.size(ToolkitTheme.dimensions.menuItem)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.ContentCopy,
+                                contentDescription = stringResource(Res.string.action_copy_flow_clipboard),
+                                tint = MaterialTheme.colorScheme.secondary,
+                                modifier = Modifier.size(ToolkitTheme.dimensions.iconMediumSmall)
+                            )
+                        }
                     }
                 }
                 item { shape, modifierSpec ->
-                    FilledTonalIconButton(
-                        onClick = onEditMetadata,
-                        shape = shape,
-                        modifier = modifierSpec.size(ToolkitTheme.dimensions.menuItem)
+                    val metadataLabel = stringResource(Res.string.action_edit_metadata)
+                    ToolkitTooltipBox(
+                        tooltip = metadataLabel,
+                        modifier = modifierSpec
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Settings,
-                            contentDescription = stringResource(Res.string.action_edit_metadata),
-                            tint = MaterialTheme.colorScheme.tertiary,
-                            modifier = Modifier.size(ToolkitTheme.dimensions.iconMediumSmall)
-                        )
+                        FilledTonalIconButton(
+                            onClick = onEditMetadata,
+                            shape = shape,
+                            modifier = Modifier.size(ToolkitTheme.dimensions.menuItem)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Settings,
+                                contentDescription = metadataLabel,
+                                tint = MaterialTheme.colorScheme.tertiary,
+                                modifier = Modifier.size(ToolkitTheme.dimensions.iconMediumSmall)
+                            )
+                        }
                     }
                 }
                 item { shape, modifierSpec ->
-                    FilledTonalIconButton(
-                        onClick = onEdit,
-                        shape = shape,
-                        modifier = modifierSpec.size(ToolkitTheme.dimensions.menuItem)
+                    val editLabel = stringResource(Res.string.action_edit)
+                    ToolkitTooltipBox(
+                        tooltip = editLabel,
+                        modifier = modifierSpec
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Edit,
-                            contentDescription = stringResource(Res.string.action_edit),
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(ToolkitTheme.dimensions.iconMediumSmall)
-                        )
+                        FilledTonalIconButton(
+                            onClick = onEdit,
+                            shape = shape,
+                            modifier = Modifier.size(ToolkitTheme.dimensions.menuItem)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Edit,
+                                contentDescription = editLabel,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(ToolkitTheme.dimensions.iconMediumSmall)
+                            )
+                        }
                     }
                 }
                 item { shape, modifierSpec ->
-                    FilledTonalIconButton(
-                        onClick = onDelete,
-                        shape = shape,
-                        modifier = modifierSpec.size(ToolkitTheme.dimensions.menuItem)
+                    val deleteLabel = stringResource(Res.string.action_delete)
+                    ToolkitTooltipBox(
+                        tooltip = deleteLabel,
+                        modifier = modifierSpec
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Delete,
-                            contentDescription = stringResource(Res.string.action_delete),
-                            tint = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.size(ToolkitTheme.dimensions.iconMediumSmall)
-                        )
+                        FilledTonalIconButton(
+                            onClick = onDelete,
+                            shape = shape,
+                            modifier = Modifier.size(ToolkitTheme.dimensions.menuItem)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Delete,
+                                contentDescription = deleteLabel,
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(ToolkitTheme.dimensions.iconMediumSmall)
+                            )
+                        }
                     }
                 }
             }

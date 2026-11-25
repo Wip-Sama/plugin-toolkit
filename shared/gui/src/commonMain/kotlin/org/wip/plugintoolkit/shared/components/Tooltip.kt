@@ -1,5 +1,6 @@
 package org.wip.plugintoolkit.shared.components
 
+import androidx.compose.foundation.MutatePriority
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
@@ -24,6 +25,7 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.onPointerEvent
 import androidx.compose.ui.layout.LayoutCoordinates
@@ -73,21 +75,51 @@ private fun ToolkitTooltipPosition.toAnchorPosition(): TooltipAnchorPosition = w
     ToolkitTooltipPosition.End -> TooltipAnchorPosition.End
 }
 
+/** Standard desktop hover delay before displaying a plain or rich tooltip. */
+val DEFAULT_TOOLTIP_DELAY: Duration = 500.milliseconds
+
+/** Longer desktop hover delay used for chrome/window controls to avoid accidental popups. */
+val LONG_TOOLTIP_DELAY: Duration = 1000.milliseconds
+
 /**
- * Standard Material 3 TooltipBox wrapper supporting plain text hints on hover and keyboard focus.
+ * Standard Material 3 TooltipBox wrapper supporting debounced hover delay and immediate
+ * keyboard focus hints on desktop.
  */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalComposeUiApi::class)
 @Composable
 fun ToolkitTooltipBox(
     tooltip: String?,
     modifier: Modifier = Modifier,
     position: ToolkitTooltipPosition = ToolkitTooltipPosition.Above,
+    delay: Duration = DEFAULT_TOOLTIP_DELAY,
     content: @Composable () -> Unit
 ) {
     if (tooltip.isNullOrBlank()) {
         content()
         return
     }
+
+    val tooltipState = rememberTooltipState(isPersistent = true)
+    var isHovered by remember { mutableStateOf(false) }
+    var isFocused by remember { mutableStateOf(false) }
+
+    LaunchedEffect(isHovered, isFocused, delay) {
+        if (isHovered || isFocused) {
+            if (isHovered && !isFocused && delay > Duration.ZERO) {
+                delay(delay)
+            }
+            tooltipState.show(MutatePriority.Default)
+        } else {
+            tooltipState.dismiss()
+        }
+    }
+
+    DisposableEffect(tooltipState) {
+        onDispose {
+            tooltipState.dismiss()
+        }
+    }
+
     TooltipBox(
         positionProvider = TooltipDefaults.rememberTooltipPositionProvider(position.toAnchorPosition()),
         tooltip = {
@@ -102,24 +134,52 @@ fun ToolkitTooltipBox(
                 )
             }
         },
-        state = rememberTooltipState(),
+        state = tooltipState,
+        enableUserInput = false,
         modifier = modifier
+            .onPointerEvent(PointerEventType.Enter) { isHovered = true }
+            .onPointerEvent(PointerEventType.Exit) { isHovered = false }
+            .onPointerEvent(PointerEventType.Press) { isHovered = false }
+            .onFocusChanged { isFocused = it.hasFocus }
     ) {
         content()
     }
 }
 
 /**
- * Material 3 RichTooltip wrapper supporting custom composable tooltip bodies for inspector badges and ports.
+ * Material 3 RichTooltip wrapper supporting custom composable tooltip bodies with debounced
+ * hover delay and keyboard focus support.
  */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalComposeUiApi::class)
 @Composable
 fun ToolkitRichTooltipBox(
     tooltipContent: @Composable () -> Unit,
     modifier: Modifier = Modifier,
     position: ToolkitTooltipPosition = ToolkitTooltipPosition.Above,
+    delay: Duration = DEFAULT_TOOLTIP_DELAY,
     content: @Composable () -> Unit
 ) {
+    val tooltipState = rememberTooltipState(isPersistent = true)
+    var isHovered by remember { mutableStateOf(false) }
+    var isFocused by remember { mutableStateOf(false) }
+
+    LaunchedEffect(isHovered, isFocused, delay) {
+        if (isHovered || isFocused) {
+            if (isHovered && !isFocused && delay > Duration.ZERO) {
+                delay(delay)
+            }
+            tooltipState.show(MutatePriority.Default)
+        } else {
+            tooltipState.dismiss()
+        }
+    }
+
+    DisposableEffect(tooltipState) {
+        onDispose {
+            tooltipState.dismiss()
+        }
+    }
+
     TooltipBox(
         positionProvider = TooltipDefaults.rememberTooltipPositionProvider(position.toAnchorPosition()),
         tooltip = {
@@ -129,8 +189,13 @@ fun ToolkitRichTooltipBox(
                 tooltipContent()
             }
         },
-        state = rememberTooltipState(),
+        state = tooltipState,
+        enableUserInput = false,
         modifier = modifier
+            .onPointerEvent(PointerEventType.Enter) { isHovered = true }
+            .onPointerEvent(PointerEventType.Exit) { isHovered = false }
+            .onPointerEvent(PointerEventType.Press) { isHovered = false }
+            .onFocusChanged { isFocused = it.hasFocus }
     ) {
         content()
     }
