@@ -15,6 +15,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -36,7 +37,8 @@ fun CustomTitleBar(
     icon: Painter? = painterResource(Res.drawable.app_logo),
     showTitleAndIcon: Boolean = true,
     controller: WindowController? = LocalWindowController.current,
-    isMac: Boolean = PlatformUtils.isMac
+    isMac: Boolean = PlatformUtils.isMac,
+    containerColor: Color = MaterialTheme.colorScheme.surfaceContainerLow
 ) {
     val titleBarHeight = ToolkitTheme.dimensions.titleBarHeight
 
@@ -44,7 +46,7 @@ fun CustomTitleBar(
         modifier = modifier
             .fillMaxWidth()
             .height(titleBarHeight)
-            .background(MaterialTheme.colorScheme.surfaceContainerLow),
+            .background(containerColor),
         verticalAlignment = Alignment.CenterVertically
     ) {
         // macOS: Traffic light controls on the left

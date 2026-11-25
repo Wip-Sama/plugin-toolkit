@@ -100,7 +100,7 @@ class ThemeTest {
         val dimensions = Dimensions()
         assertEquals(80.dp, dimensions.sidebarCollapsedWidth)
         assertEquals(250.dp, dimensions.sidebarExpandedWidth)
-        assertEquals(2.dp, dimensions.cardElevation)
+        assertEquals(0.dp, dimensions.cardElevation)
     }
 
     @Test

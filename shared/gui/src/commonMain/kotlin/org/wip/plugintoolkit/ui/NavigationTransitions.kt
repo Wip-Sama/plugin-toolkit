@@ -10,6 +10,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.scene.Scene
 
@@ -26,14 +27,18 @@ fun <T : Any> desktopNavTransitionSpec(): AnimatedContentTransitionScope<Scene<T
 
 /**
  * Creates a [NavEntry] with an opaque background to prevent visual bleed-through and ghosting.
+ * Defaults to [MaterialTheme.colorScheme.surface] (matching the content canvas tray), and accepts
+ * an explicit [containerColor] so nested routes inside rounded detail panes match their host surface
+ * without creating sharp-cornered inner rectangles.
  */
 fun <T : Any> opaqueNavEntry(
     key: T,
+    containerColor: Color? = null,
     content: @Composable () -> Unit
 ): NavEntry<T> = NavEntry(key) {
     Surface(
         modifier = Modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background
+        color = containerColor ?: MaterialTheme.colorScheme.surface
     ) {
         content()
     }

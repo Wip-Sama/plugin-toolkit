@@ -104,6 +104,66 @@ object ColorEngine {
         return Color(graySrgb, graySrgb, graySrgb)
     }
 
+    private const val TONE_DARK_LOWEST = 4f
+    private const val TONE_DARK_SURFACE = 6f
+    private const val TONE_DARK_LOW = 10f
+    private const val TONE_DARK_CONTAINER = 12f
+    private const val TONE_DARK_HIGH = 17f
+    private const val TONE_DARK_HIGHEST = 22f
+
+    private const val TONE_AMOLED_LOW = 4f
+    private const val TONE_AMOLED_CONTAINER = 8f
+    private const val TONE_AMOLED_HIGH = 12f
+    private const val TONE_AMOLED_HIGHEST = 16f
+
+    private const val TONE_LIGHT_LOWEST = 100f
+    private const val TONE_LIGHT_SURFACE = 98f
+    private const val TONE_LIGHT_LOW = 96f
+    private const val TONE_LIGHT_CONTAINER = 94f
+    private const val TONE_LIGHT_HIGH = 92f
+    private const val TONE_LIGHT_HIGHEST = 90f
+
+    private const val STANDARD_NEUTRAL_HUE = 0f
+    private const val STANDARD_NEUTRAL_CHROMA = 0f
+    private const val STANDARD_NEUTRAL_VARIANT_HUE = 260f
+    private const val STANDARD_NEUTRAL_VARIANT_CHROMA = 2f
+
+    private data class TonalSurfacePalette(
+        val background: Color,
+        val surface: Color,
+        val lowest: Color,
+        val low: Color,
+        val container: Color,
+        val high: Color,
+        val highest: Color
+    )
+
+    private fun buildTonalSurfacePalette(
+        neutralTone: (Float) -> Color,
+        isDark: Boolean,
+        isAmoled: Boolean
+    ): TonalSurfacePalette = if (isDark) {
+        TonalSurfacePalette(
+            background = if (isAmoled) Color.Black else neutralTone(TONE_DARK_SURFACE),
+            surface = if (isAmoled) Color.Black else neutralTone(TONE_DARK_SURFACE),
+            lowest = if (isAmoled) Color.Black else neutralTone(TONE_DARK_LOWEST),
+            low = neutralTone(if (isAmoled) TONE_AMOLED_LOW else TONE_DARK_LOW),
+            container = neutralTone(if (isAmoled) TONE_AMOLED_CONTAINER else TONE_DARK_CONTAINER),
+            high = neutralTone(if (isAmoled) TONE_AMOLED_HIGH else TONE_DARK_HIGH),
+            highest = neutralTone(if (isAmoled) TONE_AMOLED_HIGHEST else TONE_DARK_HIGHEST)
+        )
+    } else {
+        TonalSurfacePalette(
+            background = neutralTone(TONE_LIGHT_SURFACE),
+            surface = neutralTone(TONE_LIGHT_SURFACE),
+            lowest = neutralTone(TONE_LIGHT_LOWEST),
+            low = neutralTone(TONE_LIGHT_LOW),
+            container = neutralTone(TONE_LIGHT_CONTAINER),
+            high = neutralTone(TONE_LIGHT_HIGH),
+            highest = neutralTone(TONE_LIGHT_HIGHEST)
+        )
+    }
+
     /**
      * Creates a Material 3 Expressive [ColorScheme] dynamically generated from [seedColor].
      */
@@ -138,15 +198,9 @@ object ColorEngine {
         fun neutralVariantTone(t: Float) = hctToColor(neutralHue, neutralVariantChroma, t)
         fun errorTone(t: Float) = hctToColor(errorHue, errorChroma, t)
 
-        return if (isDark) {
-            val baseBackground = if (isAmoled) Color.Black else neutralTone(6f)
-            val baseSurface = if (isAmoled) Color.Black else neutralTone(6f)
-            val lowest = if (isAmoled) Color.Black else neutralTone(4f)
-            val low = if (isAmoled) neutralTone(4f) else neutralTone(10f)
-            val container = if (isAmoled) neutralTone(8f) else neutralTone(12f)
-            val high = if (isAmoled) neutralTone(12f) else neutralTone(17f)
-            val highest = if (isAmoled) neutralTone(16f) else neutralTone(22f)
+        val surfaces = buildTonalSurfacePalette(::neutralTone, isDark = isDark, isAmoled = isAmoled)
 
+        return if (isDark) {
             darkColorScheme(
                 primary = primaryTone(80f),
                 onPrimary = primaryTone(20f),
@@ -160,17 +214,17 @@ object ColorEngine {
                 onTertiary = tertiaryTone(20f),
                 tertiaryContainer = tertiaryTone(30f),
                 onTertiaryContainer = tertiaryTone(90f),
-                background = baseBackground,
+                background = surfaces.background,
                 onBackground = neutralTone(90f),
-                surface = baseSurface,
+                surface = surfaces.surface,
                 onSurface = neutralTone(90f),
                 surfaceVariant = neutralVariantTone(30f),
                 onSurfaceVariant = neutralVariantTone(80f),
-                surfaceContainerLowest = lowest,
-                surfaceContainerLow = low,
-                surfaceContainer = container,
-                surfaceContainerHigh = high,
-                surfaceContainerHighest = highest,
+                surfaceContainerLowest = surfaces.lowest,
+                surfaceContainerLow = surfaces.low,
+                surfaceContainer = surfaces.container,
+                surfaceContainerHigh = surfaces.high,
+                surfaceContainerHighest = surfaces.highest,
                 outline = neutralVariantTone(60f),
                 outlineVariant = neutralVariantTone(30f),
                 error = errorTone(80f),
@@ -193,17 +247,17 @@ object ColorEngine {
                 onTertiary = tertiaryTone(100f),
                 tertiaryContainer = tertiaryTone(90f),
                 onTertiaryContainer = tertiaryTone(10f),
-                background = neutralTone(98f),
+                background = surfaces.background,
                 onBackground = neutralTone(10f),
-                surface = neutralTone(98f),
+                surface = surfaces.surface,
                 onSurface = neutralTone(10f),
                 surfaceVariant = neutralVariantTone(90f),
                 onSurfaceVariant = neutralVariantTone(30f),
-                surfaceContainerLowest = neutralTone(100f),
-                surfaceContainerLow = neutralTone(96f),
-                surfaceContainer = neutralTone(94f),
-                surfaceContainerHigh = neutralTone(92f),
-                surfaceContainerHighest = neutralTone(90f),
+                surfaceContainerLowest = surfaces.lowest,
+                surfaceContainerLow = surfaces.low,
+                surfaceContainer = surfaces.container,
+                surfaceContainerHigh = surfaces.high,
+                surfaceContainerHighest = surfaces.highest,
                 outline = neutralVariantTone(50f),
                 outlineVariant = neutralVariantTone(80f),
                 error = errorTone(40f),
@@ -217,7 +271,9 @@ object ColorEngine {
 
     /**
      * Creates a standard neutral scheme with [seedColor] applied only to primary accents,
-     * maintaining clean, uncolored surfaces when dynamic theme accenting is disabled.
+     * deriving all surface elevation containers from the same perceptual HCT tonal ladder
+     * as [createExpressiveScheme] (using achromatic neutral chroma) so Light, Dark, and AMOLED
+     * maintain mathematically consistent tonal contrast.
      */
     fun createStandardScheme(seedColor: Color, isDark: Boolean, isAmoled: Boolean = false): ColorScheme {
         val hct = colorToHct(seedColor)
@@ -225,42 +281,38 @@ object ColorEngine {
         val primaryChroma = max(hct.chroma, 40f)
 
         fun primaryTone(t: Float) = hctToColor(primaryHue, primaryChroma, t)
+        fun neutralTone(t: Float) = hctToColor(STANDARD_NEUTRAL_HUE, STANDARD_NEUTRAL_CHROMA, t)
+        fun neutralVariantTone(t: Float) = hctToColor(STANDARD_NEUTRAL_VARIANT_HUE, STANDARD_NEUTRAL_VARIANT_CHROMA, t)
+
+        val surfaces = buildTonalSurfacePalette(::neutralTone, isDark = isDark, isAmoled = isAmoled)
 
         return if (isDark) {
-            val baseBackground = if (isAmoled) Color.Black else Color(0xFF131314)
-            val baseSurface = if (isAmoled) Color.Black else Color(0xFF131314)
-            val lowest = if (isAmoled) Color.Black else Color(0xFF0E0E0F)
-            val low = if (isAmoled) Color(0xFF0F0F10) else Color(0xFF1B1B1C)
-            val container = if (isAmoled) Color(0xFF181819) else Color(0xFF202021)
-            val high = if (isAmoled) Color(0xFF222223) else Color(0xFF2A2A2B)
-            val highest = if (isAmoled) Color(0xFF2D2D2E) else Color(0xFF353536)
-
             darkColorScheme(
                 primary = primaryTone(80f),
                 onPrimary = primaryTone(20f),
                 primaryContainer = primaryTone(30f),
                 onPrimaryContainer = primaryTone(90f),
-                secondary = Color(0xFFC7C6CA),
-                onSecondary = Color(0xFF303033),
-                secondaryContainer = Color(0xFF47464A),
-                onSecondaryContainer = Color(0xFFE4E2E6),
+                secondary = neutralTone(80f),
+                onSecondary = neutralTone(20f),
+                secondaryContainer = neutralTone(30f),
+                onSecondaryContainer = neutralTone(90f),
                 tertiary = Color(0xFFD4C2D8),
                 onTertiary = Color(0xFF382C3D),
                 tertiaryContainer = Color(0xFF504355),
                 onTertiaryContainer = Color(0xFFF1DEEE),
-                background = baseBackground,
-                onBackground = Color(0xFFE4E2E6),
-                surface = baseSurface,
-                onSurface = Color(0xFFE4E2E6),
-                surfaceVariant = Color(0xFF45464F),
-                onSurfaceVariant = Color(0xFFC5C6D0),
-                surfaceContainerLowest = lowest,
-                surfaceContainerLow = low,
-                surfaceContainer = container,
-                surfaceContainerHigh = high,
-                surfaceContainerHighest = highest,
-                outline = Color(0xFF8F909A),
-                outlineVariant = Color(0xFF45464F),
+                background = surfaces.background,
+                onBackground = neutralTone(90f),
+                surface = surfaces.surface,
+                onSurface = neutralTone(90f),
+                surfaceVariant = neutralVariantTone(30f),
+                onSurfaceVariant = neutralVariantTone(80f),
+                surfaceContainerLowest = surfaces.lowest,
+                surfaceContainerLow = surfaces.low,
+                surfaceContainer = surfaces.container,
+                surfaceContainerHigh = surfaces.high,
+                surfaceContainerHighest = surfaces.highest,
+                outline = neutralVariantTone(60f),
+                outlineVariant = neutralVariantTone(30f),
                 error = Color(0xFFFFB4AB),
                 onError = Color(0xFF690005),
                 errorContainer = Color(0xFF93000A),
@@ -273,27 +325,27 @@ object ColorEngine {
                 onPrimary = primaryTone(100f),
                 primaryContainer = primaryTone(90f),
                 onPrimaryContainer = primaryTone(10f),
-                secondary = Color(0xFF5E5E62),
-                onSecondary = Color.White,
-                secondaryContainer = Color(0xFFE3E2E6),
-                onSecondaryContainer = Color(0xFF1B1B1F),
+                secondary = neutralTone(40f),
+                onSecondary = neutralTone(100f),
+                secondaryContainer = neutralTone(90f),
+                onSecondaryContainer = neutralTone(10f),
                 tertiary = Color(0xFF6B5B70),
                 onTertiary = Color.White,
                 tertiaryContainer = Color(0xFFF4DDF8),
                 onTertiaryContainer = Color(0xFF25182B),
-                background = Color(0xFFF9F9FC),
-                onBackground = Color(0xFF1A1C1E),
-                surface = Color(0xFFF9F9FC),
-                onSurface = Color(0xFF1A1C1E),
-                surfaceVariant = Color(0xFFE1E2EC),
-                onSurfaceVariant = Color(0xFF44474F),
-                surfaceContainerLowest = Color.White,
-                surfaceContainerLow = Color(0xFFF3F3F6),
-                surfaceContainer = Color(0xFFEDEDF0),
-                surfaceContainerHigh = Color(0xFFE7E8EB),
-                surfaceContainerHighest = Color(0xFFE2E2E5),
-                outline = Color(0xFF757780),
-                outlineVariant = Color(0xFFC5C6D0),
+                background = surfaces.background,
+                onBackground = neutralTone(10f),
+                surface = surfaces.surface,
+                onSurface = neutralTone(10f),
+                surfaceVariant = neutralVariantTone(90f),
+                onSurfaceVariant = neutralVariantTone(30f),
+                surfaceContainerLowest = surfaces.lowest,
+                surfaceContainerLow = surfaces.low,
+                surfaceContainer = surfaces.container,
+                surfaceContainerHigh = surfaces.high,
+                surfaceContainerHighest = surfaces.highest,
+                outline = neutralVariantTone(50f),
+                outlineVariant = neutralVariantTone(80f),
                 error = Color(0xFFBA1A1A),
                 onError = Color.White,
                 errorContainer = Color(0xFFFFDAD6),

@@ -1,6 +1,7 @@
 package org.wip.plugintoolkit
 
 import androidx.compose.foundation.ComposeFoundationFlags
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.CompositionLocalProvider
@@ -571,7 +572,8 @@ fun runMain(
                     window.minimumSize = Dimension(WINDOW_MIN_WIDTH, WINDOW_MIN_HEIGHT)
                     val notificationService = getKoin().get<NotificationService>()
 
-                    LaunchedEffect(useCustomTitleBar) {
+                    val isSystemDark = isSystemInDarkTheme()
+                    LaunchedEffect(useCustomTitleBar, appSettings.appearance.theme, isSystemDark) {
                         if (useCustomTitleBar) {
                             // Initialize window for custom chrome: enables Win32 styles for Aero Snap,
                             // subclasses WndProc for WM_NCCALCSIZE (removes native title bar), and
@@ -581,7 +583,7 @@ fun runMain(
                             val isDark = when (appSettings.appearance.theme) {
                                 AppTheme.Dark, AppTheme.Amoled -> true
                                 AppTheme.Light -> false
-                                AppTheme.System -> true
+                                AppTheme.System -> isSystemDark
                             }
                             WindowFrameUtils.setNativeTitleBarTheme(
                                 window = window,
