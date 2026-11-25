@@ -52,10 +52,15 @@ import org.wip.plugintoolkit.features.navigation.model.Screen
 import org.wip.plugintoolkit.features.settings.model.AppSettings
 import org.wip.plugintoolkit.features.settings.model.AppearanceSettings
 import org.wip.plugintoolkit.features.settings.model.SidebarStartMode
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
+import androidx.compose.ui.unit.LayoutDirection
 import org.wip.plugintoolkit.shared.components.AdaptiveAppBarOverflowButton
 import org.wip.plugintoolkit.shared.components.AdaptiveConstrainedContent
 import org.wip.plugintoolkit.shared.components.AdaptivePaneHeader
 import org.wip.plugintoolkit.shared.components.adaptiveOuterHorizontalPadding
+import org.wip.plugintoolkit.shared.components.adaptiveWorkspacePadding
 import org.wip.plugintoolkit.shared.components.rememberAdaptivePaneScaffoldDirective
 import org.wip.plugintoolkit.shared.components.sidebar.SidebarElement
 import org.wip.plugintoolkit.shared.components.sidebar.SidebarSectionData
@@ -91,22 +96,30 @@ class AdaptiveLayoutAndNavigationTest {
         var mediumPlusSpacer: Dp = 0.dp
         var mediumPlusOuter: Dp = 0.dp
         var compactOuter: Dp = 0.dp
+        var desktopWorkspacePadding = PaddingValues(0.dp)
+        var compactWorkspacePadding = PaddingValues(0.dp)
 
         composeTestRule.setContent {
             AppTheme(appearance = AppearanceSettings()) {
                 CompositionLocalProvider(LocalDensity provides Density(1f)) {
                     mediumPlusSpacer = rememberAdaptivePaneScaffoldDirective().horizontalPartitionSpacerSize
                     mediumPlusOuter = adaptiveOuterHorizontalPadding()
+                    desktopWorkspacePadding = adaptiveWorkspacePadding()
                 }
                 CompositionLocalProvider(LocalDensity provides Density(2.5f)) {
                     compactOuter = adaptiveOuterHorizontalPadding()
+                    compactWorkspacePadding = adaptiveWorkspacePadding()
                 }
             }
         }
 
-        assertEquals(24.dp, mediumPlusSpacer)
+        assertEquals(12.dp, mediumPlusSpacer)
         assertEquals(24.dp, mediumPlusOuter)
         assertEquals(16.dp, compactOuter)
+        assertEquals(12.dp, desktopWorkspacePadding.calculateStartPadding(LayoutDirection.Ltr))
+        assertEquals(16.dp, desktopWorkspacePadding.calculateEndPadding(LayoutDirection.Ltr))
+        assertEquals(12.dp, desktopWorkspacePadding.calculateTopPadding())
+        assertEquals(8.dp, compactWorkspacePadding.calculateStartPadding(LayoutDirection.Ltr))
     }
 
     @Test

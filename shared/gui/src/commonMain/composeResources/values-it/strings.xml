@@ -1145,4 +1145,10 @@
     <string name="sdui_media_unmute">Attiva audio</string>
     <string name="sdui_media_video_preview_only">Anteprima desktop integrata</string>
     <string name="sdui_media_audio_unavailable">Flusso audio non supportato</string>
+    <string name="sidebar_sequel_expand">Espandi barra laterale divisa</string>
+    <string name="sidebar_sequel_collapse">Comprimi barra laterale divisa</string>
+    <string name="flow_palette_collapse">Comprimi pannello nodi</string>
+    <string name="flow_palette_expand">Mostra pannello nodi</string>
+    <string name="flow_palette_drop_on_board">Rilascia per aggiungere il nodo</string>
+    <string name="flow_palette_drag_to_board">Trascina sulla lavagna per posizionare</string>
 </resources>

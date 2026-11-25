@@ -1149,4 +1149,10 @@
     <string name="sdui_media_unmute">Unmute audio</string>
     <string name="sdui_media_video_preview_only">Embedded desktop preview</string>
     <string name="sdui_media_audio_unavailable">Unsupported audio stream</string>
+    <string name="sidebar_sequel_expand">Expand split sidebar</string>
+    <string name="sidebar_sequel_collapse">Collapse split sidebar</string>
+    <string name="flow_palette_collapse">Collapse node palette</string>
+    <string name="flow_palette_expand">Show node palette</string>
+    <string name="flow_palette_drop_on_board">Drop to add node</string>
+    <string name="flow_palette_drag_to_board">Drag onto board to place</string>
 </resources>
