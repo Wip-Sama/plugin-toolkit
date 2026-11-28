@@ -19,7 +19,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FloatingToolbarDefaults
-import androidx.compose.material3.HorizontalFloatingToolbar
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalMinimumInteractiveComponentSize
@@ -77,25 +76,22 @@ internal fun FlowEditorTopBar(
     val dimensions = ToolkitTheme.dimensions
     val spacing = ToolkitTheme.spacing
 
-    HorizontalFloatingToolbar(
-        expanded = true,
+    Surface(
         modifier = modifier
             .padding(spacing.medium)
             .testTag("flow_editor_top_bar"),
         shape = FloatingToolbarDefaults.ContainerShape,
-        colors = FloatingToolbarDefaults.standardFloatingToolbarColors(
-            toolbarContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh
-        ),
-        contentPadding = PaddingValues(
-            horizontal = spacing.medium,
-            vertical = spacing.extraSmall
-        ),
-        expandedShadowElevation = dimensions.elevationMedium
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        shadowElevation = dimensions.elevationMedium
     ) {
         CompositionLocalProvider(
             LocalMinimumInteractiveComponentSize provides dimensions.desktopTouchTargetSize
         ) {
             Row(
+                modifier = Modifier.padding(
+                    horizontal = spacing.medium,
+                    vertical = spacing.extraSmall
+                ),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(spacing.small)
             ) {

@@ -42,6 +42,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
@@ -200,8 +204,14 @@ fun <K> ToolkitFloatingSidebar(
         shadowElevation = shadowElevation
     ) {
         if (!animateSequelWidth && sequelContent != null) {
+            val defaultPrimaryWidth = ToolkitTheme.dimensions.floatingSidebarDefaultWidth
+            var anchoredPrimaryWidth by remember { mutableStateOf(defaultPrimaryWidth) }
+
             BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
                 val minPrimaryWidth = ToolkitTheme.dimensions.floatingSidebarMinWidth.coerceAtMost(maxWidth)
+                if (!isSequelComposed && maxWidth >= minPrimaryWidth) {
+                    anchoredPrimaryWidth = maxWidth.coerceIn(minPrimaryWidth, defaultPrimaryWidth)
+                }
                 val availableForSequel = (maxWidth - minPrimaryWidth).coerceAtLeast(ToolkitTheme.spacing.none)
                 val renderedSequelWidth = if (maxWidth >= ToolkitTheme.dimensions.floatingSidebarMinTwoColumnWidth) {
                     minOf(sequelWidth, availableForSequel)
@@ -209,7 +219,12 @@ fun <K> ToolkitFloatingSidebar(
                     sequelWidth
                 }
                 val primaryWidth = if (isSequelComposed) {
-                    (maxWidth - renderedSequelWidth).coerceIn(minPrimaryWidth, maxWidth)
+                    val fullSplitWidth = anchoredPrimaryWidth + renderedSequelWidth
+                    if (maxWidth >= fullSplitWidth) {
+                        (maxWidth - renderedSequelWidth).coerceIn(minPrimaryWidth, maxWidth)
+                    } else {
+                        anchoredPrimaryWidth.coerceAtMost(maxWidth)
+                    }
                 } else {
                     maxWidth
                 }

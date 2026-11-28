@@ -356,4 +356,48 @@ class ToolkitFloatingSidebarTest {
         )
         composeTestRule.onNodeWithText("Capabilities Column").assertIsDisplayed()
     }
+
+    @Test
+    fun primaryColumnWidthStaysAnchoredDuringOneToTwoColumnExpansion() {
+        var containerWidth by mutableStateOf(300.dp)
+        var sequelVisible by mutableStateOf(false)
+
+        composeTestRule.setContent {
+            AppTheme(appearance = AppearanceSettings()) {
+                CompositionLocalProvider(LocalDensity provides Density(1f)) {
+                    ToolkitFloatingSidebar(
+                        navigationKey = "plugins",
+                        animateSequelWidth = false,
+                        sequelVisible = sequelVisible,
+                        sequelContent = { Text("Sequel Column") },
+                        modifier = Modifier.width(containerWidth).height(500.dp)
+                    ) {
+                        Text("Primary Column")
+                    }
+                }
+            }
+        }
+
+        composeTestRule.waitForIdle()
+        val initialPrimaryBounds = composeTestRule.onNodeWithTag("toolkit_floating_sidebar_primary").getUnclippedBoundsInRoot()
+        assertEquals(300f, initialPrimaryBounds.right.value - initialPrimaryBounds.left.value, 1f)
+
+        // Frame 1 of expansion: sequel becomes visible while container is still 300dp -> primary MUST stay 300dp (not jump to 240dp!)
+        sequelVisible = true
+        composeTestRule.waitForIdle()
+        val frame1PrimaryBounds = composeTestRule.onNodeWithTag("toolkit_floating_sidebar_primary").getUnclippedBoundsInRoot()
+        assertEquals(300f, frame1PrimaryBounds.right.value - frame1PrimaryBounds.left.value, 1f)
+
+        // Mid-expansion (430dp) and full split (560dp): primary stays anchored at 300dp while sequel reveals on the right
+        containerWidth = 430.dp
+        composeTestRule.waitForIdle()
+        val midPrimaryBounds = composeTestRule.onNodeWithTag("toolkit_floating_sidebar_primary").getUnclippedBoundsInRoot()
+        assertEquals(300f, midPrimaryBounds.right.value - midPrimaryBounds.left.value, 1f)
+
+        containerWidth = 560.dp
+        composeTestRule.waitForIdle()
+        val settledPrimaryBounds = composeTestRule.onNodeWithTag("toolkit_floating_sidebar_primary").getUnclippedBoundsInRoot()
+        assertEquals(300f, settledPrimaryBounds.right.value - settledPrimaryBounds.left.value, 1f)
+        composeTestRule.onNodeWithText("Sequel Column").assertIsDisplayed()
+    }
 }

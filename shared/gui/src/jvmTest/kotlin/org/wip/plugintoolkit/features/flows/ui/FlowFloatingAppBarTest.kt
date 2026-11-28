@@ -217,9 +217,14 @@ class FlowFloatingAppBarTest {
         val hostCenterX = (hostBounds.left.value + hostBounds.right.value) / 2f
         val topBarBounds = onNodeWithTag("flow_editor_top_bar").getUnclippedBoundsInRoot()
         val topBarCenterX = (topBarBounds.left.value + topBarBounds.right.value) / 2f
+        val topBarHeight = topBarBounds.bottom.value - topBarBounds.top.value
         assertTrue(
             abs(topBarCenterX - hostCenterX) <= 2f,
             "Expected FlowEditorTopBar horizontal center near ${hostCenterX}dp, got $topBarCenterX"
+        )
+        assertTrue(
+            topBarHeight <= 60f,
+            "Expected FlowEditorTopBar to render as a sleek bar (height <= 60dp), got $topBarHeight"
         )
     }
 

@@ -177,7 +177,7 @@ data class Dimensions(
     val floatingSidebarMinWidth: Dp = 240.dp,
     val floatingSidebarSequelWidth: Dp = 260.dp,
     val floatingSidebarMinTwoColumnWidth: Dp = 480.dp,
-    val floatingSidebarSplitTotalWidth: Dp = 540.dp,
+    val floatingSidebarSplitTotalWidth: Dp = 560.dp,
     val paneDividerHandleThickness: Dp = 14.dp,
     val paneCollapseDragThreshold: Dp = 64.dp,
     val paneVerticalCollapseDragThreshold: Dp = 52.dp,
