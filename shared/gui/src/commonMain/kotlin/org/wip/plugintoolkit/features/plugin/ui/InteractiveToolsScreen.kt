@@ -7,6 +7,7 @@ import androidx.compose.material3.adaptive.navigation.rememberListDetailPaneScaf
 import org.wip.plugintoolkit.shared.components.AdaptiveBackNavigationButton
 import org.wip.plugintoolkit.shared.components.ToolkitAdaptiveListDetailWorkspace
 import org.wip.plugintoolkit.shared.components.rememberAdaptivePaneScaffoldDirective
+import org.wip.plugintoolkit.shared.components.sidebar.SequelSidebarHysteresis
 import org.wip.plugintoolkit.shared.components.sidebar.SequelSidebarMode
 import org.wip.plugintoolkit.shared.components.sidebar.isLargeAdaptiveWidth
 import org.wip.plugintoolkit.shared.components.sidebar.resolveSequelExpanded
@@ -171,10 +172,12 @@ fun InteractiveToolsScreen(
             if (appSettings.appearance.compactPanelsByDefault) SequelSidebarMode.ForcedCompact else SequelSidebarMode.Auto
         )
     }
+    var dragSequelOverride by remember { mutableStateOf<Boolean?>(null) }
     val isLargeWidth = isLargeAdaptiveWidth()
-    val isSequelExpanded = resolveSequelExpanded(sequelMode, isLargeWidth) &&
+    val targetSequelExpanded = resolveSequelExpanded(sequelMode, isLargeWidth) &&
         (selectedPluginId != null || sequelMode == SequelSidebarMode.ForcedExpanded)
-    val listPaneWidth = if (isSequelExpanded) {
+    val isSequelExpanded = dragSequelOverride ?: targetSequelExpanded
+    val listPaneWidth = if (targetSequelExpanded) {
         ToolkitTheme.dimensions.floatingSidebarSplitTotalWidth
     } else {
         ToolkitTheme.dimensions.floatingSidebarDefaultWidth
@@ -182,11 +185,21 @@ fun InteractiveToolsScreen(
 
     ToolkitAdaptiveListDetailWorkspace<String>(
         listPaneWidth = listPaneWidth,
+        onLiveListPaneWidthChanged = { draggedWidth ->
+            val nextSplit = SequelSidebarHysteresis.resolveFromDraggedWidth(
+                isCurrentlySplit = isSequelExpanded,
+                draggedWidth = draggedWidth
+            )
+            if (nextSplit != isSequelExpanded) {
+                dragSequelOverride = nextSplit
+            }
+        },
         listPane = { navigator ->
             DirectExecutionSidebar(
                 loadedPlugins = loadedPlugins,
                 selectedPluginId = selectedPluginId,
                 onPluginSelected = { pluginId ->
+                    dragSequelOverride = null
                     selectedPluginId = pluginId
                     val pluginTools = tools.filter { it.plugin.getManifest().getOrNull()?.plugin?.id == pluginId }
                     if (pluginTools.size == 1 && selectedTool == null) {
@@ -198,6 +211,7 @@ fun InteractiveToolsScreen(
                     }
                 },
                 onBackToPlugins = {
+                    dragSequelOverride = null
                     selectedPluginId = null
                 },
                 selectedCapability = if (selectedTool?.plugin?.getManifest()?.getOrNull()?.plugin?.id == selectedPluginId) {
@@ -221,6 +235,7 @@ fun InteractiveToolsScreen(
                 isInteractiveOnly = true,
                 isSequelExpanded = isSequelExpanded,
                 onToggleSequelMode = {
+                    dragSequelOverride = null
                     sequelMode = toggleSequelSidebarMode(isSequelExpanded)
                 },
                 fillPaneWidth = true

@@ -430,9 +430,6 @@ fun ToolkitResizableCollapsiblePane(
 
         val renderedSizeDp = animatedSizeDp.value.coerceAtLeast(0f).dp
         val latestOnLiveSize by rememberUpdatedState(onLivePaneSizeChanged)
-        LaunchedEffect(renderedSizeDp) {
-            latestOnLiveSize?.invoke(renderedSizeDp)
-        }
 
         val latestOnExpandedChange by rememberUpdatedState(onExpandedChange)
         val latestMinDp by rememberUpdatedState(effectiveMinDp)
@@ -492,6 +489,7 @@ fun ToolkitResizableCollapsiblePane(
                             )
                         }
                     } else if (next.isExpanded) {
+                        latestOnLiveSize?.invoke(next.visibleSizeDp.dp)
                         scope.launch {
                             animatedSizeDp.snapTo(next.visibleSizeDp)
                         }
@@ -507,6 +505,9 @@ fun ToolkitResizableCollapsiblePane(
                         magneticSnapDp = magneticSnapThreshold.value
                     )
                     dragSnapshot = settled
+                    if (settled.isExpanded) {
+                        latestOnLiveSize?.invoke(settled.visibleSizeDp.dp)
+                    }
                     scope.launch {
                         animatedSizeDp.animateTo(
                             targetValue = settled.visibleSizeDp,

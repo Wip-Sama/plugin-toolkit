@@ -31,6 +31,7 @@ import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.plugin.viewmodel.PluginViewModel
 import org.wip.plugintoolkit.shared.components.AdaptiveBackNavigationButton
 import org.wip.plugintoolkit.shared.components.ToolkitAdaptiveListDetailWorkspace
+import org.wip.plugintoolkit.shared.components.sidebar.SequelSidebarHysteresis
 import org.wip.plugintoolkit.shared.components.sidebar.SequelSidebarMode
 import org.wip.plugintoolkit.shared.components.sidebar.isLargeAdaptiveWidth
 import org.wip.plugintoolkit.shared.components.sidebar.resolveSequelExpanded
@@ -84,10 +85,12 @@ fun PluginSectionScreen(
             if (compactPanelsByDefault) SequelSidebarMode.ForcedCompact else SequelSidebarMode.Auto
         )
     }
+    var dragSequelOverride by remember { mutableStateOf<Boolean?>(null) }
     val isLargeWidth = isLargeAdaptiveWidth()
-    val isSequelExpanded = resolveSequelExpanded(sequelMode, isLargeWidth) &&
+    val targetSequelExpanded = resolveSequelExpanded(sequelMode, isLargeWidth) &&
         (selectedPluginId != null || sequelMode == SequelSidebarMode.ForcedExpanded)
-    val listPaneWidth = if (isSequelExpanded) {
+    val isSequelExpanded = dragSequelOverride ?: targetSequelExpanded
+    val listPaneWidth = if (targetSequelExpanded) {
         ToolkitTheme.dimensions.floatingSidebarSplitTotalWidth
     } else {
         ToolkitTheme.dimensions.floatingSidebarDefaultWidth
@@ -96,11 +99,21 @@ fun PluginSectionScreen(
 
     ToolkitAdaptiveListDetailWorkspace<String>(
         listPaneWidth = listPaneWidth,
+        onLiveListPaneWidthChanged = { draggedWidth ->
+            val nextSplit = SequelSidebarHysteresis.resolveFromDraggedWidth(
+                isCurrentlySplit = isSequelExpanded,
+                draggedWidth = draggedWidth
+            )
+            if (nextSplit != isSequelExpanded) {
+                dragSequelOverride = nextSplit
+            }
+        },
         listPane = { navigator ->
             DirectExecutionSidebar(
                 loadedPlugins = loadedPlugins,
                 selectedPluginId = selectedPluginId,
                 onPluginSelected = { id ->
+                    dragSequelOverride = null
                     val plugin = loadedPlugins.find { it.getManifest().getOrNull()?.plugin?.id == id }
                     if (plugin != null && viewModel.selectedPlugin != plugin) {
                         viewModel.selectPlugin(plugin)
@@ -110,6 +123,7 @@ fun PluginSectionScreen(
                     }
                 },
                 onBackToPlugins = {
+                    dragSequelOverride = null
                     if (backStack.any { it is PluginNavKey.PluginList }) {
                         while (backStack.lastOrNull() !is PluginNavKey.PluginList) {
                             backStack.removeLast()
@@ -127,6 +141,7 @@ fun PluginSectionScreen(
                 },
                 isSequelExpanded = isSequelExpanded,
                 onToggleSequelMode = {
+                    dragSequelOverride = null
                     sequelMode = toggleSequelSidebarMode(isSequelExpanded)
                 },
                 fillPaneWidth = true

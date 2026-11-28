@@ -1,10 +1,16 @@
 package org.wip.plugintoolkit.features.plugin.sdui
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.v2.runComposeUiTest
+import androidx.compose.ui.unit.dp
 import kotlinx.serialization.json.Json
 import org.wip.plugintoolkit.api.sdui.ErrorBoundaryNode
 import org.wip.plugintoolkit.api.sdui.SidebarAttachPoint
@@ -112,5 +118,51 @@ class SduiSequelSidebarTest {
         onNodeWithTag("sequel_sidebar_toggle").performClick()
         waitForIdle()
         onNodeWithText("Sequel Content").assertIsDisplayed()
+    }
+
+    @Test
+    fun collapsibleSduiSidebarSupportsDragToCollapseAndDragToExpand() = runComposeUiTest {
+        val tree = uiTree {
+            sidebar(
+                id = "drag_sb",
+                attachPoint = SidebarAttachPoint.LEFT,
+                title = "Collapsible Sidebar",
+                isCollapsible = true
+            ) {
+                text(id = "body_txt", text = "Sidebar Body Content")
+            }
+        }
+
+        setContent {
+            AppTheme(appearance = AppearanceSettings()) {
+                Box(modifier = Modifier.size(900.dp, 600.dp)) {
+                    SafeUiNodeRenderer(
+                        node = tree.root,
+                        onEvent = {}
+                    )
+                }
+            }
+        }
+
+        waitForIdle()
+        onNodeWithText("Sidebar Body Content").assertIsDisplayed()
+
+        // Drag the resize handle far left past min width + collapse threshold
+        onNodeWithTag("sdui_sidebar_resize_handle_drag_sb").performTouchInput {
+            down(center)
+            moveBy(Offset(-300f, 0f))
+            up()
+        }
+        waitForIdle()
+        onNodeWithText("Sidebar Body Content").assertDoesNotExist()
+
+        // Drag outward right to expand back open
+        onNodeWithTag("sdui_sidebar_resize_handle_drag_sb").performTouchInput {
+            down(center)
+            moveBy(Offset(140f, 0f))
+            up()
+        }
+        waitForIdle()
+        onNodeWithText("Sidebar Body Content").assertIsDisplayed()
     }
 }

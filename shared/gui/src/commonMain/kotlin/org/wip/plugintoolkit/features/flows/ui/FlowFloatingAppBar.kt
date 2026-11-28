@@ -1,8 +1,5 @@
 package org.wip.plugintoolkit.features.flows.ui
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -10,7 +7,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -18,6 +15,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Colorize
@@ -31,21 +29,25 @@ import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilledTonalIconToggleButton
 import androidx.compose.material3.FloatingToolbarDefaults
 import androidx.compose.material3.HorizontalFloatingToolbar
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TooltipAnchorPosition
+import androidx.compose.material3.TooltipDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -53,13 +55,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.LayoutCoordinates
-import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 import org.jetbrains.compose.resources.stringResource
@@ -68,49 +71,56 @@ import org.wip.plugintoolkit.features.colorpicker.ui.ColorPickerDialog
 import org.wip.plugintoolkit.features.colorpicker.utils.toHex
 import org.wip.plugintoolkit.features.flows.ui.components.FlowControlsInfoCard
 import org.wip.plugintoolkit.features.settings.model.ConnectionCurveStyle
-import org.wip.plugintoolkit.shared.components.LocalTooltipState
+import org.wip.plugintoolkit.features.settings.model.OrthogonalStepMode
+import org.wip.plugintoolkit.shared.components.ToolkitConnectedToggleGroup
+import org.wip.plugintoolkit.shared.components.ToolkitToggleOption
 import org.wip.plugintoolkit.shared.components.ToolkitTooltipBox
 import org.wip.plugintoolkit.shared.components.ToolkitTooltipPosition
 import org.wip.plugintoolkit.shared.components.ZoomControls
 import org.wip.plugintoolkit.shared.components.plugin.inputs.parseColorString
-import org.wip.plugintoolkit.shared.components.tooltip
 import plugintoolkit.composeapp.generated.resources.Res
-import plugintoolkit.composeapp.generated.resources.action_close
-import plugintoolkit.composeapp.generated.resources.flow_connection_style_bezier
 import plugintoolkit.composeapp.generated.resources.flow_connection_style_cardinal
 import plugintoolkit.composeapp.generated.resources.flow_connection_style_orthogonal
 import plugintoolkit.composeapp.generated.resources.flow_connection_style_straight
 import plugintoolkit.composeapp.generated.resources.flow_export_image_title
 import plugintoolkit.composeapp.generated.resources.flow_export_image_tooltip
 import plugintoolkit.composeapp.generated.resources.flow_info_button_tooltip
+import plugintoolkit.composeapp.generated.resources.flow_orthogonal_port_lead
+import plugintoolkit.composeapp.generated.resources.flow_orthogonal_step_after
+import plugintoolkit.composeapp.generated.resources.flow_orthogonal_step_auto
+import plugintoolkit.composeapp.generated.resources.flow_orthogonal_step_before
+import plugintoolkit.composeapp.generated.resources.flow_orthogonal_step_middle
+import plugintoolkit.composeapp.generated.resources.flow_orthogonal_step_mode
 import plugintoolkit.composeapp.generated.resources.flow_toolbar_add_group
 import plugintoolkit.composeapp.generated.resources.flow_toolbar_add_label
 import plugintoolkit.composeapp.generated.resources.flow_toolbar_advanced_connections
 import plugintoolkit.composeapp.generated.resources.flow_toolbar_colors_in_flow
 import plugintoolkit.composeapp.generated.resources.flow_toolbar_eyedropper
 import plugintoolkit.composeapp.generated.resources.flow_toolbar_hide_connection_points
+import plugintoolkit.composeapp.generated.resources.flow_toolbar_no_custom_colors
 import plugintoolkit.composeapp.generated.resources.flow_toolbar_paint
 import plugintoolkit.composeapp.generated.resources.flow_toolbar_palette_quick
 import plugintoolkit.composeapp.generated.resources.flow_toolbar_pick_color
 import plugintoolkit.composeapp.generated.resources.flow_toolbar_roundness
 import plugintoolkit.composeapp.generated.resources.flow_toolbar_spline_style
 import plugintoolkit.composeapp.generated.resources.flow_toolbar_wash
-import plugintoolkit.composeapp.generated.resources.flow_orthogonal_step_mode
-import plugintoolkit.composeapp.generated.resources.flow_orthogonal_step_auto
-import plugintoolkit.composeapp.generated.resources.flow_orthogonal_step_middle
-import plugintoolkit.composeapp.generated.resources.flow_orthogonal_step_before
-import plugintoolkit.composeapp.generated.resources.flow_orthogonal_step_after
-import plugintoolkit.composeapp.generated.resources.flow_orthogonal_port_lead
-import org.wip.plugintoolkit.features.settings.model.OrthogonalStepMode
 import kotlin.math.roundToInt
 
 private const val DEFAULT_PAINT_COLOR = "#4CAF50"
+private const val MAX_FLOW_SWATCHES = 8
+private val QUICK_PALETTE_PRESET_COLORS = listOf(
+    "#4CAF50", "#2196F3", "#FF9800", "#F44336",
+    "#9C27B0", "#00BCD4", "#E91E63", "#607D8B"
+)
 
 /**
- * Material 3 Floating App Bar (Toolbar) for the Flow Editor canvas.
- * Consolidates Add Group, Add Label, Paint Tool, Wash Brush, Eyedropper, Spline Settings, Info, and Zoom Controls.
+ * Material 3 Expressive floating toolbar for the Flow Editor canvas.
+ *
+ * Remains always expanded and bottom-centered on the canvas for 1-click desktop accessibility,
+ * with vertically centered controls, shape-morphing tonal toggles, delayed tooltips, anchored
+ * popovers, and a matching-height [ZoomControls] pill.
  */
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun FlowFloatingAppBar(
     scale: Float,
@@ -146,10 +156,16 @@ fun FlowFloatingAppBar(
     val dimensions = ToolkitTheme.dimensions
     val spacing = ToolkitTheme.spacing
     val shapes = ToolkitTheme.shapes
-    val tooltipState = LocalTooltipState.current
 
     var showColorPicker by remember { mutableStateOf(false) }
+    var showQuickPalette by remember { mutableStateOf(false) }
     var showSplineSettings by remember { mutableStateOf(false) }
+    var showControlsInfo by remember { mutableStateOf(false) }
+
+    val abovePopoverPositionProvider = TooltipDefaults.rememberTooltipPositionProvider(
+        positioning = TooltipAnchorPosition.Above,
+        spacingBetweenTooltipAndAnchor = spacing.small
+    )
 
     val currentColor = if (!activePaintColor.isNullOrBlank()) {
         parseColorString(activePaintColor)
@@ -162,312 +178,251 @@ fun FlowFloatingAppBar(
         modifier = modifier
             .padding(spacing.medium)
             .testTag("flow_floating_app_bar"),
-        shape = shapes.large,
+        shape = FloatingToolbarDefaults.ContainerShape,
         colors = FloatingToolbarDefaults.standardFloatingToolbarColors(
             toolbarContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh
         ),
+        contentPadding = PaddingValues(
+            horizontal = spacing.small,
+            vertical = spacing.extraSmall
+        ),
         expandedShadowElevation = dimensions.elevationMedium
     ) {
-            if (!isReadOnly) {
-                // 1. Add Group button
-                val addGroupLabel = stringResource(Res.string.flow_toolbar_add_group)
-                ToolkitTooltipBox(tooltip = addGroupLabel, position = ToolkitTooltipPosition.Above) {
-                    IconButton(
+        CompositionLocalProvider(
+            LocalMinimumInteractiveComponentSize provides dimensions.desktopTouchTargetSize
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(spacing.extraSmall)
+            ) {
+                if (!isReadOnly) {
+                    // 1. Canvas authoring actions
+                    ToolbarActionIconButton(
+                        icon = Icons.Default.Layers,
+                        tooltip = stringResource(Res.string.flow_toolbar_add_group),
                         onClick = onAddGroup,
-                        modifier = Modifier
-                            .size(dimensions.standardButtonHeight)
-                            .testTag("toolbar_add_group")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Layers,
-                            contentDescription = addGroupLabel,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(dimensions.iconSmall)
-                        )
-                    }
-                }
+                        testTag = "toolbar_add_group"
+                    )
 
-                // 2. Add Label button
-                val addLabelText = stringResource(Res.string.flow_toolbar_add_label)
-                ToolkitTooltipBox(tooltip = addLabelText, position = ToolkitTooltipPosition.Above) {
-                    IconButton(
+                    ToolbarActionIconButton(
+                        icon = Icons.Default.TextFields,
+                        tooltip = stringResource(Res.string.flow_toolbar_add_label),
                         onClick = onAddLabel,
-                        modifier = Modifier
-                            .size(dimensions.standardButtonHeight)
-                            .testTag("toolbar_add_label")
+                        testTag = "toolbar_add_label"
+                    )
+
+                    ToolbarDivider()
+
+                    // 2. Drawing tools tonal cluster (Paint + Swatch + Eyedropper)
+                    Surface(
+                        shape = shapes.pill,
+                        color = MaterialTheme.colorScheme.surfaceContainerHighest
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.TextFields,
-                            contentDescription = addLabelText,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(dimensions.iconSmall)
-                        )
-                    }
-                }
-
-                ToolbarDivider()
-
-                // 3. Paint Tool toggle, Color Swatch & Eyedropper
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(2.dp)
-                ) {
-                    val paintLabel = stringResource(Res.string.flow_toolbar_paint)
-                    ToolkitTooltipBox(tooltip = paintLabel, position = ToolkitTooltipPosition.Above) {
-                        IconButton(
-                            onClick = onTogglePaintTool,
-                            colors = IconButtonDefaults.iconButtonColors(
-                                containerColor = if (isPaintToolActive) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
-                                contentColor = if (isPaintToolActive) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
-                            ),
-                            modifier = Modifier
-                                .size(dimensions.standardButtonHeight)
-                                .testTag("toolbar_paint_tool")
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(spacing.xxs),
+                            modifier = Modifier.padding(horizontal = spacing.xxs)
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Palette,
-                                contentDescription = paintLabel,
-                                modifier = Modifier.size(dimensions.iconSmall)
+                            ToolbarToggleIconButton(
+                                checked = isPaintToolActive,
+                                onCheckedChange = { onTogglePaintTool() },
+                                icon = Icons.Default.Palette,
+                                tooltip = stringResource(Res.string.flow_toolbar_paint),
+                                checkedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                checkedContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                testTag = "toolbar_paint_tool"
                             )
-                        }
-                    }
 
-                    // Color swatch indicator with hover/click Quick Palette popup
-                    var colorSwatchCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
-                    val swatchTooltipKey = remember { Any() }
+                            Box(contentAlignment = Alignment.Center) {
+                                val pickColorLabel = stringResource(Res.string.flow_toolbar_pick_color)
+                                ToolkitTooltipBox(
+                                    tooltip = pickColorLabel,
+                                    position = ToolkitTooltipPosition.Above
+                                ) {
+                                    Box(
+                                        contentAlignment = Alignment.Center,
+                                        modifier = Modifier
+                                            .size(dimensions.toolbarZoomHeight)
+                                            .clip(CircleShape)
+                                            .pointerHoverIcon(PointerIcon.Hand)
+                                            .clickable(role = Role.Button) {
+                                                showQuickPalette = !showQuickPalette
+                                                showSplineSettings = false
+                                                showControlsInfo = false
+                                            }
+                                            .semantics { contentDescription = pickColorLabel }
+                                            .testTag("toolbar_color_swatch")
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(dimensions.toolbarColorSwatchSize)
+                                                .clip(CircleShape)
+                                                .background(currentColor)
+                                                .border(
+                                                    width = dimensions.borderThin,
+                                                    color = MaterialTheme.colorScheme.outline,
+                                                    shape = CircleShape
+                                                )
+                                        )
+                                    }
+                                }
 
-                    Box(
-                        modifier = Modifier
-                            .size(20.dp)
-                            .clip(CircleShape)
-                            .background(currentColor)
-                            .border(1.dp, MaterialTheme.colorScheme.outline, CircleShape)
-                            .onGloballyPositioned { colorSwatchCoordinates = it }
-                            .clickable {
-                                colorSwatchCoordinates?.let { coords ->
-                                    tooltipState?.toggle(coords, swatchTooltipKey) {
+                                if (showQuickPalette) {
+                                    Popup(
+                                        popupPositionProvider = abovePopoverPositionProvider,
+                                        onDismissRequest = { showQuickPalette = false },
+                                        properties = PopupProperties(focusable = true)
+                                    ) {
                                         QuickPaletteCard(
                                             colorsInFlow = colorsInFlow,
                                             onSelectColor = { hex ->
                                                 onSelectPaintColor(hex)
-                                                tooltipState.dismiss()
+                                                showQuickPalette = false
                                             },
                                             onOpenFullPicker = {
-                                                tooltipState.dismiss()
+                                                showQuickPalette = false
                                                 showColorPicker = true
                                             }
                                         )
                                     }
                                 }
                             }
-                            .tooltip {
-                                QuickPaletteCard(
-                                    colorsInFlow = colorsInFlow,
-                                    onSelectColor = { hex ->
-                                        onSelectPaintColor(hex)
-                                        tooltipState?.dismiss()
-                                    },
-                                    onOpenFullPicker = {
-                                        tooltipState?.dismiss()
-                                        showColorPicker = true
-                                    }
+
+                            ToolbarToggleIconButton(
+                                checked = isEyedropperActive,
+                                onCheckedChange = { onToggleEyedropper() },
+                                icon = Icons.Default.Colorize,
+                                tooltip = stringResource(Res.string.flow_toolbar_eyedropper),
+                                checkedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                checkedContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                testTag = "toolbar_eyedropper_tool"
+                            )
+                        }
+                    }
+
+                    // 3. Wash Brush tool
+                    ToolbarToggleIconButton(
+                        checked = isWashToolActive,
+                        onCheckedChange = { onToggleWashTool() },
+                        icon = Icons.Default.Refresh,
+                        tooltip = stringResource(Res.string.flow_toolbar_wash),
+                        checkedContainerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                        checkedContentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+                        testTag = "toolbar_wash_tool"
+                    )
+
+                    ToolbarDivider()
+
+                    // 4. Connection routing & display controls
+                    Box(contentAlignment = Alignment.Center) {
+                        ToolbarToggleIconButton(
+                            checked = showSplineSettings,
+                            onCheckedChange = { checked ->
+                                showSplineSettings = checked
+                                if (checked) {
+                                    showQuickPalette = false
+                                    showControlsInfo = false
+                                }
+                            },
+                            icon = Icons.Default.Tune,
+                            tooltip = stringResource(Res.string.flow_toolbar_spline_style),
+                            checkedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+                            checkedContentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                            testTag = "toolbar_spline_settings"
+                        )
+
+                        if (showSplineSettings) {
+                            Popup(
+                                popupPositionProvider = abovePopoverPositionProvider,
+                                onDismissRequest = { showSplineSettings = false },
+                                properties = PopupProperties(focusable = true)
+                            ) {
+                                SplineSettingsCard(
+                                    connectionStyle = connectionStyle,
+                                    connectionRoundness = connectionRoundness,
+                                    orthogonalStepMode = orthogonalStepMode,
+                                    orthogonalPortLead = orthogonalPortLead,
+                                    onChangeConnectionStyle = onChangeConnectionStyle,
+                                    onChangeConnectionRoundness = onChangeConnectionRoundness,
+                                    onChangeOrthogonalStepMode = onChangeOrthogonalStepMode,
+                                    onChangeOrthogonalPortLead = onChangeOrthogonalPortLead
                                 )
                             }
-                            .testTag("toolbar_color_swatch")
+                        }
+                    }
+
+                    ToolbarToggleIconButton(
+                        checked = isAdvancedConnectionMode,
+                        onCheckedChange = { onToggleAdvancedConnectionMode() },
+                        icon = Icons.Default.Hub,
+                        tooltip = stringResource(Res.string.flow_toolbar_advanced_connections),
+                        checkedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        checkedContentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                        testTag = "toolbar_advanced_connection_mode"
                     )
 
-                    // Eyedropper Tool button
-                    val eyedropperLabel = stringResource(Res.string.flow_toolbar_eyedropper)
-                    ToolkitTooltipBox(tooltip = eyedropperLabel, position = ToolkitTooltipPosition.Above) {
-                        IconButton(
-                            onClick = onToggleEyedropper,
-                            colors = IconButtonDefaults.iconButtonColors(
-                                containerColor = if (isEyedropperActive) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
-                                contentColor = if (isEyedropperActive) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
-                            ),
-                            modifier = Modifier
-                                .size(dimensions.standardButtonHeight)
-                                .testTag("toolbar_eyedropper_tool")
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Colorize,
-                                contentDescription = eyedropperLabel,
-                                modifier = Modifier.size(dimensions.iconSmall)
-                            )
-                        }
-                    }
+                    ToolbarToggleIconButton(
+                        checked = hideConnectionPointsUnlessHovered,
+                        onCheckedChange = { onToggleHideConnectionPoints() },
+                        icon = if (hideConnectionPointsUnlessHovered) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                        tooltip = stringResource(Res.string.flow_toolbar_hide_connection_points),
+                        checkedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        checkedContentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                        testTag = "toolbar_hide_connection_points"
+                    )
+
+                    ToolbarDivider()
                 }
 
-                // 4. Wash Brush tool
-                val washLabel = stringResource(Res.string.flow_toolbar_wash)
-                ToolkitTooltipBox(tooltip = washLabel, position = ToolkitTooltipPosition.Above) {
-                    IconButton(
-                        onClick = onToggleWashTool,
-                        colors = IconButtonDefaults.iconButtonColors(
-                            containerColor = if (isWashToolActive) MaterialTheme.colorScheme.tertiaryContainer else Color.Transparent,
-                            contentColor = if (isWashToolActive) MaterialTheme.colorScheme.onTertiaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
-                        ),
-                        modifier = Modifier
-                            .size(dimensions.standardButtonHeight)
-                            .testTag("toolbar_wash_tool")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Refresh,
-                            contentDescription = washLabel,
-                            modifier = Modifier.size(dimensions.iconSmall)
-                        )
-                    }
-                }
+                // 5. Controls Info popover toggle
+                Box(contentAlignment = Alignment.Center) {
+                    ToolbarToggleIconButton(
+                        checked = showControlsInfo,
+                        onCheckedChange = { checked ->
+                            showControlsInfo = checked
+                            if (checked) {
+                                showQuickPalette = false
+                                showSplineSettings = false
+                            }
+                        },
+                        icon = Icons.Default.Info,
+                        tooltip = stringResource(Res.string.flow_info_button_tooltip),
+                        checkedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        checkedContentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                        testTag = "flow_controls_info_button"
+                    )
 
-                ToolbarDivider()
-
-                // 5. Spline & Roundness settings button
-                Box {
-                    val splineLabel = stringResource(Res.string.flow_toolbar_spline_style)
-                    ToolkitTooltipBox(tooltip = splineLabel, position = ToolkitTooltipPosition.Above) {
-                        IconButton(
-                            onClick = { showSplineSettings = !showSplineSettings },
-                            colors = IconButtonDefaults.iconButtonColors(
-                                containerColor = if (showSplineSettings) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
-                                contentColor = if (showSplineSettings) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
-                            ),
-                            modifier = Modifier
-                                .size(dimensions.standardButtonHeight)
-                                .testTag("toolbar_spline_settings")
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Tune,
-                                contentDescription = splineLabel,
-                                modifier = Modifier.size(dimensions.iconSmall)
-                            )
-                        }
-                    }
-
-                    if (showSplineSettings) {
-                        val popupOffsetY = if (connectionStyle == ConnectionCurveStyle.Orthogonal) -390 else -260
+                    if (showControlsInfo) {
                         Popup(
-                            alignment = Alignment.TopCenter,
-                            offset = IntOffset(0, popupOffsetY),
-                            onDismissRequest = { showSplineSettings = false },
+                            popupPositionProvider = abovePopoverPositionProvider,
+                            onDismissRequest = { showControlsInfo = false },
                             properties = PopupProperties(focusable = true)
                         ) {
-                            SplineSettingsCard(
-                                connectionStyle = connectionStyle,
-                                connectionRoundness = connectionRoundness,
-                                orthogonalStepMode = orthogonalStepMode,
-                                orthogonalPortLead = orthogonalPortLead,
-                                onChangeConnectionStyle = onChangeConnectionStyle,
-                                onChangeConnectionRoundness = onChangeConnectionRoundness,
-                                onChangeOrthogonalStepMode = onChangeOrthogonalStepMode,
-                                onChangeOrthogonalPortLead = onChangeOrthogonalPortLead
-                            )
+                            FlowControlsInfoCard()
                         }
                     }
                 }
 
-                // 5.1 Advanced Connection Mode toggle
-                val advancedConnLabel = stringResource(Res.string.flow_toolbar_advanced_connections)
-                ToolkitTooltipBox(tooltip = advancedConnLabel, position = ToolkitTooltipPosition.Above) {
-                    IconButton(
-                        onClick = onToggleAdvancedConnectionMode,
-                        colors = IconButtonDefaults.iconButtonColors(
-                            containerColor = if (isAdvancedConnectionMode) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
-                            contentColor = if (isAdvancedConnectionMode) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
-                        ),
-                        modifier = Modifier
-                            .size(dimensions.standardButtonHeight)
-                            .testTag("toolbar_advanced_connection_mode")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Hub,
-                            contentDescription = advancedConnLabel,
-                            modifier = Modifier.size(dimensions.iconSmall)
-                        )
-                    }
-                }
-
-                // 5.2 Port Auto-Hide toggle
-                val hidePortsLabel = stringResource(Res.string.flow_toolbar_hide_connection_points)
-                ToolkitTooltipBox(tooltip = hidePortsLabel, position = ToolkitTooltipPosition.Above) {
-                    IconButton(
-                        onClick = onToggleHideConnectionPoints,
-                        colors = IconButtonDefaults.iconButtonColors(
-                            containerColor = if (hideConnectionPointsUnlessHovered) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
-                            contentColor = if (hideConnectionPointsUnlessHovered) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
-                        ),
-                        modifier = Modifier
-                            .size(dimensions.standardButtonHeight)
-                            .testTag("toolbar_hide_connection_points")
-                    ) {
-                        Icon(
-                            imageVector = if (hideConnectionPointsUnlessHovered) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                            contentDescription = hidePortsLabel,
-                            modifier = Modifier.size(dimensions.iconSmall)
-                        )
-                    }
-                }
-
-                ToolbarDivider()
-            }
-
-            // 6. Info Button
-            var infoButtonCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
-            val infoTooltipKey = remember { Any() }
-
-            Surface(
-                shape = CircleShape,
-                color = Color.Transparent,
-                modifier = Modifier
-                    .size(dimensions.standardButtonHeight)
-                    .clip(CircleShape)
-                    .onGloballyPositioned { infoButtonCoordinates = it }
-                    .clickable {
-                        infoButtonCoordinates?.let { coords ->
-                            tooltipState?.toggle(coords, infoTooltipKey) {
-                                FlowControlsInfoCard()
-                            }
-                        }
-                    }
-                    .tooltip { FlowControlsInfoCard() }
-                    .testTag("flow_controls_info_button")
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = Icons.Default.Info,
-                        contentDescription = stringResource(Res.string.flow_info_button_tooltip),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(dimensions.iconSmall)
+                // 6. Export Image action
+                if (onExportImage != null) {
+                    ToolbarActionIconButton(
+                        icon = Icons.Default.Image,
+                        tooltip = stringResource(Res.string.flow_export_image_tooltip),
+                        contentDescription = stringResource(Res.string.flow_export_image_title),
+                        onClick = onExportImage,
+                        testTag = "toolbar_export_image"
                     )
                 }
-            }
 
-            // 6.1 Export Image Button
-            if (onExportImage != null) {
-                val exportTooltip = stringResource(Res.string.flow_export_image_tooltip)
-                ToolkitTooltipBox(tooltip = exportTooltip, position = ToolkitTooltipPosition.Above) {
-                    IconButton(
-                        onClick = onExportImage,
-                        modifier = Modifier
-                            .size(dimensions.standardButtonHeight)
-                            .testTag("toolbar_export_image")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Image,
-                            contentDescription = stringResource(Res.string.flow_export_image_title),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(dimensions.iconSmall)
-                        )
-                    }
-                }
+                // 7. Zoom Controls pill
+                ZoomControls(
+                    scale = scale,
+                    onZoomIn = onZoomIn,
+                    onZoomOut = onZoomOut,
+                    modifier = Modifier.testTag("zoom_controls")
+                )
             }
-
-            // 7. Zoom Controls
-            ZoomControls(
-                scale = scale,
-                onZoomIn = onZoomIn,
-                onZoomOut = onZoomOut,
-                modifier = Modifier.testTag("zoom_controls")
-            )
+        }
     }
 
     if (showColorPicker) {
@@ -484,12 +439,76 @@ fun FlowFloatingAppBar(
 }
 
 @Composable
+private fun ToolbarActionIconButton(
+    icon: ImageVector,
+    tooltip: String,
+    onClick: () -> Unit,
+    testTag: String,
+    contentDescription: String = tooltip
+) {
+    val dimensions = ToolkitTheme.dimensions
+    ToolkitTooltipBox(tooltip = tooltip, position = ToolkitTooltipPosition.Above) {
+        IconButton(
+            onClick = onClick,
+            modifier = Modifier
+                .size(dimensions.toolbarZoomHeight)
+                .pointerHoverIcon(PointerIcon.Hand)
+                .testTag(testTag)
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = contentDescription,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(dimensions.iconSmall)
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun ToolbarToggleIconButton(
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    icon: ImageVector,
+    tooltip: String,
+    checkedContainerColor: Color,
+    checkedContentColor: Color,
+    testTag: String
+) {
+    val dimensions = ToolkitTheme.dimensions
+    ToolkitTooltipBox(tooltip = tooltip, position = ToolkitTooltipPosition.Above) {
+        FilledTonalIconToggleButton(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            shapes = IconButtonDefaults.toggleableShapes(),
+            colors = IconButtonDefaults.filledTonalIconToggleButtonColors(
+                containerColor = Color.Transparent,
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                checkedContainerColor = checkedContainerColor,
+                checkedContentColor = checkedContentColor
+            ),
+            modifier = Modifier
+                .size(dimensions.toolbarZoomHeight)
+                .pointerHoverIcon(PointerIcon.Hand)
+                .testTag(testTag)
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = tooltip,
+                modifier = Modifier.size(dimensions.iconSmall)
+            )
+        }
+    }
+}
+
+@Composable
 private fun ToolbarDivider() {
     Box(
         modifier = Modifier
-            .width(1.dp)
-            .height(24.dp)
-            .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+            .width(ToolkitTheme.dimensions.borderThin)
+            .height(ToolkitTheme.dimensions.iconMedium)
+            .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = ToolkitTheme.opacity.divider))
     )
 }
 
@@ -502,20 +521,19 @@ private fun QuickPaletteCard(
 ) {
     val spacing = ToolkitTheme.spacing
     val shapes = ToolkitTheme.shapes
-    val presetColors = listOf("#4CAF50", "#2196F3", "#FF9800", "#F44336", "#9C27B0", "#00BCD4", "#E91E63", "#607D8B")
+    val dimensions = ToolkitTheme.dimensions
 
     Surface(
         shape = shapes.medium,
         color = MaterialTheme.colorScheme.surfaceContainerHighest,
-        shadowElevation = ToolkitTheme.dimensions.elevationHigh,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        shadowElevation = dimensions.elevationHigh,
+        border = BorderStroke(dimensions.borderThin, MaterialTheme.colorScheme.outlineVariant),
         modifier = modifier
-            .width(240.dp)
-            .padding(spacing.small)
+            .width(dimensions.toolbarQuickPaletteWidth)
             .testTag("quick_palette_card")
     ) {
         Column(
-            modifier = Modifier.padding(spacing.small),
+            modifier = Modifier.padding(spacing.medium),
             verticalArrangement = Arrangement.spacedBy(spacing.small)
         ) {
             Text(
@@ -529,21 +547,13 @@ private fun QuickPaletteCard(
                     horizontalArrangement = Arrangement.spacedBy(spacing.extraSmall),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    colorsInFlow.take(8).forEach { hex ->
-                        val c = parseColorString(hex)
-                        Box(
-                            modifier = Modifier
-                                .size(22.dp)
-                                .clip(CircleShape)
-                                .background(c)
-                                .border(1.dp, MaterialTheme.colorScheme.outline, CircleShape)
-                                .clickable { onSelectColor(hex) }
-                        )
+                    colorsInFlow.take(MAX_FLOW_SWATCHES).forEach { hex ->
+                        PaletteSwatchDot(hex = hex, onClick = { onSelectColor(hex) })
                     }
                 }
             } else {
                 Text(
-                    text = "No custom colors in flow yet",
+                    text = stringResource(Res.string.flow_toolbar_no_custom_colors),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -559,27 +569,41 @@ private fun QuickPaletteCard(
                 horizontalArrangement = Arrangement.spacedBy(spacing.extraSmall),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                presetColors.forEach { hex ->
-                    val c = parseColorString(hex)
-                    Box(
-                        modifier = Modifier
-                            .size(22.dp)
-                            .clip(CircleShape)
-                            .background(c)
-                            .border(1.dp, MaterialTheme.colorScheme.outline, CircleShape)
-                            .clickable { onSelectColor(hex) }
-                    )
+                QUICK_PALETTE_PRESET_COLORS.forEach { hex ->
+                    PaletteSwatchDot(hex = hex, onClick = { onSelectColor(hex) })
                 }
             }
 
             TextButton(
                 onClick = onOpenFullPicker,
-                modifier = Modifier.align(Alignment.End)
+                modifier = Modifier
+                    .align(Alignment.End)
+                    .pointerHoverIcon(PointerIcon.Hand)
             ) {
-                Text(stringResource(Res.string.flow_toolbar_pick_color), style = MaterialTheme.typography.labelMedium)
+                Text(
+                    text = stringResource(Res.string.flow_toolbar_pick_color),
+                    style = MaterialTheme.typography.labelMedium
+                )
             }
         }
     }
+}
+
+@Composable
+private fun PaletteSwatchDot(
+    hex: String,
+    onClick: () -> Unit
+) {
+    val dimensions = ToolkitTheme.dimensions
+    Box(
+        modifier = Modifier
+            .size(dimensions.toolbarColorSwatchSize)
+            .clip(CircleShape)
+            .background(parseColorString(hex))
+            .border(dimensions.borderThin, MaterialTheme.colorScheme.outline, CircleShape)
+            .pointerHoverIcon(PointerIcon.Hand)
+            .clickable(role = Role.Button, onClick = onClick)
+    )
 }
 
 @Composable
@@ -598,14 +622,46 @@ private fun SplineSettingsCard(
     val shapes = ToolkitTheme.shapes
     val dimensions = ToolkitTheme.dimensions
 
+    val styleOptions = listOf(
+        ToolkitToggleOption(
+            key = ConnectionCurveStyle.CardinalSpline.name,
+            label = stringResource(Res.string.flow_connection_style_cardinal)
+        ),
+        ToolkitToggleOption(
+            key = ConnectionCurveStyle.Straight.name,
+            label = stringResource(Res.string.flow_connection_style_straight)
+        ),
+        ToolkitToggleOption(
+            key = ConnectionCurveStyle.Orthogonal.name,
+            label = stringResource(Res.string.flow_connection_style_orthogonal)
+        )
+    )
+    val stepModeOptions = listOf(
+        ToolkitToggleOption(
+            key = OrthogonalStepMode.Auto.name,
+            label = stringResource(Res.string.flow_orthogonal_step_auto)
+        ),
+        ToolkitToggleOption(
+            key = OrthogonalStepMode.Middle.name,
+            label = stringResource(Res.string.flow_orthogonal_step_middle)
+        ),
+        ToolkitToggleOption(
+            key = OrthogonalStepMode.Before.name,
+            label = stringResource(Res.string.flow_orthogonal_step_before)
+        ),
+        ToolkitToggleOption(
+            key = OrthogonalStepMode.After.name,
+            label = stringResource(Res.string.flow_orthogonal_step_after)
+        )
+    )
+
     Surface(
         shape = shapes.medium,
         color = MaterialTheme.colorScheme.surfaceContainerHighest,
         shadowElevation = dimensions.elevationHigh,
         border = BorderStroke(dimensions.borderUnselected, MaterialTheme.colorScheme.outlineVariant),
         modifier = modifier
-            .width(280.dp)
-            .padding(spacing.small)
+            .widthIn(min = dimensions.toolbarPopoverWidth)
             .testTag("spline_settings_card")
     ) {
         Column(
@@ -618,28 +674,13 @@ private fun SplineSettingsCard(
                 color = MaterialTheme.colorScheme.onSurface
             )
 
-            // Connection style chips
-            FlowRow(
-                modifier = Modifier.padding(vertical = spacing.extraSmall),
-                horizontalArrangement = Arrangement.spacedBy(spacing.extraSmall),
-                verticalArrangement = Arrangement.spacedBy(spacing.extraSmall)
-            ) {
-                FilterChip(
-                    selected = connectionStyle == ConnectionCurveStyle.CardinalSpline,
-                    onClick = { onChangeConnectionStyle(ConnectionCurveStyle.CardinalSpline) },
-                    label = { Text(stringResource(Res.string.flow_connection_style_cardinal), style = MaterialTheme.typography.labelSmall) }
-                )
-                FilterChip(
-                    selected = connectionStyle == ConnectionCurveStyle.Straight,
-                    onClick = { onChangeConnectionStyle(ConnectionCurveStyle.Straight) },
-                    label = { Text(stringResource(Res.string.flow_connection_style_straight), style = MaterialTheme.typography.labelSmall) }
-                )
-                FilterChip(
-                    selected = connectionStyle == ConnectionCurveStyle.Orthogonal,
-                    onClick = { onChangeConnectionStyle(ConnectionCurveStyle.Orthogonal) },
-                    label = { Text(stringResource(Res.string.flow_connection_style_orthogonal), style = MaterialTheme.typography.labelSmall) }
-                )
-            }
+            ToolkitConnectedToggleGroup(
+                options = styleOptions,
+                selectedKey = connectionStyle.name,
+                onSelect = { key ->
+                    ConnectionCurveStyle.entries.find { it.name == key }?.let(onChangeConnectionStyle)
+                }
+            )
 
             if (connectionStyle == ConnectionCurveStyle.Orthogonal) {
                 Spacer(modifier = Modifier.height(spacing.extraSmall))
@@ -648,38 +689,20 @@ private fun SplineSettingsCard(
                     style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.colorScheme.onSurface
                 )
-                FlowRow(
-                    modifier = Modifier.padding(vertical = spacing.extraSmall),
-                    horizontalArrangement = Arrangement.spacedBy(spacing.extraSmall),
-                    verticalArrangement = Arrangement.spacedBy(spacing.extraSmall)
-                ) {
-                    FilterChip(
-                        selected = orthogonalStepMode == OrthogonalStepMode.Auto,
-                        onClick = { onChangeOrthogonalStepMode(OrthogonalStepMode.Auto) },
-                        label = { Text(stringResource(Res.string.flow_orthogonal_step_auto), style = MaterialTheme.typography.labelSmall) }
-                    )
-                    FilterChip(
-                        selected = orthogonalStepMode == OrthogonalStepMode.Middle,
-                        onClick = { onChangeOrthogonalStepMode(OrthogonalStepMode.Middle) },
-                        label = { Text(stringResource(Res.string.flow_orthogonal_step_middle), style = MaterialTheme.typography.labelSmall) }
-                    )
-                    FilterChip(
-                        selected = orthogonalStepMode == OrthogonalStepMode.Before,
-                        onClick = { onChangeOrthogonalStepMode(OrthogonalStepMode.Before) },
-                        label = { Text(stringResource(Res.string.flow_orthogonal_step_before), style = MaterialTheme.typography.labelSmall) }
-                    )
-                    FilterChip(
-                        selected = orthogonalStepMode == OrthogonalStepMode.After,
-                        onClick = { onChangeOrthogonalStepMode(OrthogonalStepMode.After) },
-                        label = { Text(stringResource(Res.string.flow_orthogonal_step_after), style = MaterialTheme.typography.labelSmall) }
-                    )
-                }
+                ToolkitConnectedToggleGroup(
+                    options = stepModeOptions,
+                    selectedKey = orthogonalStepMode.name,
+                    onSelect = { key ->
+                        OrthogonalStepMode.entries.find { it.name == key }?.let(onChangeOrthogonalStepMode)
+                    }
+                )
 
                 if (orthogonalStepMode == OrthogonalStepMode.Auto) {
                     Spacer(modifier = Modifier.height(spacing.extraSmall))
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .pointerHoverIcon(PointerIcon.Hand)
                             .clickable { onChangeOrthogonalPortLead(!orthogonalPortLead) },
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
@@ -715,4 +738,3 @@ private fun SplineSettingsCard(
         }
     }
 }
-

@@ -3,6 +3,7 @@ package org.wip.plugintoolkit.shared.components.sidebar
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ContentTransform
+import androidx.compose.animation.core.updateTransition
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -14,6 +15,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -26,6 +28,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.VerticalSplit
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -50,6 +53,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import androidx.window.core.layout.WindowSizeClass
 import org.jetbrains.compose.resources.stringResource
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
@@ -107,6 +111,32 @@ fun isLargeAdaptiveWidth(): Boolean {
 }
 
 /**
+ * Hysteresis thresholds for switching a floating sidebar between single-column drill-down and
+ * two-column sequel split mode when the user manually drags the pane resize handle.
+ */
+object SequelSidebarHysteresis {
+    /** Dragging narrower than this width downgrades two-column mode to single-column drill-down. */
+    val COLLAPSE_TO_SINGLE_COLUMN_WIDTH: Dp = 440.dp
+
+    /** Dragging wider than this width restores two-column sequel mode. */
+    val EXPAND_TO_TWO_COLUMN_WIDTH: Dp = 500.dp
+
+    /**
+     * Resolves the next split-mode state given [isCurrentlySplit] and the live [draggedWidth],
+     * applying hysteresis between [COLLAPSE_TO_SINGLE_COLUMN_WIDTH] and
+     * [EXPAND_TO_TWO_COLUMN_WIDTH] to prevent oscillation.
+     */
+    fun resolveFromDraggedWidth(
+        isCurrentlySplit: Boolean,
+        draggedWidth: Dp
+    ): Boolean = when {
+        isCurrentlySplit && draggedWidth < COLLAPSE_TO_SINGLE_COLUMN_WIDTH -> false
+        !isCurrentlySplit && draggedWidth >= EXPAND_TO_TWO_COLUMN_WIDTH -> true
+        else -> isCurrentlySplit
+    }
+}
+
+/**
  * Unified floating sidebar surface used across secondary workspaces, canvas overlays, and SDUI.
  *
  * Renders a single clipped rounded [Surface] (`surfaceContainer` + `ToolkitTheme.shapes.large`)
@@ -114,6 +144,11 @@ fun isLargeAdaptiveWidth(): Boolean {
  * - Optional spring-driven internal navigation via [navigationKey] (`AnimatedContent`)
  * - Optional adjacent sequel sidebar pane docked seamlessly on the right inside the exact same
  *   rounded block, separated by a subtle [VerticalDivider].
+ *
+ * When hosted inside an outer width-animating pane (such as `ToolkitAdaptiveListDetailWorkspace`
+ * or SDUI `RenderSidebar`), set [animateSequelWidth] to `false` so the outer container owns the
+ * sole spatial width spring while the sequel pane reveals cleanly via an effects-only crossfade
+ * and clipped width, preventing competing springs.
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -126,13 +161,17 @@ fun <K> ToolkitFloatingSidebar(
     border: BorderStroke? = null,
     shadowElevation: Dp = ToolkitTheme.spacing.none,
     animateNavigation: Boolean = true,
+    navigationContentKey: (K) -> Any? = { it },
     navigationTransitionSpec: (initialState: K, targetState: K) -> ContentTransform? = { _, _ -> null },
     sequelVisible: Boolean = false,
     sequelWidth: Dp = ToolkitTheme.dimensions.floatingSidebarSequelWidth,
+    animateSequelWidth: Boolean = true,
     sequelContent: (@Composable ColumnScope.() -> Unit)? = null,
     primaryContent: @Composable (K) -> Unit
 ) {
     val motion = MaterialTheme.motionScheme
+    val sequelTransition = updateTransition(targetState = sequelVisible, label = "floatingSidebarSequel")
+    val isSequelComposed = sequelContent != null && (sequelTransition.currentState || sequelTransition.targetState)
 
     Surface(
         modifier = modifier.testTag("toolkit_floating_sidebar"),
@@ -141,67 +180,157 @@ fun <K> ToolkitFloatingSidebar(
         border = border,
         shadowElevation = shadowElevation
     ) {
-        Row(modifier = Modifier.fillMaxSize()) {
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight()
-                    .clipToBounds()
-                    .testTag("toolkit_floating_sidebar_primary")
-            ) {
-                if (animateNavigation) {
-                    AnimatedContent(
-                        targetState = navigationKey,
-                        transitionSpec = {
-                            navigationTransitionSpec(initialState, targetState)
-                                ?: (fadeIn(motion.fastEffectsSpec()) + slideInHorizontally(motion.defaultSpatialSpec()) { it / 6 }
-                                    togetherWith fadeOut(motion.fastEffectsSpec()) + slideOutHorizontally(motion.defaultSpatialSpec()) { -it / 6 })
-                        },
-                        label = "floatingSidebarNavigation"
-                    ) { key ->
-                        primaryContent(key)
-                    }
+        if (!animateSequelWidth && sequelContent != null) {
+            BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                val minPrimaryWidth = ToolkitTheme.dimensions.floatingSidebarMinWidth.coerceAtMost(maxWidth)
+                val primaryWidth = if (isSequelComposed) {
+                    (maxWidth - sequelWidth).coerceIn(minPrimaryWidth, maxWidth)
                 } else {
-                    primaryContent(navigationKey)
+                    maxWidth
+                }
+
+                Row(modifier = Modifier.fillMaxSize()) {
+                    Box(
+                        modifier = Modifier
+                            .width(primaryWidth)
+                            .fillMaxHeight()
+                            .clipToBounds()
+                            .testTag("toolkit_floating_sidebar_primary")
+                    ) {
+                        FloatingSidebarPrimaryBody(
+                            navigationKey = navigationKey,
+                            animateNavigation = animateNavigation,
+                            navigationContentKey = navigationContentKey,
+                            navigationTransitionSpec = navigationTransitionSpec,
+                            primaryContent = primaryContent
+                        )
+                    }
+
+                    sequelTransition.AnimatedVisibility(
+                        visible = { it },
+                        enter = fadeIn(motion.fastEffectsSpec()),
+                        exit = fadeOut(motion.fastEffectsSpec()),
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .clipToBounds()
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clipToBounds(),
+                            contentAlignment = Alignment.TopStart
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .wrapContentWidth(align = Alignment.Start, unbounded = true)
+                                    .width(sequelWidth)
+                                    .fillMaxHeight()
+                                    .testTag("toolkit_floating_sidebar_sequel")
+                            ) {
+                                VerticalDivider(
+                                    thickness = ToolkitTheme.dimensions.borderThin,
+                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = ToolkitTheme.opacity.divider)
+                                )
+                                Surface(
+                                    color = sequelContainerColor,
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .fillMaxHeight()
+                                ) {
+                                    Column(
+                                        modifier = Modifier.fillMaxSize(),
+                                        content = sequelContent
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
             }
-
-            if (sequelContent != null) {
-                AnimatedVisibility(
-                    visible = sequelVisible,
-                    enter = expandHorizontally(
-                        animationSpec = motion.defaultSpatialSpec(),
-                        expandFrom = Alignment.Start
-                    ) + fadeIn(motion.fastEffectsSpec()),
-                    exit = shrinkHorizontally(
-                        animationSpec = motion.defaultSpatialSpec(),
-                        shrinkTowards = Alignment.Start
-                    ) + fadeOut(motion.fastEffectsSpec())
+        } else {
+            Row(modifier = Modifier.fillMaxSize()) {
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .clipToBounds()
+                        .testTag("toolkit_floating_sidebar_primary")
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxHeight()
-                            .testTag("toolkit_floating_sidebar_sequel")
+                    FloatingSidebarPrimaryBody(
+                        navigationKey = navigationKey,
+                        animateNavigation = animateNavigation,
+                        navigationContentKey = navigationContentKey,
+                        navigationTransitionSpec = navigationTransitionSpec,
+                        primaryContent = primaryContent
+                    )
+                }
+
+                if (sequelContent != null) {
+                    AnimatedVisibility(
+                        visible = sequelVisible,
+                        enter = expandHorizontally(
+                            animationSpec = motion.defaultSpatialSpec(),
+                            expandFrom = Alignment.Start
+                        ) + fadeIn(motion.fastEffectsSpec()),
+                        exit = shrinkHorizontally(
+                            animationSpec = motion.defaultSpatialSpec(),
+                            shrinkTowards = Alignment.Start
+                        ) + fadeOut(motion.fastEffectsSpec())
                     ) {
-                        VerticalDivider(
-                            thickness = ToolkitTheme.dimensions.borderThin,
-                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = ToolkitTheme.opacity.divider)
-                        )
-                        Surface(
-                            color = sequelContainerColor,
+                        Row(
                             modifier = Modifier
-                                .width(sequelWidth)
                                 .fillMaxHeight()
+                                .testTag("toolkit_floating_sidebar_sequel")
                         ) {
-                            Column(
-                                modifier = Modifier.fillMaxSize(),
-                                content = sequelContent
+                            VerticalDivider(
+                                thickness = ToolkitTheme.dimensions.borderThin,
+                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = ToolkitTheme.opacity.divider)
                             )
+                            Surface(
+                                color = sequelContainerColor,
+                                modifier = Modifier
+                                    .width(sequelWidth)
+                                    .fillMaxHeight()
+                            ) {
+                                Column(
+                                    modifier = Modifier.fillMaxSize(),
+                                    content = sequelContent
+                                )
+                            }
                         }
                     }
                 }
             }
         }
+    }
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun <K> FloatingSidebarPrimaryBody(
+    navigationKey: K,
+    animateNavigation: Boolean,
+    navigationContentKey: (K) -> Any?,
+    navigationTransitionSpec: (initialState: K, targetState: K) -> ContentTransform?,
+    primaryContent: @Composable (K) -> Unit
+) {
+    val motion = MaterialTheme.motionScheme
+    if (animateNavigation) {
+        AnimatedContent(
+            targetState = navigationKey,
+            contentKey = navigationContentKey,
+            transitionSpec = {
+                navigationTransitionSpec(initialState, targetState)
+                    ?: (fadeIn(motion.fastEffectsSpec()) + slideInHorizontally(motion.defaultSpatialSpec()) { it / 6 }
+                        togetherWith fadeOut(motion.fastEffectsSpec()) + slideOutHorizontally(motion.defaultSpatialSpec()) { -it / 6 })
+            },
+            label = "floatingSidebarNavigation"
+        ) { key ->
+            primaryContent(key)
+        }
+    } else {
+        primaryContent(navigationKey)
     }
 }
 

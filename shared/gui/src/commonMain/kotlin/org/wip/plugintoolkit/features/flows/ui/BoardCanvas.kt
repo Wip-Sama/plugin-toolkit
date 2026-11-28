@@ -788,7 +788,7 @@ fun BoardCanvas(
             (nodeColors + connColors + juncColors + groupColors + labelColors).distinct()
         }
 
-        Box(modifier = Modifier.align(Alignment.BottomEnd)) {
+        Box(modifier = Modifier.align(Alignment.BottomCenter)) {
             CompositionLocalProvider(LocalDensity provides currentDensity) {
                 FlowFloatingAppBar(
                     scale = state.scale,

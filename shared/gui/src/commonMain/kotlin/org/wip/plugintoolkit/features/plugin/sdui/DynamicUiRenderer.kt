@@ -3,6 +3,7 @@ package org.wip.plugintoolkit.features.plugin.sdui
 import androidx.compose.material3.ExposedDropdownMenu
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
@@ -96,8 +97,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -217,12 +220,17 @@ import org.wip.plugintoolkit.core.utils.PlatformHorizontalScrollbar
 import org.wip.plugintoolkit.core.utils.PlatformUtils
 import org.wip.plugintoolkit.core.utils.PlatformVerticalScrollbar
 import org.wip.plugintoolkit.shared.components.PaneAttachmentEdge
+import org.wip.plugintoolkit.shared.components.ResizablePaneDragPhysics
+import org.wip.plugintoolkit.shared.components.ResizablePaneDragSnapshot
 import org.wip.plugintoolkit.shared.components.ToolkitCircularProgressIndicator
 import org.wip.plugintoolkit.shared.components.ToolkitLinearProgressIndicator
 import org.wip.plugintoolkit.shared.components.ToolkitLoadingIndicator
+import org.wip.plugintoolkit.shared.components.ToolkitPaneResizeHandle
 import org.wip.plugintoolkit.shared.components.ToolkitResizableCollapsiblePane
 import org.wip.plugintoolkit.shared.components.ToolkitTooltipBox
 import plugintoolkit.composeapp.generated.resources.Res
+import plugintoolkit.composeapp.generated.resources.pane_drag_or_click_to_expand
+import plugintoolkit.composeapp.generated.resources.pane_drag_to_resize_or_collapse
 import plugintoolkit.composeapp.generated.resources.sdui_cancel
 import plugintoolkit.composeapp.generated.resources.sdui_confirm
 import plugintoolkit.composeapp.generated.resources.sdui_error_boundary_title
@@ -2757,16 +2765,55 @@ private fun RenderSidebar(
 
     val requestedPrimaryWidth = (node.modifier.widthDp?.dp ?: ToolkitTheme.dimensions.sduiSidebarDefaultWidth)
         .coerceIn(ToolkitTheme.dimensions.sduiSidebarMinWidth, ToolkitTheme.dimensions.sduiSidebarMaxWidth)
-    val targetTotalWidth = when {
-        isCollapsed -> ToolkitTheme.dimensions.sidebarCollapsedWidth
-        isSequelShown -> requestedPrimaryWidth + sequelWidth
-        else -> requestedPrimaryWidth
+    val collapsedWidth = ToolkitTheme.dimensions.sidebarCollapsedWidth
+    val minExpandedWidth = if (isSequelShown) {
+        ToolkitTheme.dimensions.sduiSidebarMinWidth + sequelWidth
+    } else {
+        ToolkitTheme.dimensions.sduiSidebarMinWidth
     }
-    val animatedSidebarWidth by animateDpAsState(
-        targetValue = targetTotalWidth,
-        animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
-        label = "sduiSidebarWidth"
-    )
+    val maxExpandedWidth = if (isSequelShown) {
+        ToolkitTheme.dimensions.sduiSidebarMaxWidth + sequelWidth
+    } else {
+        ToolkitTheme.dimensions.sduiSidebarMaxWidth
+    }
+    val defaultExpandedWidth = if (isSequelShown) {
+        requestedPrimaryWidth + sequelWidth
+    } else {
+        requestedPrimaryWidth
+    }
+
+    val motion = MaterialTheme.motionScheme
+    val scope = rememberCoroutineScope()
+    var dragSnapshot by remember(node.id) {
+        mutableStateOf(
+            ResizablePaneDragSnapshot(
+                isExpanded = !isCollapsed,
+                visibleSizeDp = if (isCollapsed) 0f else defaultExpandedWidth.value,
+                lastExpandedSizeDp = defaultExpandedWidth.value
+            )
+        )
+    }
+    var isDraggingHandle by remember(node.id) { mutableStateOf(false) }
+    val animatedSidebarWidthDp = remember(node.id) {
+        Animatable(if (isCollapsed) collapsedWidth.value else defaultExpandedWidth.value)
+    }
+
+    LaunchedEffect(isCollapsed, isSequelShown, defaultExpandedWidth) {
+        if (!isDraggingHandle) {
+            val targetWidth = if (isCollapsed) collapsedWidth.value else defaultExpandedWidth.value
+            dragSnapshot = dragSnapshot.copy(
+                isExpanded = !isCollapsed,
+                visibleSizeDp = if (isCollapsed) 0f else defaultExpandedWidth.value,
+                lastExpandedSizeDp = defaultExpandedWidth.value,
+                overDragCollapseDp = 0f,
+                dragOpenProgressDp = 0f
+            )
+            animatedSidebarWidthDp.animateTo(
+                targetValue = targetWidth,
+                animationSpec = motion.defaultSpatialSpec()
+            )
+        }
+    }
 
     val sidebarBorder = BorderStroke(
         ToolkitTheme.dimensions.borderUnselected,
@@ -2774,169 +2821,284 @@ private fun RenderSidebar(
     )
 
     if (isHorizontal) {
-        ToolkitFloatingSidebar(
-            navigationKey = Unit,
-            animateNavigation = false,
-            containerColor = MaterialTheme.colorScheme.surfaceContainer,
-            sequelContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-            shape = ToolkitTheme.shapes.large,
-            border = sidebarBorder,
-            sequelVisible = isSequelShown,
-            sequelWidth = sequelWidth,
-            sequelContent = if (hasSequel) {
-                {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(ToolkitTheme.dimensions.sduiCompactSpacing),
-                        verticalArrangement = Arrangement.spacedBy(ToolkitTheme.dimensions.sduiCompactSpacing)
-                    ) {
-                        node.sequelTitle?.takeIf { it.isNotBlank() }?.let { titleText ->
-                            Text(
-                                text = titleText,
-                                style = ToolkitTheme.typography.titleSmall,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
+        val edge = if (node.attachPoint == SidebarAttachPoint.RIGHT) {
+            PaneAttachmentEdge.End
+        } else {
+            PaneAttachmentEdge.Start
+        }
+        val density = LocalDensity.current
+        val collapseThresholdDp = ToolkitTheme.dimensions.paneCollapseDragThreshold.value
+        val expandThresholdDp = ToolkitTheme.dimensions.paneExpandDragThreshold.value
+        val magneticSnapDp = ToolkitTheme.dimensions.paneMagneticSnapThreshold.value
+        val collapseIntentProgress = if (dragSnapshot.isExpanded && collapseThresholdDp > 0f) {
+            (dragSnapshot.overDragCollapseDp / collapseThresholdDp).coerceIn(0f, 1f)
+        } else {
+            0f
+        }
+        val expandIntentProgress = if (!dragSnapshot.isExpanded && expandThresholdDp > 0f) {
+            (dragSnapshot.dragOpenProgressDp / expandThresholdDp).coerceIn(0f, 1f)
+        } else {
+            0f
+        }
+
+        val resizeHandle: @Composable () -> Unit = {
+            ToolkitPaneResizeHandle(
+                edge = edge,
+                isExpanded = !isCollapsed,
+                isDragging = isDraggingHandle,
+                collapseIntentProgress = collapseIntentProgress,
+                expandIntentProgress = expandIntentProgress,
+                tooltip = stringResource(
+                    if (isCollapsed) Res.string.pane_drag_or_click_to_expand else Res.string.pane_drag_to_resize_or_collapse
+                ),
+                testTag = "sdui_sidebar_resize_handle_${node.id}",
+                onClick = {
+                    if (isCollapsed) {
+                        isCollapsed = false
+                        val nextTarget = dragSnapshot.lastExpandedSizeDp.coerceIn(minExpandedWidth.value, maxExpandedWidth.value)
+                        dragSnapshot = dragSnapshot.copy(
+                            isExpanded = true,
+                            visibleSizeDp = nextTarget,
+                            overDragCollapseDp = 0f,
+                            dragOpenProgressDp = 0f
+                        )
+                        scope.launch {
+                            animatedSidebarWidthDp.animateTo(nextTarget, motion.defaultSpatialSpec())
                         }
-                        val sequelScroll = rememberScrollState()
-                        val sequelScrollbarReserve = if (sequelScroll.maxValue > 0) {
-                            ToolkitTheme.dimensions.sduiScrollbarEndPadding
-                        } else {
-                            ToolkitTheme.spacing.none
+                    }
+                },
+                onDragStart = { isDraggingHandle = true },
+                onDragDelta = { deltaX, _ ->
+                    val expandSign = if (edge == PaneAttachmentEdge.Start) 1f else -1f
+                    val expandDeltaDp = (deltaX / density.density) * expandSign
+                    val wasExpanded = dragSnapshot.isExpanded
+                    val updated = ResizablePaneDragPhysics.onDragDelta(
+                        state = dragSnapshot,
+                        expandDeltaDp = expandDeltaDp,
+                        minSizeDp = minExpandedWidth.value,
+                        maxSizeDp = maxExpandedWidth.value,
+                        collapseThresholdDp = collapseThresholdDp,
+                        expandThresholdDp = expandThresholdDp,
+                        collapsible = true
+                    )
+                    dragSnapshot = updated
+                    if (wasExpanded && !updated.isExpanded) {
+                        isCollapsed = true
+                        scope.launch {
+                            animatedSidebarWidthDp.animateTo(collapsedWidth.value, motion.fastSpatialSpec())
                         }
-                        Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                            CompositionLocalProvider(LocalInVerticalScroll provides true) {
-                                Column(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .verticalScroll(sequelScroll)
-                                        .padding(end = sequelScrollbarReserve),
-                                    verticalArrangement = Arrangement.spacedBy(
-                                        resolveContainerSpacing(SpacingSize.SMALL, sequelNodes, isVertical = true)
-                                    )
-                                ) {
-                                    RenderColumnChildren(
-                                        children = sequelNodes,
-                                        onEvent = onEvent,
-                                        allowWeight = false
+                    } else if (!wasExpanded && updated.isExpanded) {
+                        isCollapsed = false
+                        scope.launch {
+                            animatedSidebarWidthDp.snapTo(updated.visibleSizeDp)
+                        }
+                    } else if (updated.isExpanded) {
+                        scope.launch {
+                            animatedSidebarWidthDp.snapTo(updated.visibleSizeDp)
+                        }
+                    }
+                },
+                onDragEnd = {
+                    val settled = ResizablePaneDragPhysics.onDragEnd(
+                        state = dragSnapshot,
+                        defaultSizeDp = defaultExpandedWidth.value,
+                        minSizeDp = minExpandedWidth.value,
+                        maxSizeDp = maxExpandedWidth.value,
+                        magneticSnapDp = magneticSnapDp
+                    )
+                    dragSnapshot = settled
+                    isDraggingHandle = false
+                    isCollapsed = !settled.isExpanded
+                    val target = if (settled.isExpanded) settled.visibleSizeDp else collapsedWidth.value
+                    scope.launch {
+                        animatedSidebarWidthDp.animateTo(target, motion.defaultSpatialSpec())
+                    }
+                }
+            )
+        }
+
+        val sidebarContent: @Composable (Modifier) -> Unit = { sidebarModifier ->
+            ToolkitFloatingSidebar(
+                navigationKey = Unit,
+                animateNavigation = false,
+                animateSequelWidth = false,
+                containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                sequelContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                shape = ToolkitTheme.shapes.large,
+                border = sidebarBorder,
+                sequelVisible = isSequelShown,
+                sequelWidth = sequelWidth,
+                sequelContent = if (hasSequel) {
+                    {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(ToolkitTheme.dimensions.sduiCompactSpacing),
+                            verticalArrangement = Arrangement.spacedBy(ToolkitTheme.dimensions.sduiCompactSpacing)
+                        ) {
+                            node.sequelTitle?.takeIf { it.isNotBlank() }?.let { titleText ->
+                                Text(
+                                    text = titleText,
+                                    style = ToolkitTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                            val sequelScroll = rememberScrollState()
+                            val sequelScrollbarReserve = if (sequelScroll.maxValue > 0) {
+                                ToolkitTheme.dimensions.sduiScrollbarEndPadding
+                            } else {
+                                ToolkitTheme.spacing.none
+                            }
+                            Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                                CompositionLocalProvider(LocalInVerticalScroll provides true) {
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .verticalScroll(sequelScroll)
+                                            .padding(end = sequelScrollbarReserve),
+                                        verticalArrangement = Arrangement.spacedBy(
+                                            resolveContainerSpacing(SpacingSize.SMALL, sequelNodes, isVertical = true)
+                                        )
+                                    ) {
+                                        RenderColumnChildren(
+                                            children = sequelNodes,
+                                            onEvent = onEvent,
+                                            allowWeight = false
+                                        )
+                                    }
+                                }
+                                if (sequelScroll.maxValue > 0) {
+                                    PlatformVerticalScrollbar(
+                                        scrollState = sequelScroll,
+                                        modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight()
                                     )
                                 }
                             }
-                            if (sequelScroll.maxValue > 0) {
+                        }
+                    }
+                } else null,
+                modifier = sidebarModifier
+                    .width(animatedSidebarWidthDp.value.coerceAtLeast(collapsedWidth.value).dp)
+                    .fillMaxHeight()
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(ToolkitTheme.dimensions.sduiCompactSpacing),
+                    verticalArrangement = Arrangement.spacedBy(ToolkitTheme.dimensions.sduiCompactSpacing)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        if (!isCollapsed) {
+                            node.title?.let { titleText ->
+                                Text(
+                                    text = titleText,
+                                    style = ToolkitTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f).padding(end = ToolkitTheme.spacing.xs)
+                                )
+                            } ?: Spacer(modifier = Modifier.weight(1f))
+
+                            if (hasSequel) {
+                                ToolkitSequelSidebarToggleButton(
+                                    isExpanded = isSequelShown,
+                                    onToggle = { sequelMode = toggleSequelSidebarMode(isSequelShown) }
+                                )
+                            }
+                        }
+                        if (node.isCollapsible) {
+                            SduiTooltipBox(tooltip = stringResource(Res.string.sdui_toggle_sidebar)) {
+                                IconButton(
+                                    onClick = { isCollapsed = !isCollapsed },
+                                    modifier = Modifier
+                                        .size(ToolkitTheme.dimensions.denseIconButtonSize)
+                                        .pointerHoverIcon(PointerIcon.Hand)
+                                ) {
+                                    Icon(
+                                        imageVector = if (isCollapsed) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
+                                        contentDescription = stringResource(Res.string.sdui_toggle_sidebar),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(ToolkitTheme.dimensions.denseIconSize)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    AnimatedVisibility(
+                        visible = !isCollapsed,
+                        modifier = Modifier.weight(1f).fillMaxWidth()
+                    ) {
+                        if (applySidebarScroll) {
+                            val sidebarScrollState = rememberScrollState()
+                            val scrollbarReserve = if (sidebarScrollState.maxValue > 0) {
+                                ToolkitTheme.dimensions.sduiScrollbarEndPadding
+                            } else {
+                                ToolkitTheme.spacing.none
+                            }
+                            Box(modifier = Modifier.fillMaxSize()) {
+                                CompositionLocalProvider(LocalInVerticalScroll provides true) {
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .verticalScroll(sidebarScrollState)
+                                            .padding(end = scrollbarReserve),
+                                        verticalArrangement = Arrangement.spacedBy(
+                                            resolveContainerSpacing(SpacingSize.SMALL, node.children, isVertical = true)
+                                        )
+                                    ) {
+                                        RenderColumnChildren(
+                                            children = node.children,
+                                            onEvent = onEvent,
+                                            allowWeight = false
+                                        )
+                                    }
+                                }
                                 PlatformVerticalScrollbar(
-                                    scrollState = sequelScroll,
+                                    scrollState = sidebarScrollState,
                                     modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight()
                                 )
                             }
-                        }
-                    }
-                }
-            } else null,
-            modifier = modifier.width(animatedSidebarWidth).fillMaxHeight()
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(ToolkitTheme.dimensions.sduiCompactSpacing),
-                verticalArrangement = Arrangement.spacedBy(ToolkitTheme.dimensions.sduiCompactSpacing)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    if (!isCollapsed) {
-                        node.title?.let { titleText ->
-                            Text(
-                                text = titleText,
-                                style = ToolkitTheme.typography.titleSmall,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.weight(1f).padding(end = ToolkitTheme.spacing.xs)
-                            )
-                        } ?: Spacer(modifier = Modifier.weight(1f))
-
-                        if (hasSequel) {
-                            ToolkitSequelSidebarToggleButton(
-                                isExpanded = isSequelShown,
-                                onToggle = { sequelMode = toggleSequelSidebarMode(isSequelShown) }
-                            )
-                        }
-                    }
-                    if (node.isCollapsible) {
-                        SduiTooltipBox(tooltip = stringResource(Res.string.sdui_toggle_sidebar)) {
-                            IconButton(
-                                onClick = { isCollapsed = !isCollapsed },
-                                modifier = Modifier
-                                    .size(ToolkitTheme.dimensions.denseIconButtonSize)
-                                    .pointerHoverIcon(PointerIcon.Hand)
+                        } else {
+                            Column(
+                                modifier = Modifier.fillMaxSize(),
+                                verticalArrangement = Arrangement.spacedBy(
+                                    resolveContainerSpacing(SpacingSize.SMALL, node.children, isVertical = true)
+                                )
                             ) {
-                                Icon(
-                                    imageVector = if (isCollapsed) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
-                                    contentDescription = stringResource(Res.string.sdui_toggle_sidebar),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(ToolkitTheme.dimensions.denseIconSize)
+                                RenderColumnChildren(
+                                    children = node.children,
+                                    onEvent = onEvent,
+                                    allowWeight = true
                                 )
                             }
-                        }
-                    }
-                }
-
-                AnimatedVisibility(
-                    visible = !isCollapsed,
-                    modifier = Modifier.weight(1f).fillMaxWidth()
-                ) {
-                    if (applySidebarScroll) {
-                        val sidebarScrollState = rememberScrollState()
-                        val scrollbarReserve = if (sidebarScrollState.maxValue > 0) {
-                            ToolkitTheme.dimensions.sduiScrollbarEndPadding
-                        } else {
-                            ToolkitTheme.spacing.none
-                        }
-                        Box(modifier = Modifier.fillMaxSize()) {
-                            CompositionLocalProvider(LocalInVerticalScroll provides true) {
-                                Column(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .verticalScroll(sidebarScrollState)
-                                        .padding(end = scrollbarReserve),
-                                    verticalArrangement = Arrangement.spacedBy(
-                                        resolveContainerSpacing(SpacingSize.SMALL, node.children, isVertical = true)
-                                    )
-                                ) {
-                                    RenderColumnChildren(
-                                        children = node.children,
-                                        onEvent = onEvent,
-                                        allowWeight = false
-                                    )
-                                }
-                            }
-                            PlatformVerticalScrollbar(
-                                scrollState = sidebarScrollState,
-                                modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight()
-                            )
-                        }
-                    } else {
-                        Column(
-                            modifier = Modifier.fillMaxSize(),
-                            verticalArrangement = Arrangement.spacedBy(
-                                resolveContainerSpacing(SpacingSize.SMALL, node.children, isVertical = true)
-                            )
-                        ) {
-                            RenderColumnChildren(
-                                children = node.children,
-                                onEvent = onEvent,
-                                allowWeight = true
-                            )
                         }
                     }
                 }
             }
+        }
+
+        if (node.isCollapsible) {
+            Row(modifier = modifier.fillMaxHeight()) {
+                if (edge == PaneAttachmentEdge.End) {
+                    resizeHandle()
+                    sidebarContent(Modifier)
+                } else {
+                    sidebarContent(Modifier)
+                    resizeHandle()
+                }
+            }
+        } else {
+            sidebarContent(modifier)
         }
     } else {
         Surface(
