@@ -322,27 +322,6 @@ fun PaletteSidebar(
                                     }
                                 )
                             }
-
-                            val collapseLabel = stringResource(Res.string.flow_palette_collapse)
-                            ToolkitTooltipBox(
-                                tooltip = collapseLabel,
-                                position = ToolkitTooltipPosition.Below
-                            ) {
-                                IconButton(
-                                    onClick = { isExpanded = false },
-                                    modifier = Modifier
-                                        .size(ToolkitTheme.dimensions.denseIconButtonSize)
-                                        .pointerHoverIcon(PointerIcon.Hand)
-                                        .testTag("flow_palette_collapse_button")
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.AutoMirrored.Filled.MenuOpen,
-                                        contentDescription = collapseLabel,
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.size(ToolkitTheme.dimensions.denseIconSize)
-                                    )
-                                }
-                            }
                         }
 
                         ToolkitTextField(
@@ -407,7 +386,7 @@ fun PaletteSidebar(
             }
         }
 
-        // Persistent trailing drag/click handle allows drag-to-resize, drag-to-collapse, and drag-to-open
+        // Single persistent edge handle for click-to-toggle, drag-to-resize, drag-to-collapse, and drag-to-open
         ToolkitPaneResizeHandle(
             edge = PaneAttachmentEdge.Start,
             isExpanded = dragSnapshot.isExpanded,
@@ -421,23 +400,23 @@ fun PaletteSidebar(
             },
             testTag = "flow_palette_resize_handle",
             onClick = {
-                if (!dragSnapshot.isExpanded) {
-                    val next = ResizablePaneDragPhysics.toggle(
-                        state = dragSnapshot,
-                        minSizeDp = minPaletteWidth.value,
-                        maxSizeDp = maxPaletteWidth.value
-                    )
-                    dragSnapshot = next
-                    isExpanded = next.isExpanded
-                    scope.launch {
-                        animatedWidthDp.animateTo(next.visibleSizeDp, animationSpec = motion.defaultSpatialSpec())
-                    }
+                val next = ResizablePaneDragPhysics.toggle(
+                    state = dragSnapshot,
+                    minSizeDp = minPaletteWidth.value,
+                    maxSizeDp = maxPaletteWidth.value
+                )
+                dragSnapshot = next
+                isExpanded = next.isExpanded
+                scope.launch {
+                    animatedWidthDp.animateTo(next.visibleSizeDp, animationSpec = motion.defaultSpatialSpec())
                 }
             },
-            onDragStart = { isDragging = true },
+            onDragStart = {
+                isDragging = true
+                dragSnapshot = ResizablePaneDragPhysics.onDragStart(dragSnapshot)
+            },
             onDragDelta = { deltaX, _ ->
                 val deltaDp = with(density) { deltaX.toDp().value }
-                val prevExpanded = dragSnapshot.isExpanded
                 val next = ResizablePaneDragPhysics.onDragDelta(
                     state = dragSnapshot,
                     expandDeltaDp = deltaDp,
@@ -448,72 +427,33 @@ fun PaletteSidebar(
                     collapsible = true
                 )
                 dragSnapshot = next
-                if (next.isExpanded != prevExpanded) {
-                    isExpanded = next.isExpanded
-                    scope.launch {
-                        animatedWidthDp.animateTo(
-                            targetValue = next.visibleSizeDp,
-                            animationSpec = if (next.isExpanded) motion.defaultSpatialSpec() else collapseAnimSpec
-                        )
-                    }
-                } else if (next.isExpanded) {
-                    scope.launch { animatedWidthDp.snapTo(next.visibleSizeDp) }
-                }
+                scope.launch { animatedWidthDp.snapTo(next.visibleSizeDp) }
             },
-            onDragEnd = {
+            onDragEnd = { velocityX, _ ->
                 isDragging = false
+                val velocityDp = with(density) { velocityX.toDp().value }
                 val settled = ResizablePaneDragPhysics.onDragEnd(
                     state = dragSnapshot,
                     defaultSizeDp = defaultPaletteWidth.value,
                     minSizeDp = minPaletteWidth.value,
                     maxSizeDp = maxPaletteWidth.value,
-                    magneticSnapDp = magneticSnap.value
+                    magneticSnapDp = magneticSnap.value,
+                    collapseThresholdDp = collapseThreshold.value,
+                    expandThresholdDp = expandThreshold.value,
+                    collapsible = true,
+                    releaseExpandVelocityDpPerSec = velocityDp
                 )
                 dragSnapshot = settled
+                isExpanded = settled.isExpanded
                 scope.launch {
                     animatedWidthDp.animateTo(
                         targetValue = settled.visibleSizeDp,
-                        animationSpec = if (settled.isExpanded) motion.defaultSpatialSpec() else collapseAnimSpec
+                        animationSpec = motion.defaultSpatialSpec(),
+                        initialVelocity = velocityDp
                     )
                 }
             }
         )
-
-        if (!showPaletteBody) {
-            val expandLabel = stringResource(Res.string.flow_palette_expand)
-            ToolkitTooltipBox(
-                tooltip = expandLabel,
-                position = ToolkitTooltipPosition.Right
-            ) {
-                Surface(
-                    shape = ToolkitTheme.shapes.large,
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    border = BorderStroke(
-                        ToolkitTheme.dimensions.borderUnselected,
-                        MaterialTheme.colorScheme.outlineVariant.copy(alpha = ToolkitTheme.opacity.divider)
-                    ),
-                    shadowElevation = ToolkitTheme.dimensions.elevationMedium,
-                    modifier = Modifier.testTag("flow_palette_expand_chip")
-                ) {
-                    FilledTonalIconButton(
-                        onClick = { isExpanded = true },
-                        colors = IconButtonDefaults.filledTonalIconButtonColors(
-                            containerColor = Color.Transparent,
-                            contentColor = MaterialTheme.colorScheme.onSurface
-                        ),
-                        modifier = Modifier
-                            .size(ToolkitTheme.dimensions.standardButtonHeight)
-                            .pointerHoverIcon(PointerIcon.Hand)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Extension,
-                            contentDescription = expandLabel,
-                            modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
-                        )
-                    }
-                }
-            }
-        }
     }
 }
 

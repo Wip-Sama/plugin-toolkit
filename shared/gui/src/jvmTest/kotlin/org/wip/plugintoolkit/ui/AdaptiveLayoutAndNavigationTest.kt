@@ -581,12 +581,12 @@ class AdaptiveLayoutAndNavigationTest {
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithText("Bottom Supporting Content").assertIsDisplayed()
 
-        composeTestRule.onNodeWithContentDescription(collapseSideLabel).performClick()
+        composeTestRule.onNodeWithTag("supporting_pane_side_handle").performClick()
         composeTestRule.waitForIdle()
         assertEquals(false, showPane)
 
         // Retrieve via side divider handle
-        composeTestRule.onNodeWithContentDescription(expandSideLabel).performClick()
+        composeTestRule.onNodeWithTag("supporting_pane_side_handle").performClick()
         composeTestRule.waitForIdle()
         assertTrue(showPane)
         composeTestRule.onNodeWithText("Bottom Supporting Content").assertIsDisplayed()

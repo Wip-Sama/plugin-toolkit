@@ -17,6 +17,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.dragAndDrop
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performMouseInput
 import androidx.compose.ui.test.v2.runComposeUiTest
 import androidx.compose.ui.unit.Density
@@ -62,66 +63,74 @@ class ResizableCollapsiblePaneTest {
     }
 
     @Test
-    fun twoStageDragToCollapseHoldsAtMinSizeThenAnimatesShutPastThreshold() {
-        val initial = ResizablePaneDragSnapshot(
-            isExpanded = true,
-            visibleSizeDp = 300f,
-            lastExpandedSizeDp = 300f
+    fun commitOnReleaseDoesNotCollapseMidDragAndRecoversWhenCursorReverses() {
+        val started = ResizablePaneDragPhysics.onDragStart(
+            ResizablePaneDragSnapshot(
+                isExpanded = true,
+                visibleSizeDp = 300f,
+                lastExpandedSizeDp = 300f
+            )
         )
 
-        // Drag to minSize (240dp) + 30dp over-drag (< 64dp collapse threshold)
-        val stage1 = ResizablePaneDragPhysics.onDragDelta(
-            state = initial,
-            expandDeltaDp = -90f,
+        // Drag past minSize (240dp) by 80dp (> 64dp collapse threshold)
+        val overDragged = ResizablePaneDragPhysics.onDragDelta(
+            state = started,
+            expandDeltaDp = -140f,
             minSizeDp = 240f,
             maxSizeDp = 500f,
             collapseThresholdDp = 64f,
             expandThresholdDp = 40f,
             collapsible = true
         )
-        assertTrue(stage1.isExpanded, "Pane must stay open in Stage 1 resistance zone")
-        assertEquals(240f, stage1.visibleSizeDp, "Visible size must clamp at minSize without squishing")
-        assertEquals(30f, stage1.overDragCollapseDp)
-        assertTrue(stage1.collapseIntentProgress(64f) in 0.45f..0.48f)
+        // Must NOT flip isExpanded mid-drag (no handle teleporting!)
+        assertTrue(overDragged.isExpanded, "Pane must stay expanded until pointer release")
+        assertEquals(80f, overDragged.overDragCollapseDp)
+        assertTrue(overDragged.visibleSizeDp in 226f..240f, "Rubber-band pull should remain near minSize without squishing")
+        assertEquals(1f, overDragged.collapseIntentProgress(64f))
 
-        // Releasing in Stage 1 keeps pane open at minSize
-        val releasedInStage1 = ResizablePaneDragPhysics.onDragEnd(
-            state = stage1,
+        // Reversing direction back right by 100dp (rawCursor = 160 + 100 = 260dp) recovers 1:1 resizing cleanly
+        val recovered = ResizablePaneDragPhysics.onDragDelta(
+            state = overDragged,
+            expandDeltaDp = 100f,
+            minSizeDp = 240f,
+            maxSizeDp = 500f,
+            collapseThresholdDp = 64f,
+            expandThresholdDp = 40f,
+            collapsible = true
+        )
+        assertTrue(recovered.isExpanded)
+        assertEquals(260f, recovered.visibleSizeDp)
+        assertEquals(0f, recovered.overDragCollapseDp)
+
+        // Releasing while over-dragged past threshold commits collapse
+        val committedCollapse = ResizablePaneDragPhysics.onDragEnd(
+            state = overDragged,
             defaultSizeDp = 300f,
             minSizeDp = 240f,
             maxSizeDp = 500f,
-            magneticSnapDp = 14f
-        )
-        assertTrue(releasedInStage1.isExpanded)
-        assertEquals(240f, releasedInStage1.visibleSizeDp)
-        assertEquals(0f, releasedInStage1.overDragCollapseDp)
-
-        // Continuing over-drag past 64dp triggers Stage 2 collapse
-        val stage2 = ResizablePaneDragPhysics.onDragDelta(
-            state = stage1,
-            expandDeltaDp = -40f,
-            minSizeDp = 240f,
-            maxSizeDp = 500f,
+            magneticSnapDp = 14f,
             collapseThresholdDp = 64f,
             expandThresholdDp = 40f,
             collapsible = true
         )
-        assertFalse(stage2.isExpanded, "Crossing collapse threshold must collapse pane")
-        assertEquals(0f, stage2.visibleSizeDp)
-        assertEquals(300f, stage2.lastExpandedSizeDp, "Pre-collapse size must be preserved for restore")
+        assertFalse(committedCollapse.isExpanded, "Releasing past collapse threshold must collapse pane")
+        assertEquals(0f, committedCollapse.visibleSizeDp)
+        assertEquals(300f, committedCollapse.lastExpandedSizeDp, "Pre-collapse size must be preserved for restore")
     }
 
     @Test
-    fun dragToOpenFromCollapsedWallTransitionsContinuouslyIntoResizing() {
-        val collapsed = ResizablePaneDragSnapshot(
-            isExpanded = false,
-            visibleSizeDp = 0f,
-            lastExpandedSizeDp = 320f
+    fun dragToOpenUnveilsUnderCursorAndCommitsOnRelease() {
+        val started = ResizablePaneDragPhysics.onDragStart(
+            ResizablePaneDragSnapshot(
+                isExpanded = false,
+                visibleSizeDp = 0f,
+                lastExpandedSizeDp = 320f
+            )
         )
 
-        // Small pull (< 40dp expand threshold) keeps pane collapsed
-        val partialPull = ResizablePaneDragPhysics.onDragDelta(
-            state = collapsed,
+        // Pulling out 25dp (< 40dp expand threshold) unveils 25dp preview under cursor
+        val smallPull = ResizablePaneDragPhysics.onDragDelta(
+            state = started,
             expandDeltaDp = 25f,
             minSizeDp = 240f,
             maxSizeDp = 500f,
@@ -129,34 +138,102 @@ class ResizableCollapsiblePaneTest {
             expandThresholdDp = 40f,
             collapsible = true
         )
-        assertFalse(partialPull.isExpanded)
-        assertEquals(25f, partialPull.dragOpenProgressDp)
+        assertFalse(smallPull.isExpanded, "Must not flip isExpanded mid-drag")
+        assertEquals(25f, smallPull.visibleSizeDp, "Preview should track cursor 1:1")
+        assertEquals(25f, smallPull.dragOpenProgressDp)
 
-        // Pulling past 40dp opens the pane at minSize
-        val opened = ResizablePaneDragPhysics.onDragDelta(
-            state = partialPull,
-            expandDeltaDp = 20f,
+        // Releasing before expand threshold springs back closed
+        val releasedEarly = ResizablePaneDragPhysics.onDragEnd(
+            state = smallPull,
+            defaultSizeDp = 300f,
+            minSizeDp = 240f,
+            maxSizeDp = 500f,
+            magneticSnapDp = 14f,
+            expandThresholdDp = 40f
+        )
+        assertFalse(releasedEarly.isExpanded)
+        assertEquals(0f, releasedEarly.visibleSizeDp)
+
+        // Pulling out past expand threshold (to 90dp) and releasing restores lastExpandedSizeDp (320dp)
+        val mediumPull = ResizablePaneDragPhysics.onDragDelta(
+            state = smallPull,
+            expandDeltaDp = 65f,
             minSizeDp = 240f,
             maxSizeDp = 500f,
             collapseThresholdDp = 64f,
             expandThresholdDp = 40f,
             collapsible = true
         )
-        assertTrue(opened.isExpanded)
-        assertEquals(240f, opened.visibleSizeDp)
+        assertEquals(90f, mediumPull.visibleSizeDp)
+        val releasedOpen = ResizablePaneDragPhysics.onDragEnd(
+            state = mediumPull,
+            defaultSizeDp = 300f,
+            minSizeDp = 240f,
+            maxSizeDp = 500f,
+            magneticSnapDp = 14f,
+            expandThresholdDp = 40f
+        )
+        assertTrue(releasedOpen.isExpanded)
+        assertEquals(320f, releasedOpen.visibleSizeDp)
 
-        // Continued drag in the same gesture grows the newly opened pane seamlessly
-        val resized = ResizablePaneDragPhysics.onDragDelta(
-            state = opened,
-            expandDeltaDp = 80f,
+        // Pulling all the way to 360dp (>= minSizeDp) settles at cursor position (360dp)
+        val fullPull = ResizablePaneDragPhysics.onDragDelta(
+            state = mediumPull,
+            expandDeltaDp = 270f,
             minSizeDp = 240f,
             maxSizeDp = 500f,
             collapseThresholdDp = 64f,
             expandThresholdDp = 40f,
             collapsible = true
         )
-        assertTrue(resized.isExpanded)
-        assertEquals(320f, resized.visibleSizeDp)
+        val releasedAtCursor = ResizablePaneDragPhysics.onDragEnd(
+            state = fullPull,
+            defaultSizeDp = 300f,
+            minSizeDp = 240f,
+            maxSizeDp = 500f,
+            magneticSnapDp = 14f,
+            expandThresholdDp = 40f
+        )
+        assertTrue(releasedAtCursor.isExpanded)
+        assertEquals(360f, releasedAtCursor.visibleSizeDp)
+    }
+
+    @Test
+    fun velocityFlingCollapsesAndExpandsSmoothly() {
+        val nearMin = ResizablePaneDragSnapshot(
+            isExpanded = true,
+            visibleSizeDp = 250f,
+            lastExpandedSizeDp = 300f,
+            rawCursorSizeDp = 250f
+        )
+        val flungClosed = ResizablePaneDragPhysics.onDragEnd(
+            state = nearMin,
+            defaultSizeDp = 300f,
+            minSizeDp = 240f,
+            maxSizeDp = 500f,
+            magneticSnapDp = 14f,
+            releaseExpandVelocityDpPerSec = -900f
+        )
+        assertFalse(flungClosed.isExpanded)
+        assertEquals(0f, flungClosed.visibleSizeDp)
+
+        val smallOpenPull = ResizablePaneDragSnapshot(
+            isExpanded = false,
+            visibleSizeDp = 20f,
+            lastExpandedSizeDp = 300f,
+            dragOpenProgressDp = 20f,
+            rawCursorSizeDp = 20f
+        )
+        val flungOpen = ResizablePaneDragPhysics.onDragEnd(
+            state = smallOpenPull,
+            defaultSizeDp = 300f,
+            minSizeDp = 240f,
+            maxSizeDp = 500f,
+            magneticSnapDp = 14f,
+            releaseExpandVelocityDpPerSec = 900f
+        )
+        assertTrue(flungOpen.isExpanded)
+        assertEquals(300f, flungOpen.visibleSizeDp)
     }
 
     @Test
@@ -164,7 +241,8 @@ class ResizableCollapsiblePaneTest {
         val nearDefault = ResizablePaneDragSnapshot(
             isExpanded = true,
             visibleSizeDp = 308f,
-            lastExpandedSizeDp = 308f
+            lastExpandedSizeDp = 308f,
+            rawCursorSizeDp = 308f
         )
         val snapped = ResizablePaneDragPhysics.onDragEnd(
             state = nearDefault,
@@ -174,6 +252,59 @@ class ResizableCollapsiblePaneTest {
             magneticSnapDp = 14f
         )
         assertEquals(300f, snapped.visibleSizeDp)
+    }
+
+    @OptIn(ExperimentalMaterial3AdaptiveApi::class)
+    @Test
+    fun clickHandleTogglesOpenAndClosedOnBothHorizontalAndVerticalEdges() = runComposeUiTest {
+        var listExpanded by mutableStateOf(true)
+        var supportingExpanded by mutableStateOf(true)
+        var supportingWidth by mutableStateOf(1150.dp)
+
+        setContent {
+            AppTheme(appearance = AppearanceSettings()) {
+                CompositionLocalProvider(LocalDensity provides Density(1f)) {
+                    Box(modifier = Modifier.width(supportingWidth).height(700.dp)) {
+                        ToolkitAdaptiveSupportingWorkspace(
+                            showSupportingPane = supportingExpanded,
+                            onShowSupportingPaneChange = { supportingExpanded = it },
+                            collapseTooltip = "",
+                            expandTooltip = "",
+                            mainPane = {
+                                ToolkitAdaptiveListDetailWorkspace<String>(
+                                    listPaneWidth = 260.dp,
+                                    listPaneMinWidth = 200.dp,
+                                    isListPaneExpanded = listExpanded,
+                                    onListPaneExpandedChange = { listExpanded = it },
+                                    listPane = { Text("List Content") },
+                                    detailPane = { Text("Detail Content") }
+                                )
+                            },
+                            supportingPane = { Text("Supporting Content") }
+                        )
+                    }
+                }
+            }
+        }
+
+        waitForIdle()
+        // Horizontal End handle (side supporting card): click closes, click opens
+        onNodeWithTag("supporting_pane_side_handle").performClick()
+        waitForIdle()
+        assertFalse(supportingExpanded, "Clicking open side supporting handle should close it")
+        onNodeWithTag("supporting_pane_side_handle").performClick()
+        waitForIdle()
+        assertTrue(supportingExpanded, "Clicking closed side supporting handle should open it")
+
+        // Vertical Bottom handle (narrow supporting card): click closes, click opens
+        supportingWidth = 520.dp
+        waitForIdle()
+        onNodeWithTag("supporting_pane_bottom_handle").performClick()
+        waitForIdle()
+        assertFalse(supportingExpanded, "Clicking open bottom supporting handle should close it")
+        onNodeWithTag("supporting_pane_bottom_handle").performClick()
+        waitForIdle()
+        assertTrue(supportingExpanded, "Clicking closed bottom supporting handle should open it")
     }
 
     @OptIn(ExperimentalTestApi::class, ExperimentalMaterial3AdaptiveApi::class)
@@ -202,7 +333,7 @@ class ResizableCollapsiblePaneTest {
         onNodeWithText("Interactive Sidebar").assertIsDisplayed()
         onNodeWithText("Interactive Canvas").assertIsDisplayed()
 
-        // Drag handle left across minWidth (60dp) + collapseThreshold (64dp) -> collapses sidebar
+        // Drag handle left across minWidth (60dp) + collapseThreshold (64dp) -> commits collapse on release
         onNodeWithTag("list_detail_pane_resize_handle").performMouseInput {
             dragAndDrop(
                 start = center,
@@ -215,7 +346,7 @@ class ResizableCollapsiblePaneTest {
         onNodeWithText("Interactive Sidebar").assertDoesNotExist()
         onNodeWithText("Interactive Canvas").assertIsDisplayed()
 
-        // Drag collapsed left-edge handle right past expandThreshold (40dp) -> restores sidebar
+        // Drag collapsed left-edge handle right past expandThreshold (40dp) -> commits expand on release
         onNodeWithTag("list_detail_pane_resize_handle").performMouseInput {
             dragAndDrop(
                 start = center,

@@ -1,6 +1,8 @@
 package org.wip.plugintoolkit.shared.components.sidebar
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
 import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
@@ -10,18 +12,24 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.dragAndDrop
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performMouseInput
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import org.junit.Rule
 import org.wip.plugintoolkit.core.theme.AppTheme
 import org.wip.plugintoolkit.features.settings.model.AppearanceSettings
 import org.wip.plugintoolkit.shared.components.ToolkitAdaptiveListDetailWorkspace
+import org.wip.plugintoolkit.shared.components.computeMaxAdaptiveListPaneWidth
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -198,5 +206,154 @@ class ToolkitFloatingSidebarTest {
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithText("Drilldown: plugin-alpha").assertIsDisplayed()
         composeTestRule.onNodeWithText("Sequel: plugin-alpha").assertDoesNotExist()
+    }
+
+    @Test
+    fun adaptiveSequelAvailabilityBlocksTwoColumnsWhenWorkspaceCapacityIsTooNarrow() {
+        // Workspace too narrow (maxListPaneWidth = 360dp < 480dp): NEVER allows split, even ForcedExpanded
+        assertFalse(
+            resolveAdaptiveSequelExpanded(
+                maxListPaneWidth = 360.dp,
+                minTwoColumnWidth = 480.dp,
+                mode = SequelSidebarMode.ForcedExpanded,
+                isWideViewport = true,
+                hasSelection = true,
+                dragOverride = true
+            )
+        )
+
+        // Workspace wide enough (maxListPaneWidth = 540dp >= 480dp): allows split in Auto with selection
+        assertTrue(
+            resolveAdaptiveSequelExpanded(
+                maxListPaneWidth = 540.dp,
+                minTwoColumnWidth = 480.dp,
+                mode = SequelSidebarMode.Auto,
+                isWideViewport = true,
+                hasSelection = true
+            )
+        )
+
+        // Standard 1280dp window with 240dp nav sidebar + 28dp workspace padding -> 1012dp inner width
+        val maxPaneAt1280 = computeMaxAdaptiveListPaneWidth(
+            workspaceInnerWidth = 1012.dp,
+            listPaneMinWidth = 240.dp,
+            handleThickness = 14.dp
+        )
+        assertTrue(
+            maxPaneAt1280 >= 480.dp,
+            "1280dp window with expanded nav sidebar should fit two-column sidebar (got $maxPaneAt1280)"
+        )
+
+        // Narrower 860dp inner workspace -> 860 - 400 - 14 = 446dp < 480dp -> cleanly blocks two-column sliver
+        val maxPaneAtNarrow = computeMaxAdaptiveListPaneWidth(
+            workspaceInnerWidth = 860.dp,
+            listPaneMinWidth = 240.dp,
+            handleThickness = 14.dp
+        )
+        assertTrue(
+            maxPaneAtNarrow < 480.dp,
+            "Narrow workspace should report maxPane < 480dp (got $maxPaneAtNarrow)"
+        )
+    }
+
+    @OptIn(ExperimentalMaterial3AdaptiveApi::class, ExperimentalTestApi::class)
+    @Test
+    fun draggingSidebarNarrowThenReEnablingTwoColumnModeExpandsPaneToFullTwoColumnWidth() {
+        var sequelMode by mutableStateOf(SequelSidebarMode.Auto)
+        var dragSequelOverride by mutableStateOf<Boolean?>(null)
+        var widthRequestKey by mutableStateOf(0)
+
+        composeTestRule.setContent {
+            AppTheme(appearance = AppearanceSettings()) {
+                CompositionLocalProvider(LocalDensity provides Density(1f)) {
+                    Box(modifier = Modifier.width(1200.dp).height(700.dp)) {
+                        val targetSequel = resolveAdaptiveSequelExpanded(
+                            maxListPaneWidth = 600.dp,
+                            minTwoColumnWidth = 480.dp,
+                            mode = sequelMode,
+                            isWideViewport = true,
+                            hasSelection = true,
+                            dragOverride = null
+                        )
+                        val isSequelExpanded = resolveAdaptiveSequelExpanded(
+                            maxListPaneWidth = 600.dp,
+                            minTwoColumnWidth = 480.dp,
+                            mode = sequelMode,
+                            isWideViewport = true,
+                            hasSelection = true,
+                            dragOverride = dragSequelOverride
+                        )
+                        ToolkitAdaptiveListDetailWorkspace<String>(
+                            listPaneWidth = if (targetSequel) 540.dp else 300.dp,
+                            listPaneWidthRequestKey = widthRequestKey,
+                            onLiveListPaneWidthChanged = { draggedWidth ->
+                                val nextSplit = SequelSidebarHysteresis.resolveFromDraggedWidth(
+                                    isCurrentlySplit = isSequelExpanded,
+                                    draggedWidth = draggedWidth
+                                )
+                                if (nextSplit != isSequelExpanded) {
+                                    dragSequelOverride = nextSplit
+                                }
+                            },
+                            listPane = {
+                                ToolkitFloatingSidebar(
+                                    navigationKey = isSequelExpanded,
+                                    animateSequelWidth = false,
+                                    sequelVisible = isSequelExpanded,
+                                    sequelContent = {
+                                        Text("Capabilities Column")
+                                    }
+                                ) {
+                                    ToolkitFloatingSidebarScaffold(
+                                        title = "Loaded Plugins",
+                                        headerActions = {
+                                            ToolkitSequelSidebarToggleButton(
+                                                isExpanded = isSequelExpanded,
+                                                onToggle = {
+                                                    dragSequelOverride = null
+                                                    sequelMode = toggleSequelSidebarMode(isSequelExpanded)
+                                                    widthRequestKey++
+                                                }
+                                            )
+                                        }
+                                    ) {
+                                        Text("Plugin List")
+                                    }
+                                }
+                            },
+                            detailPane = {
+                                Text("Detail Area")
+                            }
+                        )
+                    }
+                }
+            }
+        }
+
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithText("Capabilities Column").assertIsDisplayed()
+
+        // Step 1: Drag sidebar narrower by 260dp (540 -> ~280dp), collapsing 2-column to 1-column via hysteresis
+        composeTestRule.onNodeWithTag("list_detail_pane_resize_handle").performMouseInput {
+            dragAndDrop(
+                start = center,
+                end = Offset(center.x - 260f, center.y),
+                durationMillis = 150
+            )
+        }
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithText("Capabilities Column").assertDoesNotExist()
+
+        // Step 2: Re-enable 2-column mode via toggle button -> pane MUST expand back to >= 480dp (no clipped sliver!)
+        composeTestRule.onNodeWithTag("sequel_sidebar_toggle").performClick()
+        composeTestRule.waitForIdle()
+
+        val sidebarBounds = composeTestRule.onNodeWithTag("toolkit_floating_sidebar").getUnclippedBoundsInRoot()
+        val sidebarWidthDp = sidebarBounds.right.value - sidebarBounds.left.value
+        assertTrue(
+            sidebarWidthDp >= 480f,
+            "Re-enabling 2-column mode after dragging narrow must expand sidebar to >= 480dp, got $sidebarWidthDp"
+        )
+        composeTestRule.onNodeWithText("Capabilities Column").assertIsDisplayed()
     }
 }

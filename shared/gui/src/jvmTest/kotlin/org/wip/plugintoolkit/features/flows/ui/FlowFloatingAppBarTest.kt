@@ -182,7 +182,45 @@ class FlowFloatingAppBarTest {
         onNodeWithTag("toolbar_spline_settings").performClick()
         waitForIdle()
         onNodeWithTag("spline_settings_card").assertIsDisplayed()
+        val splineBounds = onNodeWithTag("spline_settings_card").getUnclippedBoundsInRoot()
+        val splineWidth = splineBounds.right.value - splineBounds.left.value
+        assertTrue(
+            splineWidth in 280f..360f,
+            "Expected SplineSettingsCard to be compactly bounded (<= 360dp), got $splineWidth"
+        )
         assertEquals(ConnectionCurveStyle.CardinalSpline, selectedStyle)
+    }
+
+    @Test
+    fun flowEditorTopBarCentersAtTopAndMatchesToolbarStyle() = runComposeUiTest {
+        setContent {
+            AppTheme(appearance = AppearanceSettings()) {
+                CompositionLocalProvider(LocalDensity provides Density(1f)) {
+                    Box(modifier = Modifier.fillMaxSize().testTag("editor_canvas_host")) {
+                        FlowEditorTopBar(
+                            flowName = "Sample Pipeline",
+                            isReadOnly = false,
+                            readOnlyReasons = emptyList(),
+                            hasUnsavedChanges = true,
+                            onExportImage = {},
+                            onSave = {},
+                            onExit = {},
+                            modifier = Modifier.align(Alignment.TopCenter)
+                        )
+                    }
+                }
+            }
+        }
+
+        waitForIdle()
+        val hostBounds = onNodeWithTag("editor_canvas_host").getUnclippedBoundsInRoot()
+        val hostCenterX = (hostBounds.left.value + hostBounds.right.value) / 2f
+        val topBarBounds = onNodeWithTag("flow_editor_top_bar").getUnclippedBoundsInRoot()
+        val topBarCenterX = (topBarBounds.left.value + topBarBounds.right.value) / 2f
+        assertTrue(
+            abs(topBarCenterX - hostCenterX) <= 2f,
+            "Expected FlowEditorTopBar horizontal center near ${hostCenterX}dp, got $topBarCenterX"
+        )
     }
 
     @OptIn(ExperimentalTestApi::class)

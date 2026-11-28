@@ -2270,7 +2270,7 @@ private fun RenderSplitPane(
                 minMainPaneSize = minPaneDp,
                 maxPaneFraction = 0.85f,
                 collapsible = true,
-                clickToCollapseWhenExpanded = false,
+                clickToCollapseWhenExpanded = true,
                 handleTooltipCollapse = resizeLabel,
                 handleTooltipExpand = resizeLabel,
                 onLivePaneSizeChanged = { liveSize ->
@@ -2853,25 +2853,31 @@ private fun RenderSidebar(
                 ),
                 testTag = "sdui_sidebar_resize_handle_${node.id}",
                 onClick = {
-                    if (isCollapsed) {
-                        isCollapsed = false
-                        val nextTarget = dragSnapshot.lastExpandedSizeDp.coerceIn(minExpandedWidth.value, maxExpandedWidth.value)
-                        dragSnapshot = dragSnapshot.copy(
-                            isExpanded = true,
-                            visibleSizeDp = nextTarget,
-                            overDragCollapseDp = 0f,
-                            dragOpenProgressDp = 0f
-                        )
-                        scope.launch {
-                            animatedSidebarWidthDp.animateTo(nextTarget, motion.defaultSpatialSpec())
-                        }
+                    val nextCollapsed = !isCollapsed
+                    isCollapsed = nextCollapsed
+                    val nextTarget = if (nextCollapsed) {
+                        collapsedWidth.value
+                    } else {
+                        dragSnapshot.lastExpandedSizeDp.coerceIn(minExpandedWidth.value, maxExpandedWidth.value)
+                    }
+                    dragSnapshot = dragSnapshot.copy(
+                        isExpanded = !nextCollapsed,
+                        visibleSizeDp = if (nextCollapsed) 0f else nextTarget,
+                        overDragCollapseDp = 0f,
+                        dragOpenProgressDp = 0f,
+                        rawCursorSizeDp = if (nextCollapsed) 0f else nextTarget
+                    )
+                    scope.launch {
+                        animatedSidebarWidthDp.animateTo(nextTarget, motion.defaultSpatialSpec())
                     }
                 },
-                onDragStart = { isDraggingHandle = true },
+                onDragStart = {
+                    isDraggingHandle = true
+                    dragSnapshot = ResizablePaneDragPhysics.onDragStart(dragSnapshot)
+                },
                 onDragDelta = { deltaX, _ ->
                     val expandSign = if (edge == PaneAttachmentEdge.Start) 1f else -1f
                     val expandDeltaDp = (deltaX / density.density) * expandSign
-                    val wasExpanded = dragSnapshot.isExpanded
                     val updated = ResizablePaneDragPhysics.onDragDelta(
                         state = dragSnapshot,
                         expandDeltaDp = expandDeltaDp,
@@ -2882,36 +2888,34 @@ private fun RenderSidebar(
                         collapsible = true
                     )
                     dragSnapshot = updated
-                    if (wasExpanded && !updated.isExpanded) {
-                        isCollapsed = true
-                        scope.launch {
-                            animatedSidebarWidthDp.animateTo(collapsedWidth.value, motion.fastSpatialSpec())
-                        }
-                    } else if (!wasExpanded && updated.isExpanded) {
-                        isCollapsed = false
-                        scope.launch {
-                            animatedSidebarWidthDp.snapTo(updated.visibleSizeDp)
-                        }
-                    } else if (updated.isExpanded) {
-                        scope.launch {
-                            animatedSidebarWidthDp.snapTo(updated.visibleSizeDp)
-                        }
+                    scope.launch {
+                        animatedSidebarWidthDp.snapTo(updated.visibleSizeDp.coerceAtLeast(collapsedWidth.value))
                     }
                 },
-                onDragEnd = {
+                onDragEnd = { velocityX, _ ->
+                    val expandSign = if (edge == PaneAttachmentEdge.Start) 1f else -1f
+                    val velocityDp = (velocityX / density.density) * expandSign
                     val settled = ResizablePaneDragPhysics.onDragEnd(
                         state = dragSnapshot,
                         defaultSizeDp = defaultExpandedWidth.value,
                         minSizeDp = minExpandedWidth.value,
                         maxSizeDp = maxExpandedWidth.value,
-                        magneticSnapDp = magneticSnapDp
+                        magneticSnapDp = magneticSnapDp,
+                        collapseThresholdDp = collapseThresholdDp,
+                        expandThresholdDp = expandThresholdDp,
+                        collapsible = true,
+                        releaseExpandVelocityDpPerSec = velocityDp
                     )
                     dragSnapshot = settled
                     isDraggingHandle = false
                     isCollapsed = !settled.isExpanded
                     val target = if (settled.isExpanded) settled.visibleSizeDp else collapsedWidth.value
                     scope.launch {
-                        animatedSidebarWidthDp.animateTo(target, motion.defaultSpatialSpec())
+                        animatedSidebarWidthDp.animateTo(
+                            targetValue = target,
+                            animationSpec = motion.defaultSpatialSpec(),
+                            initialVelocity = velocityDp
+                        )
                     }
                 }
             )

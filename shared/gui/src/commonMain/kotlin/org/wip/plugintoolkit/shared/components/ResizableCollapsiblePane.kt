@@ -2,8 +2,6 @@ package org.wip.plugintoolkit.shared.components
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -38,10 +36,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.input.pointer.util.VelocityTracker
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.platform.testTag
@@ -62,6 +63,12 @@ private const val COLLAPSED_VISIBILITY_THRESHOLD_DP = 0.5f
 private const val HANDLE_HOVER_LENGTH_MULTIPLIER = 1.4f
 private const val HANDLE_COLLAPSE_INTENT_SHRINK_FACTOR = 0.35f
 private const val HANDLE_HOVER_BG_ALPHA = 0.55f
+private const val RUBBER_BAND_MAX_DP = 14f
+private const val RUBBER_BAND_DAMPING_DISTANCE_DP = 120f
+private const val FLING_VELOCITY_THRESHOLD_DP_PER_SEC = 700f
+private const val FLING_COLLAPSE_PROXIMITY_DP = 28f
+private const val FLING_EXPAND_MIN_PULL_DP = 8f
+private const val MAX_SETTLE_VELOCITY_DP_PER_SEC = 2400f
 
 /**
  * Edge of the host workspace to which a collapsible/resizable pane is docked.
@@ -78,13 +85,19 @@ enum class PaneAttachmentEdge {
 
 /**
  * Immutable snapshot representing the drag/resistance state of a resizable collapsible pane.
+ *
+ * [isExpanded] represents the committed open/closed state; during an active drag it is never
+ * flipped mid-gesture so the handle never teleports away from the user's cursor. Instead,
+ * [rawCursorSizeDp] tracks the true cursor distance from the docked wall and [ResizablePaneDragPhysics.onDragEnd]
+ * commits collapse/expand cleanly on pointer release.
  */
 data class ResizablePaneDragSnapshot(
     val isExpanded: Boolean,
     val visibleSizeDp: Float,
     val lastExpandedSizeDp: Float,
     val overDragCollapseDp: Float = 0f,
-    val dragOpenProgressDp: Float = 0f
+    val dragOpenProgressDp: Float = 0f,
+    val rawCursorSizeDp: Float = visibleSizeDp
 ) {
     /** Normalized `[0f..1f]` progress through the Stage-1 resistance zone toward Stage-2 collapse. */
     fun collapseIntentProgress(collapseThresholdDp: Float): Float =
@@ -96,7 +109,7 @@ data class ResizablePaneDragSnapshot(
 }
 
 /**
- * Pure, deterministic drag & two-stage collapse/expand physics reducer shared across all
+ * Pure, deterministic, cursor-locked drag & commit-on-release physics reducer shared across all
  * horizontal and vertical resizable panes in the application.
  */
 object ResizablePaneDragPhysics {
@@ -129,16 +142,28 @@ object ResizablePaneDragPhysics {
     }
 
     /**
-     * Advances drag state by [expandDeltaDp] (positive = away from wall, negative = toward wall).
+     * Initializes [ResizablePaneDragSnapshot.rawCursorSizeDp] at the start of a pointer drag gesture.
+     */
+    fun onDragStart(state: ResizablePaneDragSnapshot): ResizablePaneDragSnapshot = state.copy(
+        rawCursorSizeDp = if (state.isExpanded) state.visibleSizeDp else 0f,
+        overDragCollapseDp = 0f,
+        dragOpenProgressDp = 0f
+    )
+
+    /**
+     * Advances drag state by [expandDeltaDp] (positive = away from wall, negative = toward wall)
+     * without flipping [ResizablePaneDragSnapshot.isExpanded] mid-gesture:
      *
-     * Implements two-stage drag-to-collapse:
-     * 1. **Stop / Resistance Hold:** Dragging past [minSizeDp] clamps [ResizablePaneDragSnapshot.visibleSizeDp]
-     *    at [minSizeDp] (zero squishing) while accumulating [ResizablePaneDragSnapshot.overDragCollapseDp].
-     * 2. **Collapse Detent:** Crossing [collapseThresholdDp] triggers collapse (`isExpanded = false`).
-     *
-     * Implements continuous drag-to-open:
-     * - Pulling a collapsed pane past [expandThresholdDp] transitions to `isExpanded = true` so
-     *   continued pointer movement in the same gesture seamlessly resizes the pane.
+     * - **Started Expanded**:
+     *   - Within `[minSizeDp, maxSizeDp]`, [ResizablePaneDragSnapshot.visibleSizeDp] tracks the
+     *     cursor 1:1.
+     *   - Below `minSizeDp`, the pane resists shrinking (subtle rubber-band pull while inner content
+     *     remains clamped at `minSizeDp` with zero squishing) and accumulates `overDragCollapseDp`.
+     *     Reversing direction back past `minSizeDp` smoothly resumes 1:1 resizing.
+     *   - Above `maxSizeDp`, applies gentle elastic rubber-band stretch that springs back on release.
+     * - **Started Collapsed**:
+     *   - Unveils the clipped pane 1:1 directly behind the cursor from `0.dp` onward so the handle
+     *     stays locked to the pointer. Reversing back toward `0.dp` smoothly closes the preview.
      */
     fun onDragDelta(
         state: ResizablePaneDragSnapshot,
@@ -150,121 +175,140 @@ object ResizablePaneDragPhysics {
         collapsible: Boolean
     ): ResizablePaneDragSnapshot {
         val safeMax = maxOf(minSizeDp, maxSizeDp)
-        if (state.isExpanded) {
-            if (state.overDragCollapseDp > 0f) {
-                val nextOverDrag = state.overDragCollapseDp - expandDeltaDp
-                return when {
-                    nextOverDrag <= 0f -> {
-                        val grown = (minSizeDp + (-nextOverDrag)).coerceIn(minSizeDp, safeMax)
-                        state.copy(
-                            visibleSizeDp = grown,
-                            lastExpandedSizeDp = grown,
-                            overDragCollapseDp = 0f
-                        )
-                    }
-                    collapsible && nextOverDrag >= collapseThresholdDp -> {
-                        state.copy(
-                            isExpanded = false,
-                            visibleSizeDp = 0f,
-                            lastExpandedSizeDp = state.lastExpandedSizeDp.coerceIn(minSizeDp, safeMax),
-                            overDragCollapseDp = 0f,
-                            dragOpenProgressDp = 0f
-                        )
-                    }
-                    else -> {
-                        state.copy(
-                            visibleSizeDp = minSizeDp,
-                            overDragCollapseDp = nextOverDrag
-                        )
-                    }
-                }
-            }
+        val nextRaw = state.rawCursorSizeDp + expandDeltaDp
 
-            val candidate = state.visibleSizeDp + expandDeltaDp
-            if (candidate < minSizeDp) {
+        if (state.isExpanded) {
+            if (nextRaw < minSizeDp) {
                 if (!collapsible) {
                     return state.copy(
                         visibleSizeDp = minSizeDp,
                         lastExpandedSizeDp = minSizeDp,
-                        overDragCollapseDp = 0f
-                    )
-                }
-                val overDrag = minSizeDp - candidate
-                return if (overDrag >= collapseThresholdDp) {
-                    state.copy(
-                        isExpanded = false,
-                        visibleSizeDp = 0f,
-                        lastExpandedSizeDp = state.lastExpandedSizeDp.coerceIn(minSizeDp, safeMax),
                         overDragCollapseDp = 0f,
-                        dragOpenProgressDp = 0f
-                    )
-                } else {
-                    state.copy(
-                        visibleSizeDp = minSizeDp,
-                        overDragCollapseDp = overDrag
+                        rawCursorSizeDp = minSizeDp
                     )
                 }
+                val overDrag = minSizeDp - nextRaw
+                val rubberPull = rubberBand(overDrag, RUBBER_BAND_MAX_DP)
+                return state.copy(
+                    visibleSizeDp = (minSizeDp - rubberPull).coerceAtLeast(0f),
+                    overDragCollapseDp = overDrag,
+                    rawCursorSizeDp = nextRaw
+                )
             }
 
-            val clamped = candidate.coerceIn(minSizeDp, safeMax)
-            return state.copy(
-                visibleSizeDp = clamped,
-                lastExpandedSizeDp = clamped,
-                overDragCollapseDp = 0f
-            )
-        } else {
-            val nextOpenProgress = (state.dragOpenProgressDp + expandDeltaDp).coerceAtLeast(0f)
-            return if (nextOpenProgress >= expandThresholdDp) {
-                val initialOpenSize = maxOf(minSizeDp, nextOpenProgress).coerceIn(minSizeDp, safeMax)
-                state.copy(
-                    isExpanded = true,
-                    visibleSizeDp = initialOpenSize,
-                    lastExpandedSizeDp = initialOpenSize,
+            if (nextRaw > safeMax) {
+                val stretch = rubberBand(nextRaw - safeMax, RUBBER_BAND_MAX_DP)
+                return state.copy(
+                    visibleSizeDp = safeMax + stretch,
+                    lastExpandedSizeDp = safeMax,
                     overDragCollapseDp = 0f,
-                    dragOpenProgressDp = 0f
-                )
-            } else {
-                state.copy(
-                    isExpanded = false,
-                    visibleSizeDp = 0f,
-                    dragOpenProgressDp = nextOpenProgress
+                    rawCursorSizeDp = nextRaw
                 )
             }
+
+            return state.copy(
+                visibleSizeDp = nextRaw,
+                lastExpandedSizeDp = nextRaw,
+                overDragCollapseDp = 0f,
+                rawCursorSizeDp = nextRaw
+            )
+        } else {
+            val openDistance = nextRaw.coerceAtLeast(0f)
+            val previewSize = if (openDistance <= safeMax) {
+                openDistance
+            } else {
+                safeMax + rubberBand(openDistance - safeMax, RUBBER_BAND_MAX_DP)
+            }
+            return state.copy(
+                isExpanded = false,
+                visibleSizeDp = previewSize,
+                dragOpenProgressDp = openDistance,
+                overDragCollapseDp = 0f,
+                rawCursorSizeDp = nextRaw
+            )
         }
     }
 
     /**
-     * Finalizes drag state on pointer release, clearing transient over-drag/open progress and
-     * applying optional magnetic snapping near [defaultSizeDp].
+     * Commits collapse/expand on pointer release based on over-drag/open thresholds or fling
+     * velocity, and applies optional magnetic snapping near [defaultSizeDp].
      */
     fun onDragEnd(
         state: ResizablePaneDragSnapshot,
         defaultSizeDp: Float,
         minSizeDp: Float,
         maxSizeDp: Float,
-        magneticSnapDp: Float
+        magneticSnapDp: Float,
+        collapseThresholdDp: Float = 64f,
+        expandThresholdDp: Float = 40f,
+        collapsible: Boolean = true,
+        releaseExpandVelocityDpPerSec: Float = 0f
     ): ResizablePaneDragSnapshot {
         val safeMax = maxOf(minSizeDp, maxSizeDp)
-        if (!state.isExpanded) {
+        val clampedDefault = defaultSizeDp.coerceIn(minSizeDp, safeMax)
+
+        if (state.isExpanded) {
+            val isInwardFlingNearMin = state.rawCursorSizeDp <= (minSizeDp + FLING_COLLAPSE_PROXIMITY_DP) &&
+                releaseExpandVelocityDpPerSec <= -FLING_VELOCITY_THRESHOLD_DP_PER_SEC
+            val shouldCollapse = collapsible && (state.overDragCollapseDp >= collapseThresholdDp || isInwardFlingNearMin)
+            if (shouldCollapse) {
+                return state.copy(
+                    isExpanded = false,
+                    visibleSizeDp = 0f,
+                    lastExpandedSizeDp = state.lastExpandedSizeDp.coerceIn(minSizeDp, safeMax),
+                    overDragCollapseDp = 0f,
+                    dragOpenProgressDp = 0f,
+                    rawCursorSizeDp = 0f
+                )
+            }
+
+            val clamped = state.rawCursorSizeDp.coerceIn(minSizeDp, safeMax)
+            val settled = if (magneticSnapDp > 0f && abs(clamped - clampedDefault) <= magneticSnapDp) {
+                clampedDefault
+            } else {
+                clamped
+            }
             return state.copy(
-                visibleSizeDp = 0f,
+                isExpanded = true,
+                visibleSizeDp = settled,
+                lastExpandedSizeDp = settled,
                 overDragCollapseDp = 0f,
-                dragOpenProgressDp = 0f
+                dragOpenProgressDp = 0f,
+                rawCursorSizeDp = settled
+            )
+        } else {
+            val isOutwardFling = state.dragOpenProgressDp >= FLING_EXPAND_MIN_PULL_DP &&
+                releaseExpandVelocityDpPerSec >= FLING_VELOCITY_THRESHOLD_DP_PER_SEC
+            val shouldExpand = state.dragOpenProgressDp >= expandThresholdDp || isOutwardFling
+            if (!shouldExpand) {
+                return state.copy(
+                    isExpanded = false,
+                    visibleSizeDp = 0f,
+                    overDragCollapseDp = 0f,
+                    dragOpenProgressDp = 0f,
+                    rawCursorSizeDp = 0f
+                )
+            }
+
+            val targetSize = if (state.rawCursorSizeDp >= minSizeDp) {
+                val clamped = state.rawCursorSizeDp.coerceIn(minSizeDp, safeMax)
+                if (magneticSnapDp > 0f && abs(clamped - clampedDefault) <= magneticSnapDp) {
+                    clampedDefault
+                } else {
+                    clamped
+                }
+            } else {
+                state.lastExpandedSizeDp.coerceIn(minSizeDp, safeMax)
+            }
+            return state.copy(
+                isExpanded = true,
+                visibleSizeDp = targetSize,
+                lastExpandedSizeDp = targetSize,
+                overDragCollapseDp = 0f,
+                dragOpenProgressDp = 0f,
+                rawCursorSizeDp = targetSize
             )
         }
-        val clamped = state.visibleSizeDp.coerceIn(minSizeDp, safeMax)
-        val clampedDefault = defaultSizeDp.coerceIn(minSizeDp, safeMax)
-        val settled = if (magneticSnapDp > 0f && abs(clamped - clampedDefault) <= magneticSnapDp) {
-            clampedDefault
-        } else {
-            clamped
-        }
-        return state.copy(
-            visibleSizeDp = settled,
-            lastExpandedSizeDp = settled,
-            overDragCollapseDp = 0f,
-            dragOpenProgressDp = 0f
-        )
     }
 
     /**
@@ -282,7 +326,8 @@ object ResizablePaneDragPhysics {
                 isExpanded = false,
                 visibleSizeDp = 0f,
                 overDragCollapseDp = 0f,
-                dragOpenProgressDp = 0f
+                dragOpenProgressDp = 0f,
+                rawCursorSizeDp = 0f
             )
         } else {
             val restored = state.lastExpandedSizeDp.coerceIn(minSizeDp, safeMax)
@@ -291,9 +336,15 @@ object ResizablePaneDragPhysics {
                 visibleSizeDp = restored,
                 lastExpandedSizeDp = restored,
                 overDragCollapseDp = 0f,
-                dragOpenProgressDp = 0f
+                dragOpenProgressDp = 0f,
+                rawCursorSizeDp = restored
             )
         }
+    }
+
+    private fun rubberBand(overDragDp: Float, maxPullDp: Float): Float {
+        if (overDragDp <= 0f) return 0f
+        return maxPullDp * (overDragDp / (overDragDp + RUBBER_BAND_DAMPING_DISTANCE_DP))
     }
 }
 
@@ -303,12 +354,11 @@ object ResizablePaneDragPhysics {
  * [PaneAttachmentEdge.Bottom]).
  *
  * Features:
- * - Instant 1:1 pointer tracking during active drag and Material 3 Expressive spring settle
- *   (`defaultSpatialSpec()`) on release or programmatic toggle.
+ * - Root-space 1:1 pointer tracking during active drag so the handle never detaches from the cursor.
+ * - Commit-on-release collapse/expand with elastic rubber-band resistance at bounds and
+ *   velocity-preserving Material 3 Expressive spring settle (`defaultSpatialSpec()`).
  * - Minimum-size clamping on both the collapsible pane and the companion main pane (zero squish).
- * - Two-stage drag-to-collapse (hold at [minPaneSize], animate shut after [collapseDragThreshold]).
- * - Continuous drag-to-open from the docked edge handle, plus click-to-expand.
- * - Single persistent handle slot so gestures are never interrupted when crossing collapsed/expanded.
+ * - Unified click-to-toggle (open <-> closed) on every horizontal and vertical handle.
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -320,11 +370,10 @@ fun ToolkitResizableCollapsiblePane(
     minPaneSize: Dp,
     minMainPaneSize: Dp,
     modifier: Modifier = Modifier,
-    maxPaneFraction: Float = 0.58f,
+    maxPaneFraction: Float = 0.55f,
     collapsible: Boolean = true,
-    clickToCollapseWhenExpanded: Boolean = !edge.isHorizontal,
-    handleTooltipCollapse: String = "",
-    handleTooltipExpand: String = "",
+    clickToCollapseWhenExpanded: Boolean = true,
+    handleThickness: Dp = ToolkitTheme.dimensions.paneDividerHandleThickness,
     collapseDragThreshold: Dp = if (edge.isHorizontal) {
         ToolkitTheme.dimensions.paneCollapseDragThreshold
     } else {
@@ -332,7 +381,10 @@ fun ToolkitResizableCollapsiblePane(
     },
     expandDragThreshold: Dp = ToolkitTheme.dimensions.paneExpandDragThreshold,
     magneticSnapThreshold: Dp = ToolkitTheme.dimensions.paneMagneticSnapThreshold,
+    handleTooltipCollapse: String = "",
+    handleTooltipExpand: String = "",
     handleTestTag: String? = null,
+    paneSizeRequestKey: Int = 0,
     onLivePaneSizeChanged: ((Dp) -> Unit)? = null,
     mainContent: @Composable BoxScope.() -> Unit,
     paneContent: @Composable BoxScope.() -> Unit
@@ -340,13 +392,6 @@ fun ToolkitResizableCollapsiblePane(
     val motion = MaterialTheme.motionScheme
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
-    val handleThickness = ToolkitTheme.dimensions.paneDividerHandleThickness
-    val collapseAnimSpec = remember {
-        spring<Float>(
-            dampingRatio = Spring.DampingRatioNoBouncy,
-            stiffness = Spring.StiffnessMedium
-        )
-    }
 
     var dragSnapshot by remember {
         mutableStateOf(
@@ -388,26 +433,31 @@ fun ToolkitResizableCollapsiblePane(
                     isExpanded = isExpanded,
                     visibleSizeDp = nextSize,
                     overDragCollapseDp = 0f,
-                    dragOpenProgressDp = 0f
+                    dragOpenProgressDp = 0f,
+                    rawCursorSizeDp = nextSize
                 )
                 animatedSizeDp.animateTo(
                     targetValue = nextSize,
-                    animationSpec = if (isExpanded) motion.defaultSpatialSpec() else collapseAnimSpec
+                    animationSpec = motion.defaultSpatialSpec()
                 )
             }
         }
 
         // Sync external preferred/default width updates (e.g., sequel split mode toggle)
         var lastAppliedDefaultDp by remember { mutableFloatStateOf(defaultPaneSize.value) }
-        LaunchedEffect(defaultPaneSize, effectiveMinDp, effectiveMaxDp) {
+        var lastAppliedRequestKey by remember { mutableStateOf(paneSizeRequestKey) }
+        LaunchedEffect(defaultPaneSize, paneSizeRequestKey, effectiveMinDp, effectiveMaxDp) {
             if (!isDragging) {
                 val targetDefaultChanged = abs(defaultPaneSize.value - lastAppliedDefaultDp) > 0.5f
-                if (targetDefaultChanged) {
+                val requestKeyChanged = paneSizeRequestKey != lastAppliedRequestKey
+                if (targetDefaultChanged || requestKeyChanged) {
                     lastAppliedDefaultDp = defaultPaneSize.value
+                    lastAppliedRequestKey = paneSizeRequestKey
                     val nextTarget = defaultPaneSize.value.coerceIn(effectiveMinDp, effectiveMaxDp)
                     dragSnapshot = dragSnapshot.copy(
                         lastExpandedSizeDp = nextTarget,
-                        visibleSizeDp = if (dragSnapshot.isExpanded) nextTarget else 0f
+                        visibleSizeDp = if (dragSnapshot.isExpanded) nextTarget else 0f,
+                        rawCursorSizeDp = if (dragSnapshot.isExpanded) nextTarget else 0f
                     )
                     if (dragSnapshot.isExpanded) {
                         animatedSizeDp.animateTo(
@@ -420,7 +470,8 @@ fun ToolkitResizableCollapsiblePane(
                     if (abs(reclamped - dragSnapshot.visibleSizeDp) > 0.5f) {
                         dragSnapshot = dragSnapshot.copy(
                             visibleSizeDp = reclamped,
-                            lastExpandedSizeDp = reclamped
+                            lastExpandedSizeDp = reclamped,
+                            rawCursorSizeDp = reclamped
                         )
                         animatedSizeDp.snapTo(reclamped)
                     }
@@ -430,7 +481,6 @@ fun ToolkitResizableCollapsiblePane(
 
         val renderedSizeDp = animatedSizeDp.value.coerceAtLeast(0f).dp
         val latestOnLiveSize by rememberUpdatedState(onLivePaneSizeChanged)
-
         val latestOnExpandedChange by rememberUpdatedState(onExpandedChange)
         val latestMinDp by rememberUpdatedState(effectiveMinDp)
         val latestMaxDp by rememberUpdatedState(effectiveMaxDp)
@@ -458,18 +508,18 @@ fun ToolkitResizableCollapsiblePane(
                         scope.launch {
                             animatedSizeDp.animateTo(
                                 targetValue = next.visibleSizeDp,
-                                animationSpec = if (next.isExpanded) motion.defaultSpatialSpec() else collapseAnimSpec
+                                animationSpec = motion.defaultSpatialSpec()
                             )
                         }
                     }
                 },
                 onDragStart = {
                     isDragging = true
+                    dragSnapshot = ResizablePaneDragPhysics.onDragStart(dragSnapshot)
                 },
                 onDragDelta = { deltaX, deltaY ->
                     val expandDeltaPx = ResizablePaneDragPhysics.toExpandDelta(edge, deltaX, deltaY)
                     val expandDeltaDp = with(density) { expandDeltaPx.toDp().value }
-                    val prevExpanded = dragSnapshot.isExpanded
                     val next = ResizablePaneDragPhysics.onDragDelta(
                         state = dragSnapshot,
                         expandDeltaDp = expandDeltaDp,
@@ -480,38 +530,42 @@ fun ToolkitResizableCollapsiblePane(
                         collapsible = collapsible
                     )
                     dragSnapshot = next
-                    if (next.isExpanded != prevExpanded) {
-                        latestOnExpandedChange(next.isExpanded)
-                        scope.launch {
-                            animatedSizeDp.animateTo(
-                                targetValue = next.visibleSizeDp,
-                                animationSpec = if (next.isExpanded) motion.defaultSpatialSpec() else collapseAnimSpec
-                            )
-                        }
-                    } else if (next.isExpanded) {
+                    if (next.isExpanded) {
                         latestOnLiveSize?.invoke(next.visibleSizeDp.dp)
-                        scope.launch {
-                            animatedSizeDp.snapTo(next.visibleSizeDp)
-                        }
+                    }
+                    scope.launch {
+                        animatedSizeDp.snapTo(next.visibleSizeDp)
                     }
                 },
-                onDragEnd = {
+                onDragEnd = { velocityX, velocityY ->
                     isDragging = false
+                    val prevExpanded = dragSnapshot.isExpanded
+                    val expandVelocityPx = ResizablePaneDragPhysics.toExpandDelta(edge, velocityX, velocityY)
+                    val expandVelocityDp = with(density) { expandVelocityPx.toDp().value }
+                        .coerceIn(-MAX_SETTLE_VELOCITY_DP_PER_SEC, MAX_SETTLE_VELOCITY_DP_PER_SEC)
                     val settled = ResizablePaneDragPhysics.onDragEnd(
                         state = dragSnapshot,
                         defaultSizeDp = latestDefaultDp,
                         minSizeDp = latestMinDp,
                         maxSizeDp = latestMaxDp,
-                        magneticSnapDp = magneticSnapThreshold.value
+                        magneticSnapDp = magneticSnapThreshold.value,
+                        collapseThresholdDp = collapseDragThreshold.value,
+                        expandThresholdDp = expandDragThreshold.value,
+                        collapsible = collapsible,
+                        releaseExpandVelocityDpPerSec = expandVelocityDp
                     )
                     dragSnapshot = settled
+                    if (settled.isExpanded != prevExpanded) {
+                        latestOnExpandedChange(settled.isExpanded)
+                    }
                     if (settled.isExpanded) {
                         latestOnLiveSize?.invoke(settled.visibleSizeDp.dp)
                     }
                     scope.launch {
                         animatedSizeDp.animateTo(
                             targetValue = settled.visibleSizeDp,
-                            animationSpec = if (settled.isExpanded) motion.defaultSpatialSpec() else collapseAnimSpec
+                            animationSpec = motion.defaultSpatialSpec(),
+                            initialVelocity = expandVelocityDp
                         )
                     }
                 }
@@ -612,8 +666,9 @@ fun ToolkitResizableCollapsiblePane(
 }
 
 /**
- * Shared desktop drag/click handle supporting both horizontal and vertical resize gestures,
- * click-to-toggle without competing clickable modifiers, and visual collapse/expand intent cues.
+ * Shared desktop drag/click handle supporting both horizontal and vertical resize gestures in
+ * root/window coordinates (immune to handle movement), velocity tracking for expressive spring
+ * settles, click-to-toggle without competing clickable modifiers, and visual collapse/expand cues.
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -627,7 +682,7 @@ internal fun ToolkitPaneResizeHandle(
     onClick: () -> Unit,
     onDragStart: () -> Unit,
     onDragDelta: (deltaX: Float, deltaY: Float) -> Unit,
-    onDragEnd: () -> Unit,
+    onDragEnd: (velocityX: Float, velocityY: Float) -> Unit,
     modifier: Modifier = Modifier,
     testTag: String? = null
 ) {
@@ -635,6 +690,7 @@ internal fun ToolkitPaneResizeHandle(
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
     val viewConfiguration = LocalViewConfiguration.current
+    var handleCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
 
     val latestOnClick by rememberUpdatedState(onClick)
     val latestOnDragStart by rememberUpdatedState(onDragStart)
@@ -705,6 +761,7 @@ internal fun ToolkitPaneResizeHandle(
         Box(
             modifier = sizeModifier
                 .then(if (testTag != null) Modifier.testTag(testTag) else Modifier)
+                .onGloballyPositioned { handleCoordinates = it }
                 .clip(ToolkitTheme.shapes.small)
                 .background(trackBgColor)
                 .hoverable(interactionSource)
@@ -721,36 +778,51 @@ internal fun ToolkitPaneResizeHandle(
                 }
                 .pointerInput(edge, viewConfiguration) {
                     val touchSlop = viewConfiguration.touchSlop
+                    val toRoot: (Offset) -> Offset = { localPos ->
+                        val coords = handleCoordinates
+                        if (coords != null && coords.isAttached) {
+                            coords.localToRoot(localPos)
+                        } else {
+                            localPos
+                        }
+                    }
+
                     awaitEachGesture {
                         val down = awaitFirstDown(requireUnconsumed = false)
-                        var totalX = 0f
-                        var totalY = 0f
+                        val downRoot = toRoot(down.position)
+                        var lastRoot = downRoot
                         var dragging = false
-                        var pointerId = down.id
+                        val pointerId = down.id
+                        val velocityTracker = VelocityTracker()
+                        velocityTracker.addPosition(down.uptimeMillis, downRoot)
 
                         while (true) {
                             val event = awaitPointerEvent()
                             val change = event.changes.firstOrNull { it.id == pointerId } ?: break
+                            val currentRoot = toRoot(change.position)
                             if (!change.pressed) {
                                 if (dragging) {
-                                    latestOnDragEnd()
+                                    velocityTracker.addPosition(change.uptimeMillis, currentRoot)
+                                    val velocity = velocityTracker.calculateVelocity()
+                                    latestOnDragEnd(velocity.x, velocity.y)
                                 } else {
                                     latestOnClick()
                                 }
                                 break
                             }
-                            val delta = change.positionChange()
-                            if (delta.x != 0f || delta.y != 0f) {
-                                totalX += delta.x
-                                totalY += delta.y
-                                if (!dragging && hypot(totalX, totalY) >= touchSlop) {
+                            val rootDelta = currentRoot - lastRoot
+                            if (rootDelta.x != 0f || rootDelta.y != 0f) {
+                                lastRoot = currentRoot
+                                velocityTracker.addPosition(change.uptimeMillis, currentRoot)
+                                val totalFromDown = currentRoot - downRoot
+                                if (!dragging && hypot(totalFromDown.x, totalFromDown.y) >= touchSlop) {
                                     dragging = true
                                     latestOnDragStart()
                                     change.consume()
-                                    latestOnDragDelta(totalX, totalY)
+                                    latestOnDragDelta(totalFromDown.x, totalFromDown.y)
                                 } else if (dragging) {
                                     change.consume()
-                                    latestOnDragDelta(delta.x, delta.y)
+                                    latestOnDragDelta(rootDelta.x, rootDelta.y)
                                 }
                             }
                         }

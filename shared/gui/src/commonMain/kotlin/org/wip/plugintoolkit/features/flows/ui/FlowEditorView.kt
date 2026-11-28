@@ -1146,7 +1146,7 @@ fun FlowEditorView(
                 }
             },
             onExit = onExit,
-            modifier = Modifier.align(Alignment.TopEnd)
+            modifier = Modifier.align(Alignment.TopCenter)
         )
 
         // 4. Global Dragging Preview (Highest Layer above Floating Palette & TopBar)

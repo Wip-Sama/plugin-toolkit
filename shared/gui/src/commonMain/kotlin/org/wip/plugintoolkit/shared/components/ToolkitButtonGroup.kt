@@ -2,6 +2,7 @@ package org.wip.plugintoolkit.shared.components
 
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
@@ -24,6 +25,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.ui.text.style.TextOverflow
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 
 /**
@@ -45,9 +47,22 @@ fun ToolkitConnectedToggleGroup(
     options: List<ToolkitToggleOption>,
     selectedKey: String?,
     onSelect: (String) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    compact: Boolean = false
 ) {
     if (options.isEmpty()) return
+
+    val buttonPadding = if (compact) {
+        PaddingValues(
+            horizontal = ToolkitTheme.spacing.small,
+            vertical = ToolkitTheme.spacing.extraSmall
+        )
+    } else {
+        PaddingValues(
+            horizontal = ToolkitTheme.spacing.medium,
+            vertical = ToolkitTheme.spacing.small
+        )
+    }
 
     Row(
         modifier = modifier.animateContentSize(
@@ -69,9 +84,12 @@ fun ToolkitConnectedToggleGroup(
                 onCheckedChange = { checked -> if (checked) onSelect(option.key) },
                 enabled = option.enabled,
                 shapes = shapes,
-                modifier = if (option.enabled) Modifier.pointerHoverIcon(PointerIcon.Hand) else Modifier
+                contentPadding = buttonPadding,
+                modifier = Modifier
+                    .then(if (compact) Modifier.weight(1f) else Modifier)
+                    .then(if (option.enabled) Modifier.pointerHoverIcon(PointerIcon.Hand) else Modifier)
             ) {
-                val iconToShow = if (isSelected) option.icon ?: Icons.Default.Check else option.icon
+                val iconToShow = if (isSelected && !compact) option.icon ?: Icons.Default.Check else option.icon
                 if (iconToShow != null) {
                     Icon(
                         imageVector = iconToShow,
@@ -80,7 +98,13 @@ fun ToolkitConnectedToggleGroup(
                     )
                     Spacer(modifier = Modifier.size(ToggleButtonDefaults.IconSpacing))
                 }
-                Text(text = option.label, style = ToolkitTheme.typography.labelLarge)
+                Text(
+                    text = option.label,
+                    style = if (compact) ToolkitTheme.typography.labelMedium else ToolkitTheme.typography.labelLarge,
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
         }
     }

@@ -61,10 +61,30 @@ import plugintoolkit.composeapp.generated.resources.pane_drag_or_click_to_expand
 import plugintoolkit.composeapp.generated.resources.pane_drag_to_resize_or_collapse
 
 /** Maximum proportional width allocated to resizable primary/list panes during drag. */
-private const val MAX_RESIZABLE_PANE_PROPORTION = 0.55f
+private const val MAX_RESIZABLE_PANE_PROPORTION = 0.58f
 
 /** Minimum comfortable width reserved for a detail or main pane before collapsing to single-pane mode. */
-private val MIN_COMFORTABLE_DETAIL_PANE_WIDTH = 440.dp
+private val MIN_COMFORTABLE_DETAIL_PANE_WIDTH = 400.dp
+
+/**
+ * Computes the maximum width available to the list pane inside [ToolkitAdaptiveListDetailWorkspace]
+ * for a given [workspaceInnerWidth] (after subtracting outer workspace horizontal padding).
+ */
+fun computeMaxAdaptiveListPaneWidth(
+    workspaceInnerWidth: Dp,
+    listPaneMinWidth: Dp,
+    handleThickness: Dp
+): Dp {
+    val minTwoPaneWidth = listPaneMinWidth + MIN_COMFORTABLE_DETAIL_PANE_WIDTH
+    if (workspaceInnerWidth < minTwoPaneWidth) return 0.dp
+    return ResizablePaneDragPhysics.computeMaxExpandedSizeDp(
+        totalAvailableDp = workspaceInnerWidth.value,
+        minPaneSizeDp = listPaneMinWidth.value,
+        minMainPaneSizeDp = MIN_COMFORTABLE_DETAIL_PANE_WIDTH.value,
+        handleThicknessDp = handleThickness.value,
+        maxPaneFraction = MAX_RESIZABLE_PANE_PROPORTION
+    ).dp
+}
 
 /**
  * Computes a desktop-tuned [PaneScaffoldDirective] with sleek `12.dp` horizontal partition spacing
@@ -195,6 +215,7 @@ fun <T> ToolkitAdaptiveListDetailWorkspace(
     modifier: Modifier = Modifier,
     navigator: ThreePaneScaffoldNavigator<T>? = null,
     listPaneWidth: Dp = ToolkitTheme.dimensions.floatingSidebarDefaultWidth,
+    listPaneWidthRequestKey: Int = 0,
     listPaneMinWidth: Dp = ToolkitTheme.dimensions.floatingSidebarMinWidth,
     listPaneCollapsible: Boolean = true,
     isListPaneExpanded: Boolean? = null,
@@ -263,10 +284,11 @@ fun <T> ToolkitAdaptiveListDetailWorkspace(
                 minMainPaneSize = MIN_COMFORTABLE_DETAIL_PANE_WIDTH,
                 maxPaneFraction = MAX_RESIZABLE_PANE_PROPORTION,
                 collapsible = listPaneCollapsible,
-                clickToCollapseWhenExpanded = false,
+                clickToCollapseWhenExpanded = true,
                 handleTooltipCollapse = stringResource(Res.string.pane_drag_to_resize_or_collapse),
                 handleTooltipExpand = stringResource(Res.string.pane_drag_or_click_to_expand),
                 handleTestTag = "list_detail_pane_resize_handle",
+                paneSizeRequestKey = listPaneWidthRequestKey,
                 onLivePaneSizeChanged = onLiveListPaneWidthChanged,
                 paneContent = {
                     listPane(effectiveNavigator)

@@ -1,6 +1,9 @@
 package org.wip.plugintoolkit.features.plugin.ui
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
@@ -16,6 +19,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
@@ -31,10 +35,12 @@ import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.plugin.viewmodel.PluginViewModel
 import org.wip.plugintoolkit.shared.components.AdaptiveBackNavigationButton
 import org.wip.plugintoolkit.shared.components.ToolkitAdaptiveListDetailWorkspace
+import org.wip.plugintoolkit.shared.components.adaptiveWorkspacePadding
+import org.wip.plugintoolkit.shared.components.computeMaxAdaptiveListPaneWidth
 import org.wip.plugintoolkit.shared.components.sidebar.SequelSidebarHysteresis
 import org.wip.plugintoolkit.shared.components.sidebar.SequelSidebarMode
 import org.wip.plugintoolkit.shared.components.sidebar.isLargeAdaptiveWidth
-import org.wip.plugintoolkit.shared.components.sidebar.resolveSequelExpanded
+import org.wip.plugintoolkit.shared.components.sidebar.resolveAdaptiveSequelExpanded
 import org.wip.plugintoolkit.shared.components.sidebar.toggleSequelSidebarMode
 import org.wip.plugintoolkit.ui.desktopNavTransitionSpec
 import org.wip.plugintoolkit.ui.opaqueNavEntry
@@ -86,125 +92,163 @@ fun PluginSectionScreen(
         )
     }
     var dragSequelOverride by remember { mutableStateOf<Boolean?>(null) }
+    var listPaneWidthRequestKey by remember { mutableStateOf(0) }
     val isLargeWidth = isLargeAdaptiveWidth()
-    val targetSequelExpanded = resolveSequelExpanded(sequelMode, isLargeWidth) &&
-        (selectedPluginId != null || sequelMode == SequelSidebarMode.ForcedExpanded)
-    val isSequelExpanded = dragSequelOverride ?: targetSequelExpanded
-    val listPaneWidth = if (targetSequelExpanded) {
-        ToolkitTheme.dimensions.floatingSidebarSplitTotalWidth
-    } else {
-        ToolkitTheme.dimensions.floatingSidebarDefaultWidth
-    }
     val detailSurfaceColor = MaterialTheme.colorScheme.surfaceContainerLowest
+    val workspacePadding = adaptiveWorkspacePadding()
+    val layoutDirection = LocalLayoutDirection.current
+    val minTwoColumnWidth = ToolkitTheme.dimensions.floatingSidebarMinTwoColumnWidth
 
-    ToolkitAdaptiveListDetailWorkspace<String>(
-        listPaneWidth = listPaneWidth,
-        onLiveListPaneWidthChanged = { draggedWidth ->
-            val nextSplit = SequelSidebarHysteresis.resolveFromDraggedWidth(
-                isCurrentlySplit = isSequelExpanded,
-                draggedWidth = draggedWidth
-            )
-            if (nextSplit != isSequelExpanded) {
-                dragSequelOverride = nextSplit
-            }
-        },
-        listPane = { navigator ->
-            DirectExecutionSidebar(
-                loadedPlugins = loadedPlugins,
-                selectedPluginId = selectedPluginId,
-                onPluginSelected = { id ->
-                    dragSequelOverride = null
-                    val plugin = loadedPlugins.find { it.getManifest().getOrNull()?.plugin?.id == id }
-                    if (plugin != null && viewModel.selectedPlugin != plugin) {
-                        viewModel.selectPlugin(plugin)
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val innerWorkspaceWidth = (maxWidth -
+            workspacePadding.calculateStartPadding(layoutDirection) -
+            workspacePadding.calculateEndPadding(layoutDirection)).coerceAtLeast(ToolkitTheme.spacing.none)
+        val maxListPaneWidth = computeMaxAdaptiveListPaneWidth(
+            workspaceInnerWidth = innerWorkspaceWidth,
+            listPaneMinWidth = ToolkitTheme.dimensions.floatingSidebarMinWidth,
+            handleThickness = ToolkitTheme.dimensions.paneDividerHandleThickness
+        )
+        val canFitTwoColumns = maxListPaneWidth >= minTwoColumnWidth
+        val targetSequelExpanded = resolveAdaptiveSequelExpanded(
+            maxListPaneWidth = maxListPaneWidth,
+            minTwoColumnWidth = minTwoColumnWidth,
+            mode = sequelMode,
+            isWideViewport = isLargeWidth,
+            hasSelection = selectedPluginId != null,
+            dragOverride = null
+        )
+        val isSequelExpanded = resolveAdaptiveSequelExpanded(
+            maxListPaneWidth = maxListPaneWidth,
+            minTwoColumnWidth = minTwoColumnWidth,
+            mode = sequelMode,
+            isWideViewport = isLargeWidth,
+            hasSelection = selectedPluginId != null,
+            dragOverride = dragSequelOverride
+        )
+        val listPaneWidth = if (targetSequelExpanded) {
+            ToolkitTheme.dimensions.floatingSidebarSplitTotalWidth.coerceAtMost(maxListPaneWidth)
+        } else {
+            ToolkitTheme.dimensions.floatingSidebarDefaultWidth
+        }
+
+        ToolkitAdaptiveListDetailWorkspace<String>(
+            listPaneWidth = listPaneWidth,
+            listPaneWidthRequestKey = listPaneWidthRequestKey,
+            onLiveListPaneWidthChanged = { draggedWidth ->
+                if (canFitTwoColumns) {
+                    val nextSplit = SequelSidebarHysteresis.resolveFromDraggedWidth(
+                        isCurrentlySplit = isSequelExpanded,
+                        draggedWidth = draggedWidth
+                    )
+                    if (nextSplit != isSequelExpanded) {
+                        dragSequelOverride = nextSplit
                     }
-                    if ((currentKey as? PluginNavKey.PluginDetail)?.id != id) {
-                        backStack.add(PluginNavKey.PluginDetail(id))
-                    }
-                },
-                onBackToPlugins = {
-                    dragSequelOverride = null
-                    if (backStack.any { it is PluginNavKey.PluginList }) {
-                        while (backStack.lastOrNull() !is PluginNavKey.PluginList) {
-                            backStack.removeLast()
+                }
+            },
+            listPane = { navigator ->
+                DirectExecutionSidebar(
+                    loadedPlugins = loadedPlugins,
+                    selectedPluginId = selectedPluginId,
+                    onPluginSelected = { id ->
+                        if (dragSequelOverride != null) {
+                            dragSequelOverride = null
+                            listPaneWidthRequestKey++
                         }
-                    } else {
-                        backStack.add(PluginNavKey.PluginList)
-                    }
-                },
-                selectedCapability = viewModel.selectedCapability,
-                onCapabilitySelected = { capability ->
-                    viewModel.selectCapability(capability)
-                    scope.launch {
-                        navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, capability.name)
-                    }
-                },
-                isSequelExpanded = isSequelExpanded,
-                onToggleSequelMode = {
-                    dragSequelOverride = null
-                    sequelMode = toggleSequelSidebarMode(isSequelExpanded)
-                },
-                fillPaneWidth = true
-            )
-        },
-        detailPane = { navigator ->
-            Box(modifier = Modifier.fillMaxSize()) {
-                NavDisplay(
-                    backStack = backStack,
-                    modifier = Modifier.fillMaxSize(),
-                    onBack = { if (backStack.size > 1) backStack.removeLast() },
-                    transitionSpec = desktopNavTransitionSpec(),
-                    popTransitionSpec = desktopNavTransitionSpec()
-                ) { key ->
-                    when (key) {
-                        is PluginNavKey.PluginList -> opaqueNavEntry(key, containerColor = detailSurfaceColor) {
-                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text(
-                                    stringResource(Res.string.plugin_selection_hint),
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+                        val plugin = loadedPlugins.find { it.getManifest().getOrNull()?.plugin?.id == id }
+                        if (plugin != null && viewModel.selectedPlugin != plugin) {
+                            viewModel.selectPlugin(plugin)
+                        }
+                        if ((currentKey as? PluginNavKey.PluginDetail)?.id != id) {
+                            backStack.add(PluginNavKey.PluginDetail(id))
+                        }
+                    },
+                    onBackToPlugins = {
+                        dragSequelOverride = null
+                        if (backStack.any { it is PluginNavKey.PluginList }) {
+                            while (backStack.lastOrNull() !is PluginNavKey.PluginList) {
+                                backStack.removeLast()
                             }
+                        } else {
+                            backStack.add(PluginNavKey.PluginList)
                         }
-
-                        is PluginNavKey.PluginDetail -> opaqueNavEntry(key, containerColor = detailSurfaceColor) {
-                            val plugin = loadedPlugins.find { it.getManifest().getOrThrow().plugin.id == key.id }
-                            if (plugin != null) {
-                                LaunchedEffect(key.id) {
-                                    if (viewModel.selectedPlugin != plugin) {
-                                        viewModel.selectPlugin(plugin)
-                                    }
-                                }
-                                PluginContent(
-                                    viewModel = viewModel,
-                                    scrollToSetting = key.scrollToSetting
-                                )
-                            } else {
-                                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    },
+                    selectedCapability = viewModel.selectedCapability,
+                    onCapabilitySelected = { capability ->
+                        viewModel.selectCapability(capability)
+                        scope.launch {
+                            navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, capability.name)
+                        }
+                    },
+                    isSequelExpanded = isSequelExpanded,
+                    onToggleSequelMode = if (canFitTwoColumns) {
+                        {
+                            dragSequelOverride = null
+                            sequelMode = toggleSequelSidebarMode(isSequelExpanded)
+                            listPaneWidthRequestKey++
+                        }
+                    } else null,
+                    fillPaneWidth = true
+                )
+            },
+            detailPane = { navigator ->
+                Box(modifier = Modifier.fillMaxSize()) {
+                    NavDisplay(
+                        backStack = backStack,
+                        modifier = Modifier.fillMaxSize(),
+                        onBack = { if (backStack.size > 1) backStack.removeLast() },
+                        transitionSpec = desktopNavTransitionSpec(),
+                        popTransitionSpec = desktopNavTransitionSpec()
+                    ) { key ->
+                        when (key) {
+                            is PluginNavKey.PluginList -> opaqueNavEntry(key, containerColor = detailSurfaceColor) {
+                                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                                     Text(
-                                        stringResource(Res.string.plugin_not_found_unloaded),
-                                        color = MaterialTheme.colorScheme.error
+                                        stringResource(Res.string.plugin_selection_hint),
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
                             }
+
+                            is PluginNavKey.PluginDetail -> opaqueNavEntry(key, containerColor = detailSurfaceColor) {
+                                val plugin = loadedPlugins.find { it.getManifest().getOrThrow().plugin.id == key.id }
+                                if (plugin != null) {
+                                    LaunchedEffect(key.id) {
+                                        if (viewModel.selectedPlugin != plugin) {
+                                            viewModel.selectPlugin(plugin)
+                                        }
+                                    }
+                                    PluginContent(
+                                        viewModel = viewModel,
+                                        scrollToSetting = key.scrollToSetting
+                                    )
+                                } else {
+                                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                        Text(
+                                            stringResource(Res.string.plugin_not_found_unloaded),
+                                            color = MaterialTheme.colorScheme.error
+                                        )
+                                    }
+                                }
+                            }
+
+                            else -> opaqueNavEntry(key, containerColor = detailSurfaceColor) { }
                         }
-
-                        else -> opaqueNavEntry(key, containerColor = detailSurfaceColor) { }
                     }
-                }
 
-                if (navigator.canNavigateBack()) {
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.TopStart)
-                            .padding(ToolkitTheme.spacing.small)
-                    ) {
-                        AdaptiveBackNavigationButton(
-                            onClick = { scope.launch { navigator.navigateBack() } }
-                        )
+                    if (navigator.canNavigateBack()) {
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.TopStart)
+                                .padding(ToolkitTheme.spacing.small)
+                        ) {
+                            AdaptiveBackNavigationButton(
+                                onClick = { scope.launch { navigator.navigateBack() } }
+                            )
+                        }
                     }
                 }
             }
-        }
-    )
+        )
+    }
 }

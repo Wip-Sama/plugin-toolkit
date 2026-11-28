@@ -1162,7 +1162,7 @@
     <string name="pane_expand_sidebar">Show sidebar</string>
     <string name="pane_collapse_bottom_panel">Collapse panel</string>
     <string name="pane_expand_bottom_panel">Expand panel</string>
-    <string name="pane_drag_to_resize_or_collapse">Drag to resize or collapse</string>
-    <string name="pane_drag_or_click_to_expand">Drag or click to expand</string>
+    <string name="pane_drag_to_resize_or_collapse">Click to collapse · Drag to resize</string>
+    <string name="pane_drag_or_click_to_expand">Click or drag to expand</string>
     <string name="flow_toolbar_no_custom_colors">No custom colors in flow yet</string>
 </resources>

@@ -6,28 +6,20 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.pointer.PointerIcon
-import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.unit.Dp
 import org.jetbrains.compose.resources.stringResource
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.core.utils.PlatformVerticalScrollbar
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.pane_collapse_bottom_panel
-import plugintoolkit.composeapp.generated.resources.pane_collapse_sidebar
 import plugintoolkit.composeapp.generated.resources.pane_drag_to_resize_or_collapse
 import plugintoolkit.composeapp.generated.resources.pane_expand_bottom_panel
 import plugintoolkit.composeapp.generated.resources.pane_expand_sidebar
@@ -73,7 +65,6 @@ fun ToolkitAdaptiveSupportingWorkspace(
         val canFitTwoPanes = maxWidth >= minTwoPaneWidth
 
         if (canFitTwoPanes) {
-            val collapseSidebarLabel = collapseTooltip.ifBlank { stringResource(Res.string.pane_collapse_sidebar) }
             val expandSidebarLabel = expandTooltip.ifBlank { stringResource(Res.string.pane_expand_sidebar) }
             val dragResizeLabel = stringResource(Res.string.pane_drag_to_resize_or_collapse)
 
@@ -86,7 +77,7 @@ fun ToolkitAdaptiveSupportingWorkspace(
                 minMainPaneSize = ToolkitTheme.dimensions.breakpointMedium,
                 maxPaneFraction = MAX_SIDE_SUPPORTING_PANE_FRACTION,
                 collapsible = true,
-                clickToCollapseWhenExpanded = false,
+                clickToCollapseWhenExpanded = true,
                 handleTooltipCollapse = dragResizeLabel,
                 handleTooltipExpand = expandSidebarLabel,
                 handleTestTag = "supporting_pane_side_handle",
@@ -127,28 +118,6 @@ fun ToolkitAdaptiveSupportingWorkspace(
                                         .align(Alignment.CenterEnd)
                                         .fillMaxHeight()
                                 )
-                            }
-
-                            ToolkitTooltipBox(
-                                tooltip = collapseSidebarLabel,
-                                position = ToolkitTooltipPosition.Below,
-                                modifier = Modifier
-                                    .align(Alignment.TopEnd)
-                                    .padding(ToolkitTheme.spacing.small)
-                            ) {
-                                IconButton(
-                                    onClick = { onShowSupportingPaneChange(false) },
-                                    modifier = Modifier
-                                        .size(ToolkitTheme.dimensions.denseIconButtonSize)
-                                        .pointerHoverIcon(PointerIcon.Hand)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.ChevronRight,
-                                        contentDescription = collapseSidebarLabel,
-                                        modifier = Modifier.size(ToolkitTheme.dimensions.denseIconSize),
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
                             }
                         }
                     }

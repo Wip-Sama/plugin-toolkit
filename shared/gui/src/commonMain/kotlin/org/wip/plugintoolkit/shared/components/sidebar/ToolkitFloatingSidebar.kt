@@ -90,6 +90,25 @@ fun resolveSequelExpanded(
 }
 
 /**
+ * Resolves whether two-column sequel mode can actually be shown given the workspace's real
+ * [maxListPaneWidth] capacity, preventing clipped second-column slivers when the available
+ * list-pane space is narrower than [minTwoColumnWidth].
+ */
+fun resolveAdaptiveSequelExpanded(
+    maxListPaneWidth: Dp,
+    minTwoColumnWidth: Dp,
+    mode: SequelSidebarMode,
+    isWideViewport: Boolean,
+    hasSelection: Boolean,
+    dragOverride: Boolean? = null
+): Boolean {
+    if (maxListPaneWidth < minTwoColumnWidth) return false
+    val target = resolveSequelExpanded(mode, isWideViewport) &&
+        (hasSelection || mode == SequelSidebarMode.ForcedExpanded)
+    return dragOverride ?: target
+}
+
+/**
  * Toggles the user's [SequelSidebarMode] override from the currently visible [isCurrentlyExpanded]
  * state, allowing Auto mode to be overridden either ON or OFF with a single click.
  */
@@ -183,8 +202,14 @@ fun <K> ToolkitFloatingSidebar(
         if (!animateSequelWidth && sequelContent != null) {
             BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
                 val minPrimaryWidth = ToolkitTheme.dimensions.floatingSidebarMinWidth.coerceAtMost(maxWidth)
+                val availableForSequel = (maxWidth - minPrimaryWidth).coerceAtLeast(ToolkitTheme.spacing.none)
+                val renderedSequelWidth = if (maxWidth >= ToolkitTheme.dimensions.floatingSidebarMinTwoColumnWidth) {
+                    minOf(sequelWidth, availableForSequel)
+                } else {
+                    sequelWidth
+                }
                 val primaryWidth = if (isSequelComposed) {
-                    (maxWidth - sequelWidth).coerceIn(minPrimaryWidth, maxWidth)
+                    (maxWidth - renderedSequelWidth).coerceIn(minPrimaryWidth, maxWidth)
                 } else {
                     maxWidth
                 }
@@ -224,7 +249,7 @@ fun <K> ToolkitFloatingSidebar(
                             Row(
                                 modifier = Modifier
                                     .wrapContentWidth(align = Alignment.Start, unbounded = true)
-                                    .width(sequelWidth)
+                                    .width(renderedSequelWidth)
                                     .fillMaxHeight()
                                     .testTag("toolkit_floating_sidebar_sequel")
                             ) {

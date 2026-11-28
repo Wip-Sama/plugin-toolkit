@@ -724,10 +724,12 @@ internal fun JobResultConsoleSection(
                     )
                 }
             },
-            onDragStart = { isDragging = true },
+            onDragStart = {
+                isDragging = true
+                dragSnapshot = ResizablePaneDragPhysics.onDragStart(dragSnapshot)
+            },
             onDragDelta = { _, deltaY ->
                 val deltaDp = with(density) { deltaY.toDp().value }
-                val prevExpanded = dragSnapshot.isExpanded
                 val next = ResizablePaneDragPhysics.onDragDelta(
                     state = dragSnapshot,
                     expandDeltaDp = deltaDp,
@@ -738,27 +740,24 @@ internal fun JobResultConsoleSection(
                     collapsible = true
                 )
                 dragSnapshot = next
-                if (next.isExpanded != prevExpanded) {
-                    if (next.isExpanded) currentOnLogHeightChange(next.visibleSizeDp.dp)
-                    scope.launch {
-                        animatedHeightDp.animateTo(
-                            targetValue = next.visibleSizeDp,
-                            animationSpec = if (next.isExpanded) motion.defaultSpatialSpec() else collapseAnimSpec
-                        )
-                    }
-                } else if (next.isExpanded) {
+                if (next.isExpanded) {
                     currentOnLogHeightChange(next.visibleSizeDp.dp)
-                    scope.launch { animatedHeightDp.snapTo(next.visibleSizeDp) }
                 }
+                scope.launch { animatedHeightDp.snapTo(next.visibleSizeDp) }
             },
-            onDragEnd = {
+            onDragEnd = { _, velocityY ->
                 isDragging = false
+                val velocityDp = with(density) { velocityY.toDp().value }
                 val settled = ResizablePaneDragPhysics.onDragEnd(
                     state = dragSnapshot,
                     defaultSizeDp = defaultLogHeight.value,
                     minSizeDp = minLogHeight.value,
                     maxSizeDp = maxLogHeight.value,
-                    magneticSnapDp = magneticSnap.value
+                    magneticSnapDp = magneticSnap.value,
+                    collapseThresholdDp = collapseThreshold.value,
+                    expandThresholdDp = expandThreshold.value,
+                    collapsible = true,
+                    releaseExpandVelocityDpPerSec = velocityDp
                 )
                 dragSnapshot = settled
                 if (settled.isExpanded) {
@@ -767,7 +766,8 @@ internal fun JobResultConsoleSection(
                 scope.launch {
                     animatedHeightDp.animateTo(
                         targetValue = settled.visibleSizeDp,
-                        animationSpec = if (settled.isExpanded) motion.defaultSpatialSpec() else collapseAnimSpec
+                        animationSpec = motion.defaultSpatialSpec(),
+                        initialVelocity = velocityDp
                     )
                 }
             }

@@ -661,7 +661,7 @@ private fun SplineSettingsCard(
         shadowElevation = dimensions.elevationHigh,
         border = BorderStroke(dimensions.borderUnselected, MaterialTheme.colorScheme.outlineVariant),
         modifier = modifier
-            .widthIn(min = dimensions.toolbarPopoverWidth)
+            .width(dimensions.toolbarSplinePopoverWidth)
             .testTag("spline_settings_card")
     ) {
         Column(
@@ -679,7 +679,9 @@ private fun SplineSettingsCard(
                 selectedKey = connectionStyle.name,
                 onSelect = { key ->
                     ConnectionCurveStyle.entries.find { it.name == key }?.let(onChangeConnectionStyle)
-                }
+                },
+                compact = true,
+                modifier = Modifier.fillMaxWidth()
             )
 
             if (connectionStyle == ConnectionCurveStyle.Orthogonal) {
@@ -694,7 +696,9 @@ private fun SplineSettingsCard(
                     selectedKey = orthogonalStepMode.name,
                     onSelect = { key ->
                         OrthogonalStepMode.entries.find { it.name == key }?.let(onChangeOrthogonalStepMode)
-                    }
+                    },
+                    compact = true,
+                    modifier = Modifier.fillMaxWidth()
                 )
 
                 if (orthogonalStepMode == OrthogonalStepMode.Auto) {

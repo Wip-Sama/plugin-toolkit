@@ -1,16 +1,22 @@
 package org.wip.plugintoolkit.features.plugin.ui
 
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
 import androidx.compose.material3.adaptive.layout.ListDetailPaneScaffoldRole
 import androidx.compose.material3.adaptive.navigation.rememberListDetailPaneScaffoldNavigator
+import androidx.compose.ui.platform.LocalLayoutDirection
 import org.wip.plugintoolkit.shared.components.AdaptiveBackNavigationButton
 import org.wip.plugintoolkit.shared.components.ToolkitAdaptiveListDetailWorkspace
+import org.wip.plugintoolkit.shared.components.adaptiveWorkspacePadding
+import org.wip.plugintoolkit.shared.components.computeMaxAdaptiveListPaneWidth
 import org.wip.plugintoolkit.shared.components.rememberAdaptivePaneScaffoldDirective
 import org.wip.plugintoolkit.shared.components.sidebar.SequelSidebarHysteresis
 import org.wip.plugintoolkit.shared.components.sidebar.SequelSidebarMode
 import org.wip.plugintoolkit.shared.components.sidebar.isLargeAdaptiveWidth
-import org.wip.plugintoolkit.shared.components.sidebar.resolveSequelExpanded
+import org.wip.plugintoolkit.shared.components.sidebar.resolveAdaptiveSequelExpanded
 import org.wip.plugintoolkit.shared.components.sidebar.toggleSequelSidebarMode
 
 import androidx.compose.animation.AnimatedVisibility
@@ -173,74 +179,111 @@ fun InteractiveToolsScreen(
         )
     }
     var dragSequelOverride by remember { mutableStateOf<Boolean?>(null) }
+    var listPaneWidthRequestKey by remember { mutableStateOf(0) }
     val isLargeWidth = isLargeAdaptiveWidth()
-    val targetSequelExpanded = resolveSequelExpanded(sequelMode, isLargeWidth) &&
-        (selectedPluginId != null || sequelMode == SequelSidebarMode.ForcedExpanded)
-    val isSequelExpanded = dragSequelOverride ?: targetSequelExpanded
-    val listPaneWidth = if (targetSequelExpanded) {
-        ToolkitTheme.dimensions.floatingSidebarSplitTotalWidth
-    } else {
-        ToolkitTheme.dimensions.floatingSidebarDefaultWidth
-    }
+    val workspacePadding = adaptiveWorkspacePadding()
+    val layoutDirection = LocalLayoutDirection.current
+    val minTwoColumnWidth = ToolkitTheme.dimensions.floatingSidebarMinTwoColumnWidth
 
-    ToolkitAdaptiveListDetailWorkspace<String>(
-        listPaneWidth = listPaneWidth,
-        onLiveListPaneWidthChanged = { draggedWidth ->
-            val nextSplit = SequelSidebarHysteresis.resolveFromDraggedWidth(
-                isCurrentlySplit = isSequelExpanded,
-                draggedWidth = draggedWidth
-            )
-            if (nextSplit != isSequelExpanded) {
-                dragSequelOverride = nextSplit
-            }
-        },
-        listPane = { navigator ->
-            DirectExecutionSidebar(
-                loadedPlugins = loadedPlugins,
-                selectedPluginId = selectedPluginId,
-                onPluginSelected = { pluginId ->
-                    dragSequelOverride = null
-                    selectedPluginId = pluginId
-                    val pluginTools = tools.filter { it.plugin.getManifest().getOrNull()?.plugin?.id == pluginId }
-                    if (pluginTools.size == 1 && selectedTool == null) {
-                        val singleTool = pluginTools.first()
-                        viewModel.selectTool(singleTool)
-                        scope.launch {
-                            navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, pluginId)
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val innerWorkspaceWidth = (maxWidth -
+            workspacePadding.calculateStartPadding(layoutDirection) -
+            workspacePadding.calculateEndPadding(layoutDirection)).coerceAtLeast(ToolkitTheme.spacing.none)
+        val maxListPaneWidth = computeMaxAdaptiveListPaneWidth(
+            workspaceInnerWidth = innerWorkspaceWidth,
+            listPaneMinWidth = ToolkitTheme.dimensions.floatingSidebarMinWidth,
+            handleThickness = ToolkitTheme.dimensions.paneDividerHandleThickness
+        )
+        val canFitTwoColumns = maxListPaneWidth >= minTwoColumnWidth
+        val targetSequelExpanded = resolveAdaptiveSequelExpanded(
+            maxListPaneWidth = maxListPaneWidth,
+            minTwoColumnWidth = minTwoColumnWidth,
+            mode = sequelMode,
+            isWideViewport = isLargeWidth,
+            hasSelection = selectedPluginId != null,
+            dragOverride = null
+        )
+        val isSequelExpanded = resolveAdaptiveSequelExpanded(
+            maxListPaneWidth = maxListPaneWidth,
+            minTwoColumnWidth = minTwoColumnWidth,
+            mode = sequelMode,
+            isWideViewport = isLargeWidth,
+            hasSelection = selectedPluginId != null,
+            dragOverride = dragSequelOverride
+        )
+        val listPaneWidth = if (targetSequelExpanded) {
+            ToolkitTheme.dimensions.floatingSidebarSplitTotalWidth.coerceAtMost(maxListPaneWidth)
+        } else {
+            ToolkitTheme.dimensions.floatingSidebarDefaultWidth
+        }
+
+        ToolkitAdaptiveListDetailWorkspace<String>(
+            listPaneWidth = listPaneWidth,
+            listPaneWidthRequestKey = listPaneWidthRequestKey,
+            onLiveListPaneWidthChanged = { draggedWidth ->
+                if (canFitTwoColumns) {
+                    val nextSplit = SequelSidebarHysteresis.resolveFromDraggedWidth(
+                        isCurrentlySplit = isSequelExpanded,
+                        draggedWidth = draggedWidth
+                    )
+                    if (nextSplit != isSequelExpanded) {
+                        dragSequelOverride = nextSplit
+                    }
+                }
+            },
+            listPane = { navigator ->
+                DirectExecutionSidebar(
+                    loadedPlugins = loadedPlugins,
+                    selectedPluginId = selectedPluginId,
+                    onPluginSelected = { pluginId ->
+                        if (dragSequelOverride != null) {
+                            dragSequelOverride = null
+                            listPaneWidthRequestKey++
                         }
-                    }
-                },
-                onBackToPlugins = {
-                    dragSequelOverride = null
-                    selectedPluginId = null
-                },
-                selectedCapability = if (selectedTool?.plugin?.getManifest()?.getOrNull()?.plugin?.id == selectedPluginId) {
-                    selectedTool?.capability
-                } else null,
-                onCapabilitySelected = { capability ->
-                    val matching = tools.find {
-                        it.plugin.getManifest().getOrNull()?.plugin?.id == selectedPluginId &&
-                            it.capability.name == capability.name
-                    }
-                    if (matching != null) {
-                        viewModel.selectTool(matching)
-                        scope.launch {
-                            navigator.navigateTo(
-                                ListDetailPaneScaffoldRole.Detail,
-                                "${selectedPluginId ?: ""}:${capability.name}"
-                            )
+                        selectedPluginId = pluginId
+                        val pluginTools = tools.filter { it.plugin.getManifest().getOrNull()?.plugin?.id == pluginId }
+                        if (pluginTools.size == 1 && selectedTool == null) {
+                            val singleTool = pluginTools.first()
+                            viewModel.selectTool(singleTool)
+                            scope.launch {
+                                navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, pluginId)
+                            }
                         }
-                    }
-                },
-                isInteractiveOnly = true,
-                isSequelExpanded = isSequelExpanded,
-                onToggleSequelMode = {
-                    dragSequelOverride = null
-                    sequelMode = toggleSequelSidebarMode(isSequelExpanded)
-                },
-                fillPaneWidth = true
-            )
-        },
+                    },
+                    onBackToPlugins = {
+                        dragSequelOverride = null
+                        selectedPluginId = null
+                    },
+                    selectedCapability = if (selectedTool?.plugin?.getManifest()?.getOrNull()?.plugin?.id == selectedPluginId) {
+                        selectedTool?.capability
+                    } else null,
+                    onCapabilitySelected = { capability ->
+                        val matching = tools.find {
+                            it.plugin.getManifest().getOrNull()?.plugin?.id == selectedPluginId &&
+                                it.capability.name == capability.name
+                        }
+                        if (matching != null) {
+                            viewModel.selectTool(matching)
+                            scope.launch {
+                                navigator.navigateTo(
+                                    ListDetailPaneScaffoldRole.Detail,
+                                    "${selectedPluginId ?: ""}:${capability.name}"
+                                )
+                            }
+                        }
+                    },
+                    isInteractiveOnly = true,
+                    isSequelExpanded = isSequelExpanded,
+                    onToggleSequelMode = if (canFitTwoColumns) {
+                        {
+                            dragSequelOverride = null
+                            sequelMode = toggleSequelSidebarMode(isSequelExpanded)
+                            listPaneWidthRequestKey++
+                        }
+                    } else null,
+                    fillPaneWidth = true
+                )
+            },
         detailPane = { navigator ->
             Box(
                 modifier = Modifier
@@ -348,7 +391,8 @@ fun InteractiveToolsScreen(
                 }
             }
         }
-    )
+        )
+    }
 }
 
 private const val SPATIAL_SPRING_STIFFNESS = 900f
