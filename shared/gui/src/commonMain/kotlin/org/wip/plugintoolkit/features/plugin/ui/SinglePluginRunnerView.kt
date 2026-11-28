@@ -59,8 +59,8 @@ import org.wip.plugintoolkit.features.plugin.sdui.PluginCustomUiCard
 import org.wip.plugintoolkit.features.plugin.viewmodel.SinglePluginHostViewModel
 import org.wip.plugintoolkit.shared.components.ToolkitButtonGroup
 import org.wip.plugintoolkit.shared.components.ToolkitTextField
+import org.wip.plugintoolkit.shared.components.ToolkitTooltipBox
 import org.wip.plugintoolkit.shared.components.plugin.JobResultCard
-import org.wip.plugintoolkit.shared.components.tooltip
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.action_clear
 import plugintoolkit.composeapp.generated.resources.plugin_capabilities
@@ -208,18 +208,21 @@ fun SinglePluginRunnerView(
                     }
 
                     item { shape, modifierSpec ->
-                        FilledTonalButton(
-                            onClick = { showSettingsDialog = true },
-                            shape = shape,
-                            modifier = modifierSpec.tooltip(Res.string.plugin_settings)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Settings,
-                                contentDescription = stringResource(Res.string.plugin_settings),
-                                modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
-                            )
-                            Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
-                            Text(stringResource(Res.string.plugin_settings))
+                        val settingsLabel = stringResource(Res.string.plugin_settings)
+                        ToolkitTooltipBox(tooltip = settingsLabel) {
+                            FilledTonalButton(
+                                onClick = { showSettingsDialog = true },
+                                shape = shape,
+                                modifier = modifierSpec
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Settings,
+                                    contentDescription = settingsLabel,
+                                    modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
+                                )
+                                Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
+                                Text(settingsLabel)
+                            }
                         }
                     }
                 }

@@ -19,19 +19,16 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuite
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteDefaults
-import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldLayout
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.movableContentOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import androidx.window.core.layout.WindowSizeClass
 import kotlin.math.roundToInt
 import org.wip.plugintoolkit.core.model.localized
@@ -63,7 +60,8 @@ import plugintoolkit.composeapp.generated.resources.app_name
  *   collapsible categories, pinned bottom actions, delayed hover-expand overlay, and seamless
  *   `surfaceContainerLow` shell chrome shared with [CustomTitleBar].
  * - On Compact widths (`< 600.dp`): switches automatically to `ShortNavigationBarCompact` via
- *   [NavigationSuiteScaffoldLayout].
+ *   [NavigationSuite] docked at the bottom of a single unified layout tree so [content] (and any
+ *   nested `NavDisplay` / `LookaheadScope`) is never reparented across breakpoint transitions.
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -116,23 +114,63 @@ fun AppScaffold(
     )
 
     val shellColor = MaterialTheme.colorScheme.surfaceContainerLow
-    val persistentContent = remember(content) {
-        movableContentOf { content() }
-    }
 
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = shellColor
     ) {
-        if (isCompactWidth) {
-            val allElements = remember(sections, bottomSections) {
-                (sections + bottomSections)
-                    .flatMap { it.elements }
-                    .filter { it.isVisible }
-            }
-            NavigationSuiteScaffoldLayout(
-                layoutType = NavigationSuiteType.ShortNavigationBarCompact,
-                navigationSuite = {
+        Box(modifier = Modifier.fillMaxSize()) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                Row(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                ) {
+                    // Reserves pinned rail width on Medium+ widths; stays mounted at 0.dp on Compact
+                    // so the content column never shifts slot index or reparents nested LookaheadScopes.
+                    Spacer(
+                        modifier = Modifier.width(
+                            if (isCompactWidth) ToolkitTheme.spacing.none else layoutSidebarWidth
+                        )
+                    )
+
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                    ) {
+                        if (useCustomTitleBar) {
+                            CustomTitleBar(
+                                modifier = Modifier.fillMaxWidth(),
+                                showTitleAndIcon = isCompactWidth,
+                                isMac = isCompactWidth && PlatformUtils.isMac,
+                                containerColor = shellColor
+                            )
+                        }
+
+                        val contentCornerRadius = if (!isCompactWidth && useCustomTitleBar) {
+                            ToolkitTheme.dimensions.contentCanvasCornerRadius
+                        } else {
+                            ToolkitTheme.spacing.none
+                        }
+                        Surface(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(topStart = contentCornerRadius)),
+                            color = MaterialTheme.colorScheme.surface
+                        ) {
+                            content()
+                        }
+                    }
+                }
+
+                if (isCompactWidth) {
+                    val allElements = remember(sections, bottomSections) {
+                        (sections + bottomSections)
+                            .flatMap { it.elements }
+                            .filter { it.isVisible }
+                    }
                     NavigationSuite(
                         layoutType = NavigationSuiteType.ShortNavigationBarCompact,
                         colors = NavigationSuiteDefaults.colors(
@@ -161,71 +199,9 @@ fun AppScaffold(
                         }
                     }
                 }
-            ) {
-                Box(modifier = Modifier.fillMaxSize()) {
-                    Column(modifier = Modifier.fillMaxSize()) {
-                        if (useCustomTitleBar) {
-                            CustomTitleBar(
-                                modifier = Modifier.fillMaxWidth(),
-                                showTitleAndIcon = true,
-                                isMac = PlatformUtils.isMac,
-                                containerColor = shellColor
-                            )
-                        }
-                        Surface(
-                            modifier = Modifier
-                                .weight(1f)
-                                .fillMaxWidth(),
-                            color = MaterialTheme.colorScheme.surface
-                        ) {
-                            persistentContent()
-                        }
-                    }
-
-                    ToastHost(
-                        notificationService = notificationService,
-                        settings = settings.notifications
-                    )
-                    DialogHost(dialogService = dialogService)
-                }
             }
-        } else {
-            Box(modifier = Modifier.fillMaxSize()) {
-                Row(modifier = Modifier.fillMaxSize()) {
-                    // Reserves pinned rail width; hover-expanded sidebar floats cleanly over content
-                    Spacer(modifier = Modifier.width(layoutSidebarWidth))
 
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxHeight()
-                    ) {
-                        if (useCustomTitleBar) {
-                            CustomTitleBar(
-                                modifier = Modifier.fillMaxWidth(),
-                                showTitleAndIcon = false,
-                                isMac = false,
-                                containerColor = shellColor
-                            )
-                        }
-
-                        val contentCornerRadius = if (useCustomTitleBar) {
-                            ToolkitTheme.dimensions.contentCanvasCornerRadius
-                        } else {
-                            0.dp
-                        }
-                        Surface(
-                            modifier = Modifier
-                                .weight(1f)
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(topStart = contentCornerRadius)),
-                            color = MaterialTheme.colorScheme.surface
-                        ) {
-                            persistentContent()
-                        }
-                    }
-                }
-
+            if (!isCompactWidth) {
                 val macHeaderContent: @Composable () -> Unit = {
                     if (PlatformUtils.isMac && useCustomTitleBar) {
                         WindowDraggableArea(
@@ -261,13 +237,13 @@ fun AppScaffold(
                     headerContent = macHeaderContent,
                     modifier = Modifier.fillMaxHeight()
                 )
-
-                ToastHost(
-                    notificationService = notificationService,
-                    settings = settings.notifications
-                )
-                DialogHost(dialogService = dialogService)
             }
+
+            ToastHost(
+                notificationService = notificationService,
+                settings = settings.notifications
+            )
+            DialogHost(dialogService = dialogService)
         }
     }
 }

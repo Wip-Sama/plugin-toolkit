@@ -38,7 +38,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.navigation3.runtime.rememberNavBackStack
+import androidx.navigation3.ui.NavDisplay
+import org.wip.plugintoolkit.features.navigation.model.ScreenNavConfig
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
@@ -637,5 +641,94 @@ class AdaptiveLayoutAndNavigationTest {
         composeTestRule.onNodeWithContentDescription(backLabel).performClick()
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithText("Choose Item").assertIsDisplayed()
+    }
+
+    @OptIn(ExperimentalMaterial3AdaptiveApi::class)
+    @Test
+    fun appScaffoldCompactToDesktopTransitionPreservesNavDisplayWithoutLookaheadCrash() {
+        var currentDensity by mutableStateOf(Density(2.5f)) // Compact (< 600.dp) initial frame, mimicking 680x480 scaled startup
+        var currentScreen by mutableStateOf<Screen>(Screen.Main)
+        var recomposedCounterValue by mutableStateOf(0)
+
+        val sections = listOf(
+            SidebarSectionData(
+                title = "Management".localized,
+                elements = listOf(
+                    SidebarElement(
+                        id = Screen.Main,
+                        icon = Icons.Default.Home,
+                        title = "Main".localized
+                    ),
+                    SidebarElement(
+                        id = Screen.Settings,
+                        icon = Icons.Default.Settings,
+                        title = "SettingsNav".localized
+                    )
+                )
+            )
+        )
+
+        composeTestRule.setContent {
+            AppTheme(appearance = AppearanceSettings()) {
+                CompositionLocalProvider(LocalDensity provides currentDensity) {
+                    AppScaffold(
+                        settings = AppSettings(
+                            appearance = AppearanceSettings(
+                                useCustomTitleBar = false,
+                                sidebarStartMode = SidebarStartMode.Expanded,
+                                isSidebarCollapsed = false
+                            )
+                        ),
+                        sections = sections,
+                        bottomSections = emptyList(),
+                        currentScreen = currentScreen,
+                        onScreenSelected = { currentScreen = it },
+                        notificationService = FakeNotificationService(),
+                        dialogService = DialogService()
+                    ) {
+                        val backStack = rememberNavBackStack(ScreenNavConfig, Screen.Main)
+                        NavDisplay(
+                            backStack = backStack,
+                            modifier = Modifier.fillMaxSize(),
+                            onBack = {},
+                            transitionSpec = desktopNavTransitionSpec(),
+                            popTransitionSpec = desktopNavTransitionSpec()
+                        ) { key ->
+                            opaqueNavEntry(key) {
+                                val persistedState = remember { mutableStateOf(42) }
+                                recomposedCounterValue = persistedState.value
+                                ToolkitAdaptiveListDetailWorkspace<String>(
+                                    listPane = {
+                                        Text("Persistent List")
+                                    },
+                                    detailPane = {
+                                        Text("Persistent Detail ${persistedState.value}")
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Frame 1: Compact width renders without throwing
+        composeTestRule.waitForIdle()
+        assertEquals(42, recomposedCounterValue)
+
+        // Frame 2: Jump to Expanded desktop width (mimics startup 680x480 -> 1280x900)
+        currentDensity = Density(1f)
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithText("Persistent List").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Persistent Detail 42").assertIsDisplayed()
+
+        // Frame 3 & 4: Rapidly bounce back to Compact and back to Expanded
+        currentDensity = Density(2.5f)
+        composeTestRule.waitForIdle()
+        currentDensity = Density(1f)
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithText("Persistent List").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Persistent Detail 42").assertIsDisplayed()
+        assertEquals(42, recomposedCounterValue)
     }
 }

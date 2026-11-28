@@ -443,19 +443,21 @@ fun FlowFloatingAppBar(
 
             // 6.1 Export Image Button
             if (onExportImage != null) {
-                IconButton(
-                    onClick = onExportImage,
-                    modifier = Modifier
-                        .size(dimensions.standardButtonHeight)
-                        .tooltip { Text(stringResource(Res.string.flow_export_image_tooltip)) }
-                        .testTag("toolbar_export_image")
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Image,
-                        contentDescription = stringResource(Res.string.flow_export_image_title),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(dimensions.iconSmall)
-                    )
+                val exportTooltip = stringResource(Res.string.flow_export_image_tooltip)
+                ToolkitTooltipBox(tooltip = exportTooltip, position = ToolkitTooltipPosition.Above) {
+                    IconButton(
+                        onClick = onExportImage,
+                        modifier = Modifier
+                            .size(dimensions.standardButtonHeight)
+                            .testTag("toolbar_export_image")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Image,
+                            contentDescription = stringResource(Res.string.flow_export_image_title),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(dimensions.iconSmall)
+                        )
+                    }
                 }
             }
 

@@ -280,33 +280,15 @@ fun PluginManagerView(
     var showFoldersPane by remember(appSettings.appearance.compactPanelsByDefault) {
         mutableStateOf(!appSettings.appearance.compactPanelsByDefault)
     }
-    val paneExpansionState = rememberSupportingPaneExpansionState(
-        initialWidth = ToolkitTheme.dimensions.adaptiveSupportingPaneWidth
-    )
 
-    BoxWithConstraints(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(adaptiveWorkspacePadding())
-    ) {
-        val canFitTwoPanes = maxWidth >= ToolkitTheme.dimensions.adaptiveSupportingPaneWidth + ToolkitTheme.dimensions.breakpointMedium
-        val baseDirective = rememberAdaptivePaneScaffoldDirective(
-            availableContentWidth = maxWidth,
-            minTwoPaneWidth = ToolkitTheme.dimensions.adaptiveSupportingPaneWidth + ToolkitTheme.dimensions.breakpointMedium
-        )
-        val directive = remember(baseDirective, showFoldersPane, canFitTwoPanes) {
-            if (showFoldersPane && canFitTwoPanes) baseDirective else baseDirective.copy(maxHorizontalPartitions = 1)
-        }
-        val navigator = rememberSupportingPaneScaffoldNavigator<Unit>(scaffoldDirective = directive)
-
-        ToolkitAdaptiveSupportingWorkspace(
-            showSupportingPane = showFoldersPane,
-            onShowSupportingPaneChange = { showFoldersPane = it },
-            collapseTooltip = stringResource(Res.string.pane_collapse_sidebar),
-            expandTooltip = stringResource(Res.string.pane_expand_sidebar),
-            applyWorkspacePadding = false,
-            modifier = Modifier.fillMaxSize(),
-            mainPane = {
+    ToolkitAdaptiveSupportingWorkspace(
+        showSupportingPane = showFoldersPane,
+        onShowSupportingPaneChange = { showFoldersPane = it },
+        collapseTooltip = stringResource(Res.string.pane_collapse_sidebar),
+        expandTooltip = stringResource(Res.string.pane_expand_sidebar),
+        applyWorkspacePadding = true,
+        modifier = modifier.fillMaxSize(),
+        mainPane = {
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
@@ -592,5 +574,4 @@ fun PluginManagerView(
                 }
             }
         )
-    }
 }

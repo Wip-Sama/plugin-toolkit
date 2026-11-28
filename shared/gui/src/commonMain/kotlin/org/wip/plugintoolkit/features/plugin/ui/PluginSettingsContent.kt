@@ -85,10 +85,10 @@ import org.wip.plugintoolkit.shared.components.ToolkitTextField
 import org.wip.plugintoolkit.shared.components.plugin.DynamicParameterInput
 import org.wip.plugintoolkit.shared.components.settings.SettingsItem
 import org.wip.plugintoolkit.shared.components.settings.getGroupedShape
+import org.wip.plugintoolkit.shared.components.ToolkitTooltipBox
 import org.wip.plugintoolkit.shared.components.sidebar.NavigationSidebar
 import org.wip.plugintoolkit.shared.components.sidebar.SidebarElement
 import org.wip.plugintoolkit.shared.components.sidebar.SidebarSectionData
-import org.wip.plugintoolkit.shared.components.tooltip
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.action_cancel
 import plugintoolkit.composeapp.generated.resources.action_save
@@ -377,23 +377,25 @@ fun PluginSettingsContent(
                     }
                 }
 
-                FilledTonalButton(
-                    onClick = { viewModel.refreshLocks() },
-                    shape = MaterialTheme.shapes.large,
-                    modifier = Modifier.tooltip(Res.string.plugin_action_refresh_locks)
-                ) {
-                    Icon(
-                        Icons.Default.Lock,
-                        contentDescription = null,
-                        modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
-                    )
-                    Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
-                    Text(
-                        text = stringResource(Res.string.plugin_action_refresh_locks),
-                        maxLines = 1,
-                        softWrap = false,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                val refreshLocksLabel = stringResource(Res.string.plugin_action_refresh_locks)
+                ToolkitTooltipBox(tooltip = refreshLocksLabel) {
+                    FilledTonalButton(
+                        onClick = { viewModel.refreshLocks() },
+                        shape = MaterialTheme.shapes.large
+                    ) {
+                        Icon(
+                            Icons.Default.Lock,
+                            contentDescription = null,
+                            modifier = Modifier.size(ToolkitTheme.dimensions.iconSmall)
+                        )
+                        Spacer(modifier = Modifier.width(ToolkitTheme.spacing.extraSmall))
+                        Text(
+                            text = refreshLocksLabel,
+                            maxLines = 1,
+                            softWrap = false,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                 }
             }
 
@@ -585,20 +587,21 @@ fun PluginSettingsContent(
                                                         )
                                                     }
                                                     if (lockedOptionsForSetting.isNotEmpty()) {
-                                                        ToolkitChip(
-                                                            text = "Unlocks Enum Options",
-                                                            modifier = Modifier.tooltip(
-                                                                text = "Unlocks values:\n" + lockedOptionsForSetting.joinToString("\n"),
-                                                            ),
-                                                            icon = {
-                                                                Icon(
-                                                                    Icons.Default.Lock,
-                                                                    contentDescription = null,
-                                                                    modifier = Modifier.size(ToolkitTheme.dimensions.iconExtraSmall)
-                                                                )
-                                                            },
-                                                            style = ToolkitChipStyle.Outlined
-                                                        )
+                                                        ToolkitTooltipBox(
+                                                            tooltip = "Unlocks values:\n" + lockedOptionsForSetting.joinToString("\n")
+                                                        ) {
+                                                            ToolkitChip(
+                                                                text = "Unlocks Enum Options",
+                                                                icon = {
+                                                                    Icon(
+                                                                        Icons.Default.Lock,
+                                                                        contentDescription = null,
+                                                                        modifier = Modifier.size(ToolkitTheme.dimensions.iconExtraSmall)
+                                                                    )
+                                                                },
+                                                                style = ToolkitChipStyle.Outlined
+                                                            )
+                                                        }
                                                     }
                                                 }
                                             }

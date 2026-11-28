@@ -216,9 +216,11 @@ import org.wip.plugintoolkit.core.utils.PlatformContextMenuItem
 import org.wip.plugintoolkit.core.utils.PlatformHorizontalScrollbar
 import org.wip.plugintoolkit.core.utils.PlatformUtils
 import org.wip.plugintoolkit.core.utils.PlatformVerticalScrollbar
+import org.wip.plugintoolkit.shared.components.PaneAttachmentEdge
 import org.wip.plugintoolkit.shared.components.ToolkitCircularProgressIndicator
 import org.wip.plugintoolkit.shared.components.ToolkitLinearProgressIndicator
 import org.wip.plugintoolkit.shared.components.ToolkitLoadingIndicator
+import org.wip.plugintoolkit.shared.components.ToolkitResizableCollapsiblePane
 import org.wip.plugintoolkit.shared.components.ToolkitTooltipBox
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.sdui_cancel
@@ -2183,8 +2185,8 @@ private fun SplitResizeHandle(
 }
 
 /**
- * Desktop master-detail layout split pane separating tonal containers with Material 3 gutters
- * and smooth interactive pointer drag resizing.
+ * Desktop master-detail layout split pane separating tonal containers with Material 3 gutters,
+ * minimum-squish dp bounds, two-stage drag-to-collapse / drag-to-open, and expressive spring settle.
  */
 @Composable
 private fun RenderSplitPane(
@@ -2192,101 +2194,100 @@ private fun RenderSplitPane(
     onEvent: (UiEvent) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var fraction1 by remember(node.id) {
-        mutableStateOf(node.splitFraction.coerceIn(0.1f, 0.9f))
-    }
-    var isDragging by remember(node.id) { mutableStateOf(false) }
-
-    LaunchedEffect(node.splitFraction) {
-        if (!isDragging) {
-            fraction1 = node.splitFraction.coerceIn(0.1f, 0.9f)
-        }
-    }
-
-    val fraction2 = (1f - fraction1).coerceIn(0.1f, 0.9f)
     val resizeLabel = stringResource(Res.string.sdui_resize_pane)
-    val density = LocalDensity.current
+    var isFirstExpanded by remember(node.id) { mutableStateOf(true) }
 
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
-        val totalPx = with(density) {
-            if (node.isHorizontal) maxWidth.toPx() else maxHeight.toPx()
-        }
-        if (node.isHorizontal) {
-            Row(
-                modifier = Modifier.fillMaxSize(),
-                horizontalArrangement = if (node.resizable) {
-                    Arrangement.spacedBy(ToolkitTheme.spacing.xxs)
-                } else {
-                    Arrangement.spacedBy(ToolkitTheme.spacing.md)
-                }
-            ) {
-                SplitPaneContainer(
-                    paneNode = node.first,
-                    onEvent = onEvent,
-                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                    modifier = Modifier.weight(fraction1).fillMaxHeight()
-                )
-                if (node.resizable) {
-                    SplitResizeHandle(
-                        nodeId = node.id,
-                        isHorizontal = true,
-                        totalPx = totalPx,
-                        resizeLabel = resizeLabel,
-                        onDragStart = { isDragging = true },
-                        onDragDeltaFraction = { deltaFrac ->
-                            fraction1 = (fraction1 + deltaFrac).coerceIn(0.1f, 0.9f)
-                        },
-                        onDragFinish = {
-                            isDragging = false
-                            onEvent(UiEvent.ValueChanged(node.id, fraction1.toDouble()))
-                        }
+        val totalDp = if (node.isHorizontal) maxWidth else maxHeight
+        val minPaneDp = if (node.isHorizontal) {
+            minOf(ToolkitTheme.dimensions.sduiSplitMinPaneWidth, totalDp * 0.4f)
+        } else {
+            minOf(ToolkitTheme.dimensions.sduiSplitMinPaneHeight, totalDp * 0.4f)
+        }.coerceAtLeast(ToolkitTheme.spacing.xl)
+        val defaultFirstSize = (totalDp * node.splitFraction.coerceIn(0.15f, 0.85f))
+            .coerceAtLeast(minPaneDp)
+
+        if (!node.resizable) {
+            val fraction1 = node.splitFraction.coerceIn(0.15f, 0.85f)
+            val fraction2 = (1f - fraction1).coerceIn(0.15f, 0.85f)
+            if (node.isHorizontal) {
+                Row(
+                    modifier = Modifier.fillMaxSize(),
+                    horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.md)
+                ) {
+                    SplitPaneContainer(
+                        paneNode = node.first,
+                        onEvent = onEvent,
+                        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                        modifier = Modifier.weight(fraction1).fillMaxHeight()
+                    )
+                    SplitPaneContainer(
+                        paneNode = node.second,
+                        onEvent = onEvent,
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+                        modifier = Modifier.weight(fraction2).fillMaxHeight()
                     )
                 }
-                SplitPaneContainer(
-                    paneNode = node.second,
-                    onEvent = onEvent,
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
-                    modifier = Modifier.weight(fraction2).fillMaxHeight()
-                )
+            } else {
+                Column(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.md)
+                ) {
+                    SplitPaneContainer(
+                        paneNode = node.first,
+                        onEvent = onEvent,
+                        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                        modifier = Modifier.weight(fraction1).fillMaxWidth()
+                    )
+                    SplitPaneContainer(
+                        paneNode = node.second,
+                        onEvent = onEvent,
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+                        modifier = Modifier.weight(fraction2).fillMaxWidth()
+                    )
+                }
             }
         } else {
-            Column(
-                modifier = Modifier.fillMaxSize(),
-                verticalArrangement = if (node.resizable) {
-                    Arrangement.spacedBy(ToolkitTheme.spacing.xxs)
-                } else {
-                    Arrangement.spacedBy(ToolkitTheme.spacing.md)
-                }
-            ) {
-                SplitPaneContainer(
-                    paneNode = node.first,
-                    onEvent = onEvent,
-                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                    modifier = Modifier.weight(fraction1).fillMaxWidth()
-                )
-                if (node.resizable) {
-                    SplitResizeHandle(
-                        nodeId = node.id,
-                        isHorizontal = false,
-                        totalPx = totalPx,
-                        resizeLabel = resizeLabel,
-                        onDragStart = { isDragging = true },
-                        onDragDeltaFraction = { deltaFrac ->
-                            fraction1 = (fraction1 + deltaFrac).coerceIn(0.1f, 0.9f)
-                        },
-                        onDragFinish = {
-                            isDragging = false
-                            onEvent(UiEvent.ValueChanged(node.id, fraction1.toDouble()))
-                        }
+            ToolkitResizableCollapsiblePane(
+                edge = if (node.isHorizontal) PaneAttachmentEdge.Start else PaneAttachmentEdge.Top,
+                isExpanded = isFirstExpanded,
+                onExpandedChange = { expanded ->
+                    isFirstExpanded = expanded
+                    if (!expanded) {
+                        onEvent(UiEvent.ValueChanged(node.id, 0.0))
+                    }
+                },
+                defaultPaneSize = defaultFirstSize,
+                minPaneSize = minPaneDp,
+                minMainPaneSize = minPaneDp,
+                maxPaneFraction = 0.85f,
+                collapsible = true,
+                clickToCollapseWhenExpanded = false,
+                handleTooltipCollapse = resizeLabel,
+                handleTooltipExpand = resizeLabel,
+                onLivePaneSizeChanged = { liveSize ->
+                    if (totalDp.value > 1f && isFirstExpanded && liveSize.value >= minPaneDp.value - 1f) {
+                        val frac = (liveSize.value / totalDp.value).coerceIn(0.1f, 0.9f)
+                        onEvent(UiEvent.ValueChanged(node.id, frac.toDouble()))
+                    }
+                },
+                paneContent = {
+                    SplitPaneContainer(
+                        paneNode = node.first,
+                        onEvent = onEvent,
+                        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                },
+                mainContent = {
+                    SplitPaneContainer(
+                        paneNode = node.second,
+                        onEvent = onEvent,
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+                        modifier = Modifier.fillMaxSize()
                     )
                 }
-                SplitPaneContainer(
-                    paneNode = node.second,
-                    onEvent = onEvent,
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
-                    modifier = Modifier.weight(fraction2).fillMaxWidth()
-                )
-            }
+            )
         }
     }
 }

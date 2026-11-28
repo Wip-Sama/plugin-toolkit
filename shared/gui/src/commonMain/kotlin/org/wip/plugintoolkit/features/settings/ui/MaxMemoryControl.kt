@@ -26,8 +26,8 @@ import org.jetbrains.compose.resources.stringResource
 import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import org.wip.plugintoolkit.features.settings.model.GeneralSettings
 import org.wip.plugintoolkit.shared.components.ToolkitTextField
+import org.wip.plugintoolkit.shared.components.ToolkitTooltipBox
 import org.wip.plugintoolkit.shared.components.settings.ExpressiveMenu
-import org.wip.plugintoolkit.shared.components.tooltip
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.dialog_apply
 import plugintoolkit.composeapp.generated.resources.dialog_cancel
@@ -279,16 +279,18 @@ fun MaxMemoryControl(
             gapAfter = { it == MEMORY_TIERS.last() }
         )
 
-        IconButton(
-            onClick = { showCustomDialog = true },
-            enabled = enabled,
-            modifier = Modifier.tooltip(Res.string.setting_max_memory_custom_tooltip)
-        ) {
-            Icon(
-                imageVector = Icons.Default.Tune,
-                contentDescription = stringResource(Res.string.setting_max_memory_custom_tooltip),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+        val customMemoryTooltip = stringResource(Res.string.setting_max_memory_custom_tooltip)
+        ToolkitTooltipBox(tooltip = customMemoryTooltip) {
+            IconButton(
+                onClick = { showCustomDialog = true },
+                enabled = enabled
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Tune,
+                    contentDescription = customMemoryTooltip,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
     }
 }

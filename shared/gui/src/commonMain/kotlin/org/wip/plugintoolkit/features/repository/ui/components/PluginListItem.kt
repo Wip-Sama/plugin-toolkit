@@ -53,8 +53,8 @@ import org.wip.plugintoolkit.features.repository.model.ExtensionPlugin
 import org.wip.plugintoolkit.features.repository.model.ExtensionRepo
 import org.wip.plugintoolkit.features.repository.model.PluginInstallationJobState
 import org.wip.plugintoolkit.shared.components.ToolkitCard
+import org.wip.plugintoolkit.shared.components.ToolkitTooltipBox
 import org.wip.plugintoolkit.shared.components.settings.ExpressiveMenu
-import org.wip.plugintoolkit.shared.components.tooltip
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.action_install
 import plugintoolkit.composeapp.generated.resources.plugin_available_in
@@ -122,16 +122,18 @@ fun PluginListItem(
                     horizontalArrangement = Arrangement.spacedBy(ToolkitTheme.spacing.small),
                     itemVerticalAlignment = Alignment.CenterVertically
                 ) {
-                    IconButton(
-                        onClick = { onShowChangelog(plugin) },
-                        modifier = Modifier.tooltip(Res.string.plugin_changelog)
-                    ) {
-                        Icon(
-                            Icons.Default.History,
-                            contentDescription = stringResource(Res.string.plugin_changelog),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(ToolkitTheme.dimensions.iconMediumSmall)
-                        )
+                    val changelogLabel = stringResource(Res.string.plugin_changelog)
+                    ToolkitTooltipBox(tooltip = changelogLabel) {
+                        IconButton(
+                            onClick = { onShowChangelog(plugin) }
+                        ) {
+                            Icon(
+                                Icons.Default.History,
+                                contentDescription = changelogLabel,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(ToolkitTheme.dimensions.iconMediumSmall)
+                            )
+                        }
                     }
 
                     if (installState != null) {

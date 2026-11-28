@@ -569,7 +569,9 @@ fun runMain(
                     state = windowState,
                     undecorated = useCustomTitleBar
                 ) {
-                    window.minimumSize = Dimension(WINDOW_MIN_WIDTH, WINDOW_MIN_HEIGHT)
+                    LaunchedEffect(window) {
+                        window.minimumSize = Dimension(WINDOW_MIN_WIDTH, WINDOW_MIN_HEIGHT)
+                    }
                     val notificationService = getKoin().get<NotificationService>()
 
                     val isSystemDark = isSystemInDarkTheme()

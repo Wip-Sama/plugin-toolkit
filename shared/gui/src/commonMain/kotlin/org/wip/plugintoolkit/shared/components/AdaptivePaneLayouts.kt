@@ -40,7 +40,10 @@ import androidx.compose.material3.adaptive.navigation.ThreePaneScaffoldNavigator
 import androidx.compose.material3.adaptive.navigation.rememberListDetailPaneScaffoldNavigator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -54,6 +57,8 @@ import org.wip.plugintoolkit.core.theme.ToolkitTheme
 import plugintoolkit.composeapp.generated.resources.Res
 import plugintoolkit.composeapp.generated.resources.nav_back_to_list
 import plugintoolkit.composeapp.generated.resources.nav_more_options
+import plugintoolkit.composeapp.generated.resources.pane_drag_or_click_to_expand
+import plugintoolkit.composeapp.generated.resources.pane_drag_to_resize_or_collapse
 
 /** Maximum proportional width allocated to resizable primary/list panes during drag. */
 private const val MAX_RESIZABLE_PANE_PROPORTION = 0.55f
@@ -176,12 +181,13 @@ fun rememberSupportingPaneExpansionState(
 }
 
 /**
- * Standardized two-pane adaptive desktop workspace wrapping Material 3 [ListDetailPaneScaffold].
+ * Standardized two-pane adaptive desktop workspace.
  *
- * - Applies [adaptiveWorkspacePadding] and `12.dp` gutter with [DesktopPaneDragHandle].
- * - Renders [listPane] directly (expecting a single rounded `ToolkitFloatingSidebar` surface,
- *   preventing nested elevation duplication).
- * - Wraps [detailPane] in a single clean `surfaceContainerLowest` rounded surface.
+ * - On desktop two-pane widths (`maxWidth >= minTwoPaneWidth`), renders a resizable and
+ *   drag-collapsible Start sidebar via [ToolkitResizableCollapsiblePane] (with minimum-squish
+ *   protection, two-stage drag-to-collapse, and drag/click-to-expand from the left edge handle).
+ * - On narrower viewports (`maxWidth < minTwoPaneWidth`), seamlessly falls back to single-pane
+ *   Material 3 [ListDetailPaneScaffold] navigation with [ThreePaneScaffoldNavigator].
  */
 @OptIn(ExperimentalMaterial3AdaptiveApi::class)
 @Composable
@@ -190,16 +196,27 @@ fun <T> ToolkitAdaptiveListDetailWorkspace(
     navigator: ThreePaneScaffoldNavigator<T>? = null,
     listPaneWidth: Dp = ToolkitTheme.dimensions.floatingSidebarDefaultWidth,
     listPaneMinWidth: Dp = ToolkitTheme.dimensions.floatingSidebarMinWidth,
+    listPaneCollapsible: Boolean = true,
+    isListPaneExpanded: Boolean? = null,
+    onListPaneExpandedChange: ((Boolean) -> Unit)? = null,
+    onLiveListPaneWidthChanged: ((Dp) -> Unit)? = null,
     detailContainerColor: Color = MaterialTheme.colorScheme.surfaceContainerLowest,
-    listPane: @Composable ThreePaneScaffoldScope.(ThreePaneScaffoldNavigator<T>) -> Unit,
+    listPane: @Composable BoxScope.(ThreePaneScaffoldNavigator<T>) -> Unit,
     detailPane: @Composable BoxScope.(ThreePaneScaffoldNavigator<T>) -> Unit
 ) {
+    var internalListExpanded by remember { mutableStateOf(true) }
+    val effectiveListExpanded = isListPaneExpanded ?: internalListExpanded
+    val handleListExpandedChange: (Boolean) -> Unit = { expanded ->
+        internalListExpanded = expanded
+        onListPaneExpandedChange?.invoke(expanded)
+    }
+
     BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
             .padding(adaptiveWorkspacePadding())
     ) {
-        val minTwoPaneWidth = listPaneWidth + MIN_COMFORTABLE_DETAIL_PANE_WIDTH
+        val minTwoPaneWidth = listPaneMinWidth + MIN_COMFORTABLE_DETAIL_PANE_WIDTH
         val contentDirective = rememberAdaptivePaneScaffoldDirective(
             availableContentWidth = maxWidth,
             minTwoPaneWidth = minTwoPaneWidth
@@ -207,33 +224,54 @@ fun <T> ToolkitAdaptiveListDetailWorkspace(
         val effectiveNavigator = navigator ?: rememberListDetailPaneScaffoldNavigator<T>(
             scaffoldDirective = contentDirective
         )
-        val effectiveDirective = if (maxWidth < minTwoPaneWidth) {
-            contentDirective.copy(maxHorizontalPartitions = 1)
-        } else {
-            contentDirective
-        }
-        val paneExpansionState = rememberFixedListPaneExpansionState(
-            initialWidth = listPaneWidth,
-            minWidth = listPaneMinWidth
-        )
+        val isSinglePane = maxWidth < minTwoPaneWidth || contentDirective.maxHorizontalPartitions <= 1
 
-        ListDetailPaneScaffold(
-            directive = effectiveDirective,
-            value = effectiveNavigator.scaffoldValue,
-            modifier = Modifier.fillMaxSize(),
-            paneExpansionState = paneExpansionState,
-            paneExpansionDragHandle = { state ->
-                DesktopPaneDragHandle(paneExpansionState = state)
-            },
-            listPane = {
-                AnimatedPane(
-                    modifier = Modifier.preferredWidth(listPaneWidth)
-                ) {
-                    listPane(effectiveNavigator)
+        if (isSinglePane) {
+            val singlePaneDirective = contentDirective.copy(maxHorizontalPartitions = 1)
+            ListDetailPaneScaffold(
+                directive = singlePaneDirective,
+                value = effectiveNavigator.scaffoldValue,
+                modifier = Modifier.fillMaxSize(),
+                listPane = {
+                    AnimatedPane {
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            listPane(effectiveNavigator)
+                        }
+                    }
+                },
+                detailPane = {
+                    AnimatedPane {
+                        Surface(
+                            color = detailContainerColor,
+                            shape = ToolkitTheme.shapes.large,
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            Box(modifier = Modifier.fillMaxSize()) {
+                                detailPane(effectiveNavigator)
+                            }
+                        }
+                    }
                 }
-            },
-            detailPane = {
-                AnimatedPane {
+            )
+        } else {
+            ToolkitResizableCollapsiblePane(
+                edge = PaneAttachmentEdge.Start,
+                isExpanded = effectiveListExpanded,
+                onExpandedChange = handleListExpandedChange,
+                defaultPaneSize = listPaneWidth,
+                minPaneSize = listPaneMinWidth,
+                minMainPaneSize = MIN_COMFORTABLE_DETAIL_PANE_WIDTH,
+                maxPaneFraction = MAX_RESIZABLE_PANE_PROPORTION,
+                collapsible = listPaneCollapsible,
+                clickToCollapseWhenExpanded = false,
+                handleTooltipCollapse = stringResource(Res.string.pane_drag_to_resize_or_collapse),
+                handleTooltipExpand = stringResource(Res.string.pane_drag_or_click_to_expand),
+                handleTestTag = "list_detail_pane_resize_handle",
+                onLivePaneSizeChanged = onLiveListPaneWidthChanged,
+                paneContent = {
+                    listPane(effectiveNavigator)
+                },
+                mainContent = {
                     Surface(
                         color = detailContainerColor,
                         shape = ToolkitTheme.shapes.large,
@@ -244,8 +282,8 @@ fun <T> ToolkitAdaptiveListDetailWorkspace(
                         }
                     }
                 }
-            }
-        )
+            )
+        }
     }
 }
 

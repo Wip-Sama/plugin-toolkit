@@ -1158,4 +1158,7 @@
     <string name="pane_expand_sidebar">Mostra barra laterale</string>
     <string name="pane_collapse_bottom_panel">Comprimi pannello</string>
     <string name="pane_expand_bottom_panel">Espandi pannello</string>
+    <string name="pane_drag_to_resize_or_collapse">Trascina per ridimensionare o comprimere</string>
+    <string name="pane_drag_or_click_to_expand">Trascina o clicca per espandere</string>
+    <string name="flow_toolbar_no_custom_colors">Nessun colore personalizzato nel flusso</string>
 </resources>

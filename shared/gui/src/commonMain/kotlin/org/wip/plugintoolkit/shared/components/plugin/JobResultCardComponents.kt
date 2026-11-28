@@ -1,8 +1,18 @@
 package org.wip.plugintoolkit.shared.components.plugin
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.dp
+import org.wip.plugintoolkit.shared.components.PaneAttachmentEdge
+import org.wip.plugintoolkit.shared.components.ResizablePaneDragPhysics
+import org.wip.plugintoolkit.shared.components.ResizablePaneDragSnapshot
+import org.wip.plugintoolkit.shared.components.ToolkitPaneResizeHandle
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -569,8 +579,10 @@ internal fun calculateToggledLogHeight(
 ): Dp = if (currentHeight > defaultHeight) defaultHeight else expandedHeight
 
 /**
- * Terminal console output section featuring an expand/collapse toggle and a resizable drag handle.
+ * Terminal console output section featuring an expand/collapse toggle and a spring-driven
+ * resizable drag handle with two-stage drag-to-collapse and drag-to-open.
  */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun JobResultConsoleSection(
     logs: List<String>,
@@ -583,11 +595,38 @@ internal fun JobResultConsoleSection(
     modifier: Modifier = Modifier
 ) {
     val uriHandler = LocalUriHandler.current
-    val currentLogHeight by rememberUpdatedState(logHeight)
+    val motion = MaterialTheme.motionScheme
+    val scope = rememberCoroutineScope()
+    val density = LocalDensity.current
     val currentOnLogHeightChange by rememberUpdatedState(onLogHeightChange)
-    val currentMinLogHeight by rememberUpdatedState(minLogHeight)
-    val currentMaxLogHeight by rememberUpdatedState(maxLogHeight)
+    val collapseThreshold = ToolkitTheme.dimensions.paneVerticalCollapseDragThreshold
+    val expandThreshold = ToolkitTheme.dimensions.paneExpandDragThreshold
+    val magneticSnap = ToolkitTheme.dimensions.paneMagneticSnapThreshold
+    val collapseAnimSpec = remember {
+        spring<Float>(
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness = Spring.StiffnessMedium
+        )
+    }
+
+    var dragSnapshot by remember {
+        mutableStateOf(
+            ResizablePaneDragSnapshot(
+                isExpanded = true,
+                visibleSizeDp = logHeight.value,
+                lastExpandedSizeDp = logHeight.value
+            )
+        )
+    }
     var isDragging by remember { mutableStateOf(false) }
+    val animatedHeightDp = remember { Animatable(logHeight.value) }
+
+    LaunchedEffect(logHeight) {
+        if (!isDragging && dragSnapshot.isExpanded && kotlin.math.abs(animatedHeightDp.targetValue - logHeight.value) > 0.5f) {
+            dragSnapshot = dragSnapshot.copy(visibleSizeDp = logHeight.value, lastExpandedSizeDp = logHeight.value)
+            animatedHeightDp.animateTo(logHeight.value, animationSpec = motion.defaultSpatialSpec())
+        }
+    }
 
     Column(modifier = modifier.fillMaxWidth()) {
         Row(
@@ -602,11 +641,26 @@ internal fun JobResultConsoleSection(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
-            val isExpanded = logHeight > defaultLogHeight
+            val isExpanded = dragSnapshot.isExpanded && logHeight > defaultLogHeight
             val expandedHeight = ToolkitTheme.dimensions.logTerminalExpandedHeight
             IconButton(
                 onClick = {
-                    onLogHeightChange(calculateToggledLogHeight(logHeight, defaultLogHeight, expandedHeight))
+                    val target = if (!dragSnapshot.isExpanded) {
+                        defaultLogHeight
+                    } else {
+                        calculateToggledLogHeight(logHeight, defaultLogHeight, expandedHeight)
+                    }
+                    dragSnapshot = dragSnapshot.copy(
+                        isExpanded = true,
+                        visibleSizeDp = target.value,
+                        lastExpandedSizeDp = target.value,
+                        overDragCollapseDp = 0f,
+                        dragOpenProgressDp = 0f
+                    )
+                    onLogHeightChange(target)
+                    scope.launch {
+                        animatedHeightDp.animateTo(target.value, animationSpec = motion.defaultSpatialSpec())
+                    }
                 },
                 modifier = Modifier.size(ToolkitTheme.dimensions.iconMedium)
             ) {
@@ -622,67 +676,102 @@ internal fun JobResultConsoleSection(
         }
         Spacer(modifier = Modifier.height(ToolkitTheme.spacing.small))
 
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(logHeight)
-                .clip(ToolkitTheme.shapes.large)
-                .background(
-                    MaterialTheme.colorScheme.surfaceContainerLowest,
-                    ToolkitTheme.shapes.large
-                )
-                .padding(ToolkitTheme.spacing.medium)
-        ) {
-            TerminalView(
-                logs = logs,
-                scrollState = scrollState,
-                onOpenUrl = { url -> uriHandler.openUri(url) },
-                onOpenFolder = { path -> PlatformUtils.openFolder(path) }
-            )
-        }
-
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(ToolkitTheme.dimensions.logHandleHeight)
-                .pointerHoverIcon(PlatformUtils.verticalResizePointerIcon())
-                .pointerInput(Unit) {
-                    var accumulatedHeightPx = 0f
-                    detectDragGestures(
-                        onDragStart = {
-                            isDragging = true
-                            accumulatedHeightPx = currentLogHeight.toPx()
-                        },
-                        onDragEnd = {
-                            isDragging = false
-                        },
-                        onDragCancel = {
-                            isDragging = false
-                        },
-                        onDrag = { change, dragAmount ->
-                            change.consume()
-                            accumulatedHeightPx = calculateResizedLogHeightPx(
-                                currentHeightPx = accumulatedHeightPx,
-                                deltaY = dragAmount.y,
-                                minHeightPx = currentMinLogHeight.toPx(),
-                                maxHeightPx = currentMaxLogHeight.toPx()
-                            )
-                            currentOnLogHeightChange(accumulatedHeightPx.toDp())
-                        }
-                    )
-                },
-            contentAlignment = Alignment.Center
-        ) {
+        val renderedHeightDp = animatedHeightDp.value.coerceAtLeast(0f).dp
+        if (renderedHeightDp.value > 0.5f) {
             Box(
                 modifier = Modifier
-                    .width(ToolkitTheme.dimensions.logHandleWidth)
-                    .height(ToolkitTheme.dimensions.logHandleBarHeight)
+                    .fillMaxWidth()
+                    .height(renderedHeightDp)
+                    .clip(ToolkitTheme.shapes.large)
                     .background(
-                        if (isDragging) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
-                        MaterialTheme.shapes.small
+                        MaterialTheme.colorScheme.surfaceContainerLowest,
+                        ToolkitTheme.shapes.large
                     )
-            )
+                    .padding(ToolkitTheme.spacing.medium)
+            ) {
+                TerminalView(
+                    logs = logs,
+                    scrollState = scrollState,
+                    onOpenUrl = { url -> uriHandler.openUri(url) },
+                    onOpenFolder = { path -> PlatformUtils.openFolder(path) }
+                )
+            }
         }
+
+        ToolkitPaneResizeHandle(
+            edge = PaneAttachmentEdge.Top,
+            isExpanded = dragSnapshot.isExpanded,
+            isDragging = isDragging,
+            collapseIntentProgress = dragSnapshot.collapseIntentProgress(collapseThreshold.value),
+            expandIntentProgress = dragSnapshot.expandIntentProgress(expandThreshold.value),
+            tooltip = stringResource(
+                if (dragSnapshot.isExpanded) Res.string.action_collapse_terminal else Res.string.action_expand_terminal
+            ),
+            onClick = {
+                val next = ResizablePaneDragPhysics.toggle(
+                    state = dragSnapshot,
+                    minSizeDp = minLogHeight.value,
+                    maxSizeDp = maxLogHeight.value
+                )
+                dragSnapshot = next
+                if (next.isExpanded) {
+                    currentOnLogHeightChange(next.visibleSizeDp.dp)
+                }
+                scope.launch {
+                    animatedHeightDp.animateTo(
+                        targetValue = next.visibleSizeDp,
+                        animationSpec = if (next.isExpanded) motion.defaultSpatialSpec() else collapseAnimSpec
+                    )
+                }
+            },
+            onDragStart = { isDragging = true },
+            onDragDelta = { _, deltaY ->
+                val deltaDp = with(density) { deltaY.toDp().value }
+                val prevExpanded = dragSnapshot.isExpanded
+                val next = ResizablePaneDragPhysics.onDragDelta(
+                    state = dragSnapshot,
+                    expandDeltaDp = deltaDp,
+                    minSizeDp = minLogHeight.value,
+                    maxSizeDp = maxLogHeight.value,
+                    collapseThresholdDp = collapseThreshold.value,
+                    expandThresholdDp = expandThreshold.value,
+                    collapsible = true
+                )
+                dragSnapshot = next
+                if (next.isExpanded != prevExpanded) {
+                    if (next.isExpanded) currentOnLogHeightChange(next.visibleSizeDp.dp)
+                    scope.launch {
+                        animatedHeightDp.animateTo(
+                            targetValue = next.visibleSizeDp,
+                            animationSpec = if (next.isExpanded) motion.defaultSpatialSpec() else collapseAnimSpec
+                        )
+                    }
+                } else if (next.isExpanded) {
+                    currentOnLogHeightChange(next.visibleSizeDp.dp)
+                    scope.launch { animatedHeightDp.snapTo(next.visibleSizeDp) }
+                }
+            },
+            onDragEnd = {
+                isDragging = false
+                val settled = ResizablePaneDragPhysics.onDragEnd(
+                    state = dragSnapshot,
+                    defaultSizeDp = defaultLogHeight.value,
+                    minSizeDp = minLogHeight.value,
+                    maxSizeDp = maxLogHeight.value,
+                    magneticSnapDp = magneticSnap.value
+                )
+                dragSnapshot = settled
+                if (settled.isExpanded) {
+                    currentOnLogHeightChange(settled.visibleSizeDp.dp)
+                }
+                scope.launch {
+                    animatedHeightDp.animateTo(
+                        targetValue = settled.visibleSizeDp,
+                        animationSpec = if (settled.isExpanded) motion.defaultSpatialSpec() else collapseAnimSpec
+                    )
+                }
+            }
+        )
     }
 }
 

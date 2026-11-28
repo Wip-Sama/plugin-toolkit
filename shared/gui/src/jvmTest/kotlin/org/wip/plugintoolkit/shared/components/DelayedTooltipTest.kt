@@ -2,15 +2,26 @@ package org.wip.plugintoolkit.shared.components
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.InputMode
+import androidx.compose.ui.input.InputModeManager
+import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performMouseInput
 import androidx.compose.ui.test.v2.runComposeUiTest
 import androidx.compose.ui.unit.dp
@@ -149,5 +160,115 @@ class DelayedTooltipTest {
         mainClock.advanceTimeBy(250)
         waitForIdle()
         onNodeWithText("Rich Details").assertIsDisplayed()
+    }
+
+    @Test
+    fun clickingToggleButtonDoesNotFlashInstantTooltipOnFocusOrLabelSwap() = runComposeUiTest {
+        mainClock.autoAdvance = false
+        var isCollapsed by mutableStateOf(false)
+        val pointerInputModeManager = object : InputModeManager {
+            override val inputMode: InputMode = InputMode.Touch
+            override fun requestInputMode(inputMode: InputMode): Boolean = true
+        }
+
+        setContent {
+            AppTheme(appearance = AppearanceSettings()) {
+                CompositionLocalProvider(LocalInputModeManager provides pointerInputModeManager) {
+                    ToolkitTooltipBox(
+                        tooltip = if (isCollapsed) "Expand navigation" else "Collapse navigation",
+                        delay = DEFAULT_TOOLTIP_DELAY
+                    ) {
+                        IconButton(
+                            onClick = { isCollapsed = !isCollapsed },
+                            modifier = Modifier.size(48.dp).testTag("nav_toggle_btn")
+                        ) {
+                            Text("Toggle")
+                        }
+                    }
+                }
+            }
+        }
+        mainClock.advanceTimeBy(100)
+        waitForIdle()
+
+        // Hover briefly and click (simulating clicking Collapse navigation -> becomes Expand navigation)
+        onNodeWithTag("nav_toggle_btn").performMouseInput {
+            enter(Offset(10f, 10f))
+        }
+        onNodeWithTag("nav_toggle_btn").performClick()
+        mainClock.advanceTimeBy(100)
+        waitForIdle()
+
+        // Must NOT flash either tooltip immediately after click
+        onNodeWithText("Collapse navigation").assertDoesNotExist()
+        onNodeWithText("Expand navigation").assertDoesNotExist()
+
+        // Even while pointer stays resting on the clicked button, remains suppressed until exit+re-enter
+        mainClock.advanceTimeBy(DEFAULT_TOOLTIP_DELAY.inWholeMilliseconds + 200)
+        waitForIdle()
+        onNodeWithText("Expand navigation").assertDoesNotExist()
+
+        // Exit and re-enter: must respect full hover delay before showing
+        onNodeWithTag("nav_toggle_btn").performMouseInput {
+            exit(Offset(100f, 100f))
+        }
+        mainClock.advanceTimeBy(100)
+        waitForIdle()
+
+        onNodeWithTag("nav_toggle_btn").performMouseInput {
+            enter(Offset(10f, 10f))
+        }
+        mainClock.advanceTimeBy(DEFAULT_TOOLTIP_DELAY.inWholeMilliseconds - 100)
+        waitForIdle()
+        onNodeWithText("Expand navigation").assertDoesNotExist()
+
+        mainClock.advanceTimeBy(200)
+        waitForIdle()
+        onNodeWithText("Expand navigation").assertIsDisplayed()
+    }
+
+    @Test
+    fun keyboardFocusTooltipIsDebouncedAndNotInstant() = runComposeUiTest {
+        mainClock.autoAdvance = false
+        val focusRequester = FocusRequester()
+        val keyboardInputModeManager = object : InputModeManager {
+            override val inputMode: InputMode = InputMode.Keyboard
+            override fun requestInputMode(inputMode: InputMode): Boolean = true
+        }
+
+        setContent {
+            AppTheme(appearance = AppearanceSettings()) {
+                CompositionLocalProvider(LocalInputModeManager provides keyboardInputModeManager) {
+                    ToolkitTooltipBox(
+                        tooltip = "Hide sidebar",
+                        delay = DEFAULT_TOOLTIP_DELAY
+                    ) {
+                        IconButton(
+                            onClick = {},
+                            modifier = Modifier
+                                .size(48.dp)
+                                .focusRequester(focusRequester)
+                                .testTag("sidebar_toggle_btn")
+                        ) {
+                            Text("Hide")
+                        }
+                    }
+                }
+            }
+        }
+        mainClock.advanceTimeBy(50)
+        waitForIdle()
+
+        runOnIdle { focusRequester.requestFocus() }
+        mainClock.advanceTimeBy(50)
+        waitForIdle()
+
+        // Must NOT appear instantaneously at 50ms (< KEYBOARD_TOOLTIP_DELAY)
+        onNodeWithText("Hide sidebar").assertDoesNotExist()
+
+        // Appears once KEYBOARD_TOOLTIP_DELAY has elapsed
+        mainClock.advanceTimeBy(KEYBOARD_TOOLTIP_DELAY.inWholeMilliseconds + 50)
+        waitForIdle()
+        onNodeWithText("Hide sidebar").assertIsDisplayed()
     }
 }

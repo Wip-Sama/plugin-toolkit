@@ -12,10 +12,13 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.delay
+import org.wip.plugintoolkit.shared.components.DEFAULT_TOOLTIP_DELAY
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -139,7 +142,17 @@ internal fun TerminalView(
     var isShiftHeld by remember { mutableStateOf(false) }
     var layoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
     var hoveredSpan by remember { mutableStateOf<TerminalLinkSpan?>(null) }
+    var visibleTooltipSpan by remember { mutableStateOf<TerminalLinkSpan?>(null) }
     var pointerPosition by remember { mutableStateOf(Offset.Zero) }
+
+    LaunchedEffect(hoveredSpan) {
+        visibleTooltipSpan = null
+        val span = hoveredSpan
+        if (span != null) {
+            delay(DEFAULT_TOOLTIP_DELAY)
+            visibleTooltipSpan = span
+        }
+    }
 
     val logData = remember(logs, isShiftHeld, defaultColor, linkColor, errorColor, warnColor) {
         buildCombinedLogData(logs, isShiftHeld, defaultColor, linkColor, errorColor, warnColor)
@@ -203,8 +216,8 @@ internal fun TerminalView(
             )
         }
 
-        if (hoveredSpan != null) {
-            val span = hoveredSpan!!
+        if (visibleTooltipSpan != null) {
+            val span = visibleTooltipSpan!!
             val tooltipText = if (isShiftHeld) {
                 if (span.isUrl) stringResource(Res.string.terminal_link_click_to_open_url, span.target)
                 else stringResource(Res.string.terminal_link_click_to_open_path, span.target)
